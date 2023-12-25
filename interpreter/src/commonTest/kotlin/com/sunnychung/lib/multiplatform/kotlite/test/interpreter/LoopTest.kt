@@ -18,7 +18,7 @@ class LoopTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(100, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(100, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -32,7 +32,7 @@ class LoopTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(120, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(120, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -48,7 +48,7 @@ class LoopTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(51, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(51, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -70,8 +70,8 @@ class LoopTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
-        assertEquals(10, (symbolTable.propertyValues["x"] as IntValue).value)
-        assertEquals(2 + 4 + 6 + 8 + 10, (symbolTable.propertyValues["sum"] as IntValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(2 + 4 + 6 + 8 + 10, (symbolTable.findPropertyByDeclaredName("sum") as IntValue).value)
     }
 
     @Test
@@ -85,7 +85,7 @@ class LoopTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(1000010, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(1000010, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -99,6 +99,6 @@ class LoopTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(1000011, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(1000011, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 }

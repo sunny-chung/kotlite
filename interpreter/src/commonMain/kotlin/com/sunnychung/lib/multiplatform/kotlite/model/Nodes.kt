@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.annotation.ModifyByAnalyzer
 import kotlin.random.Random
 
 fun generateId() = Random.nextInt()
@@ -34,7 +35,7 @@ data class UnaryOpNode(var node: ASTNode?, val operator: String) : ASTNode {
     }
 }
 
-data class ScriptNode(var nodes: List<ASTNode>) : ASTNode {
+data class ScriptNode(val nodes: List<ASTNode>) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Script\"]"
         return nodes.map { "$self-->${it.toMermaid()}\n" }.joinToString("\n")
@@ -47,25 +48,25 @@ data class TypeNode(val name: String, val argument: TypeNode?) : ASTNode {
     }
 }
 
-data class PropertyDeclarationNode(val name: String, val type: TypeNode, val initialValue: ASTNode?) : ASTNode {
+data class PropertyDeclarationNode(val name: String, val type: TypeNode, val initialValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self-->${type.toMermaid()}\n$self-->${initialValue?.toMermaid()}\n"
     }
 }
 
-data class AssignmentNode(val variableName: String, val operator: String, val value: ASTNode) : ASTNode {
+data class AssignmentNode(val variableName: String, val operator: String, val value: ASTNode, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Assignment Node `$variableName` `$operator`\"]"
         return "$self-->${value.toMermaid()}"
     }
 }
 
-data class VariableReferenceNode(val variableName: String) : ASTNode {
+data class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 
-data class FunctionValueParameterNode(val name: String, val type: TypeNode, val defaultValue: ASTNode?) : ASTNode {
+data class FunctionValueParameterNode(val name: String, val type: TypeNode, val defaultValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Value Parameter Node `$name`\"]"
         return "$self-->${type.toMermaid()}\n" +
@@ -103,21 +104,21 @@ data class FunctionCallNode(val function: ASTNode, val arguments: List<FunctionC
     }
 }
 
-data class ReturnNode(val value: ASTNode?, val returnToLabel: String, var returnToAddress: String) : ASTNode {
+data class ReturnNode(val value: ASTNode?, val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Return Node `$returnToLabel`\"]"
         return "$self${if (value != null) "-->${value.toMermaid()}" else "" }\n"
     }
 }
 
-data class ContinueNode(val returnToLabel: String, var returnToAddress: String) : ASTNode {
+data class ContinueNode(val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Continue Node `$returnToLabel`\"]"
         return self
     }
 }
 
-data class BreakNode(val returnToLabel: String, var returnToAddress: String) : ASTNode {
+data class BreakNode(val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Break Node `$returnToLabel`\"]"
         return self

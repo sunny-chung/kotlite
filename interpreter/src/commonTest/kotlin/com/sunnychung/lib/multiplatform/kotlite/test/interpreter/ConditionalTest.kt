@@ -19,7 +19,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(12, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -34,7 +34,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(11, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(11, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -49,7 +49,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(12, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -64,7 +64,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(11, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(11, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -81,7 +81,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(12, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -98,7 +98,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(10, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -117,7 +117,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(32, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(32, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -136,7 +136,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(29, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -159,7 +159,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(32, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(32, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -182,7 +182,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(29, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -205,7 +205,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(32, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(32, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -228,7 +228,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(29, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -267,7 +267,7 @@ class ConditionalTest {
             val symbolTable = interpreter.callStack.currentSymbolTable()
             println(symbolTable.propertyValues)
             assertEquals(4, symbolTable.propertyValues.size)
-            assertEquals(it.second, (symbolTable.propertyValues["r"] as BooleanValue).value)
+            assertEquals(it.second, (symbolTable.findPropertyByDeclaredName("r") as BooleanValue).value)
         }
     }
 
@@ -285,7 +285,7 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(32, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(32, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 
     @Test
@@ -302,6 +302,6 @@ class ConditionalTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
-        assertEquals(29, (symbolTable.propertyValues["x"] as IntValue).value)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 }

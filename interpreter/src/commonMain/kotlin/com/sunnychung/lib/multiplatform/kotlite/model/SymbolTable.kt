@@ -51,6 +51,11 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val parentScope: S
         return functionDeclarations[name] ?: parentScope?.findFunction(name)
     }
 
+    fun findPropertyByDeclaredName(declaredName: String): RuntimeValue? {
+        return propertyValues.keys.firstOrNull { it.substring(0 ..< it.lastIndexOf('/')) == declaredName }
+            ?.let { transformedName -> propertyValues[transformedName] }
+    }
+
     override fun toString(): String {
         return "functionDeclarations = $functionDeclarations\n" +
                 "propertyDeclarations = $propertyDeclarations\n" +

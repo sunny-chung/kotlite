@@ -15,8 +15,8 @@ class ArithmeticsTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
-        assertEquals(3, (symbolTable.propertyValues["x"] as IntValue).value)
-        assertEquals(44, (symbolTable.propertyValues["y"] as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(44, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
     }
 
     @Test
@@ -33,10 +33,10 @@ class ArithmeticsTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(4, symbolTable.propertyValues.size)
-        assertEquals(3, (symbolTable.propertyValues["x"] as IntValue).value)
-        assertEquals(44, (symbolTable.propertyValues["y"] as IntValue).value)
-        assertEquals(50, (symbolTable.propertyValues["z"] as IntValue).value)
-        assertEquals(1, (symbolTable.propertyValues["a"] as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(44, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+        assertEquals(50, (symbolTable.findPropertyByDeclaredName("z") as IntValue).value)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
     }
 
     @Test
@@ -49,8 +49,8 @@ class ArithmeticsTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
-        assertEquals(21, (symbolTable.propertyValues["x"] as IntValue).value)
-        assertEquals(21, (symbolTable.propertyValues["y"] as IntValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
     }
 
     @Test
@@ -63,8 +63,8 @@ class ArithmeticsTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
-        assertEquals(21, (symbolTable.propertyValues["x"] as IntValue).value)
-        assertEquals(20, (symbolTable.propertyValues["y"] as IntValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
     }
 
     @Test
@@ -77,8 +77,8 @@ class ArithmeticsTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
-        assertEquals(19, (symbolTable.propertyValues["x"] as IntValue).value)
-        assertEquals(19, (symbolTable.propertyValues["y"] as IntValue).value)
+        assertEquals(19, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(19, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
     }
 
     @Test
@@ -91,7 +91,7 @@ class ArithmeticsTest {
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
-        assertEquals(19, (symbolTable.propertyValues["x"] as IntValue).value)
-        assertEquals(20, (symbolTable.propertyValues["y"] as IntValue).value)
+        assertEquals(19, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
     }
 }

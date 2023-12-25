@@ -89,25 +89,25 @@ class Interpreter(val scriptNode: ScriptNode) {
             "+" -> IntValue(+ result.value!!)
             "-" -> IntValue(- result.value!!)
             "pre++" -> {
-                val variable = (node as VariableReferenceNode).variableName
+                val variable = (node as VariableReferenceNode).transformedRefName!!
                 val newValue = IntValue(result.value + 1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 newValue
             }
             "pre--" -> {
-                val variable = (node as VariableReferenceNode).variableName
+                val variable = (node as VariableReferenceNode).transformedRefName!!
                 val newValue = IntValue(result.value - 1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 newValue
             }
             "post++" -> {
-                val variable = (node as VariableReferenceNode).variableName
+                val variable = (node as VariableReferenceNode).transformedRefName!!
                 val newValue = IntValue(result.value + 1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 result
             }
             "post--" -> {
-                val variable = (node as VariableReferenceNode).variableName
+                val variable = (node as VariableReferenceNode).transformedRefName!!
                 val newValue = IntValue(result.value - 1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 result
@@ -118,6 +118,7 @@ class Interpreter(val scriptNode: ScriptNode) {
 
     fun PropertyDeclarationNode.eval() {
         val symbolTable = callStack.currentSymbolTable()
+        val name = transformedRefName!!
         if (initialValue != null) {
             val value = initialValue.eval()
             symbolTable.declareProperty(name, type)
@@ -132,7 +133,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         val finalResult = if (operator == "=") {
             result as RuntimeValue
         } else {
-            val existing = callStack.currentSymbolTable().read(variableName)
+            val existing = callStack.currentSymbolTable().read(transformedRefName!!)
             val newResult = when (operator) {
                 "+=" -> (existing as IntValue) + result as IntValue
                 "-=" -> (existing as IntValue) - result as IntValue
@@ -143,11 +144,11 @@ class Interpreter(val scriptNode: ScriptNode) {
             }
             newResult
         }
-        callStack.currentSymbolTable().assign(variableName, finalResult)
+        callStack.currentSymbolTable().assign(transformedRefName!!, finalResult)
     }
 
     fun VariableReferenceNode.eval(): IntValue {
-        return callStack.currentSymbolTable().read(variableName) as IntValue
+        return callStack.currentSymbolTable().read(transformedRefName!!) as IntValue
     }
 
     fun FunctionDeclarationNode.eval() {
@@ -180,8 +181,8 @@ class Interpreter(val scriptNode: ScriptNode) {
         try {
             val symbolTable = callStack.currentSymbolTable()
             functionNode.valueParameters.forEachIndexed { index, it ->
-                symbolTable.declareProperty(it.name, it.type)
-                symbolTable.assign(it.name, callArguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue))
+                symbolTable.declareProperty(it.transformedRefName!!, it.type)
+                symbolTable.assign(it.transformedRefName!!, callArguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue))
             }
 
             // execute function

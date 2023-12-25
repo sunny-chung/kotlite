@@ -51,16 +51,26 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
     }
 
-    fun checkPropertyReadAccess(name: String) {
+    fun checkPropertyReadAccess(name: String): Int {
         if (!currentScope.hasProperty(name)) {
             throw SemanticException("Property `$name` is not declared")
         }
+        var scope = currentScope
+        while (!scope.hasProperty(name, isThisScopeOnly = true)) {
+            scope = scope.parentScope!!
+        }
+        return scope.scopeLevel
     }
 
-    fun checkPropertyWriteAccess(name: String) {
+    fun checkPropertyWriteAccess(name: String): Int {
         if (!currentScope.hasProperty(name)) { // FIXME
             throw SemanticException("Property `$name` is not declared")
         }
+        var scope = currentScope
+        while (!scope.hasProperty(name, isThisScopeOnly = true)) {
+            scope = scope.parentScope!!
+        }
+        return scope.scopeLevel
     }
 
     fun ScriptNode.visit() {
@@ -78,7 +88,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
     fun AssignmentNode.visit() {
         value.visit()
-        checkPropertyWriteAccess(variableName)
+        val l = checkPropertyWriteAccess(variableName)
+        if (transformedRefName == null) {
+            transformedRefName = "$variableName/$l"
+        }
     }
 
     fun PropertyDeclarationNode.visit() {
@@ -87,10 +100,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             throw SemanticException("Property `$name` has already been declared")
         }
         currentScope.declareProperty(name = name, type = type)
+        transformedRefName = "$name/${currentScope.scopeLevel}"
     }
 
     fun VariableReferenceNode.visit() {
-        checkPropertyReadAccess(variableName)
+        val l = checkPropertyReadAccess(variableName)
+        if (transformedRefName == null) {
+            transformedRefName = "$variableName/$l"
+        }
     }
 
     fun FunctionDeclarationNode.visit() {
@@ -121,6 +138,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             throw SemanticException("Property `$name` has already been declared")
         }
         currentScope.declareProperty(name = name, type = type)
+        transformedRefName = "$name/${currentScope.scopeLevel}"
     }
 
     fun FunctionCallArgumentNode.visit() {
