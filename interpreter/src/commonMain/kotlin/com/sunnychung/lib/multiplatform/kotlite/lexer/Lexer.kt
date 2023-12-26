@@ -64,6 +64,26 @@ class Lexer(val code: String) {
         return sb.toString()
     }
 
+    fun readLine(): String {
+        val sb = StringBuilder()
+        while (currentChar() !in setOf(null, '\n')) {
+            sb.append(currentChar()!!)
+            advanceChar()
+        }
+        backward() // preserve new line token
+        return sb.toString()
+    }
+
+    fun readBlockComment(): String {
+        val sb = StringBuilder()
+        while (!(currentChar() == '*' && nextChar() == '/')) {
+            sb.append(currentChar()!!)
+            advanceChar()
+        }
+        advanceChar()
+        return sb.toString()
+    }
+
     fun readToken(): Token {
         while (currentChar() != null) {
             val c = currentChar()!!
@@ -80,9 +100,21 @@ class Lexer(val code: String) {
                             return Token(TokenType.Symbol, "$c=", position)
                         }
                         val withNextChar = "$c${nextChar()}"
-                        if (withNextChar in setOf("++", "--")) {
-                            advanceChar()
-                            return Token(TokenType.Operator, withNextChar, position)
+                        when (withNextChar) {
+                            "++", "--" -> {
+                                advanceChar()
+                                return Token(TokenType.Operator, withNextChar, position)
+                            }
+                            "//" -> {
+                                advanceChar()
+                                readLine()
+                                continue // discard
+                            }
+                            "/*" -> {
+                                advanceChar()
+                                readBlockComment()
+                                continue // discard
+                            }
                         }
                         return Token(TokenType.Operator, c.toString(), position)
                     }

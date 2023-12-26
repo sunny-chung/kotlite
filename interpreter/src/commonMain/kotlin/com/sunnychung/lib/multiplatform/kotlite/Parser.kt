@@ -872,6 +872,9 @@ class Parser(lexer: Lexer) {
 //                semi()
 //            }
 //        } while (curr != null)
+        while (isSemi()) {
+            semis()
+        }
         while (currentToken.type != TokenType.EOF) {
             nodes += statement()
             if (currentToken.type in setOf(TokenType.Semicolon, TokenType.NewLine)) {

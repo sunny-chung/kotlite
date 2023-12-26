@@ -33,4 +33,56 @@ class LexerTokenTest {
         val tokens = Lexer("1 + 5 * (7 + 3 )  - 2 ").readAllTokens()
         println(tokens)
     }
+
+    @Test
+    fun lineComment1() {
+        val tokens = Lexer("""
+            // line comment 1
+            1 + 5 * 7  - 2 
+        """.trimIndent()).readAllTokens()
+        println(tokens)
+        assertEquals(9, tokens.size)
+    }
+
+    @Test
+    fun lineComment2() {
+        val tokens = Lexer("""
+            // line comment 1
+            1 + 5 * 7  - 2 // line comment 2
+            10
+        """.trimIndent()).readAllTokens()
+        println(tokens)
+        assertEquals(11, tokens.size)
+    }
+
+    @Test
+    fun blockComment() {
+        val tokens = Lexer("""
+            1 + 5 * 7 /* block comment */ - 2 
+        """.trimIndent()).readAllTokens()
+        println(tokens)
+        assertEquals(8, tokens.size)
+    }
+
+    @Test
+    fun multilineBlockComment1() {
+        val tokens = Lexer("""
+            1 + 5 * 7 /* 
+                block comment
+              */ - 2 
+        """.trimIndent()).readAllTokens()
+        println(tokens)
+        assertEquals(8, tokens.size)
+    }
+
+    @Test
+    fun multilineBlockComment2() {
+        val tokens = Lexer("""
+            1 + 5 * 7/* 
+                block comment
+              */- 2 
+        """.trimIndent()).readAllTokens()
+        println(tokens)
+        assertEquals(8, tokens.size)
+    }
 }
