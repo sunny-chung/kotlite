@@ -39,7 +39,7 @@ class Lexer(val code: String) {
 
     internal fun makeSourcePosition() = SourcePosition(lineNum = lineNum, col = col)
 
-    internal fun Char.isIdentifierChar() = !isWhitespace() && this !in setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '\n')
+    internal fun Char.isIdentifierChar() = !isWhitespace() && this !in setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '|', '&', '\n')
 
     internal fun readInteger(): String {
         val sb = StringBuilder()
@@ -137,6 +137,18 @@ class Lexer(val code: String) {
                             }
                         }
                         return Token(TokenType.Operator, c.toString(), position)
+                    }
+                    c in setOf('|', '&') -> {
+                        val position = makeSourcePosition()
+                        val withNextChar = "$c${nextChar()}"
+                        when (withNextChar) {
+                            "||", "&&" -> {
+                                advanceChar()
+                                return Token(TokenType.Operator, withNextChar, position)
+                            }
+                        }
+//                        return Token(TokenType.Operator, c.toString(), position)
+                        throw UnsupportedOperationException("Operator `$c` is not supported")
                     }
                     c in setOf('<', '>', '=', '!') -> {
                         val position = makeSourcePosition()

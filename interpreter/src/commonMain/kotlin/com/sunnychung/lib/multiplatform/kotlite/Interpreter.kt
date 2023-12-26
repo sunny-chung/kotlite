@@ -66,57 +66,74 @@ class Interpreter(val scriptNode: ScriptNode) {
         nodes.forEach { it.eval() }
     }
 
-    fun BinaryOpNode.eval(): RuntimeValue {
-        val result1 = node1.eval() as NumberValue<*>
-        val result2 = node2.eval() as NumberValue<*>
-        return when (operator) { // TODO overflow
-            "+" -> result1 + result2
-            "-" -> result1 - result2
-            "*" -> result1 * result2
-            "/" -> result1 / result2
-            "%" -> result1 % result2
+    fun <T : RuntimeValue, R: RuntimeValue> castType(a: Any, calculation: (T) -> R): R
+        = calculation(a as T)
 
-            "<" -> BooleanValue(result1 < result2)
-            "<=" -> BooleanValue(result1 <= result2)
-            ">" -> BooleanValue(result1 > result2)
-            ">=" -> BooleanValue(result1 >= result2)
-            "==" -> BooleanValue(result1 == result2)
-            "!=" -> BooleanValue(result1 != result2)
+    fun <T : RuntimeValue, R: RuntimeValue> castType(a: Any, b: Any, calculation: (T, T) -> R): R
+        = calculation(a as T, b as T)
+
+    fun BinaryOpNode.eval(): RuntimeValue {
+        return when (operator) { // TODO overflow
+            "+" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a + b }
+            "-" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a - b }
+            "*" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a * b }
+            "/" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a / b }
+            "%" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a % b }
+
+            "<" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a < b) }
+            "<=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a <= b) }
+            ">" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a > b) }
+            ">=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a >= b) }
+            "==" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a == b) }
+            "!=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a != b) }
+
+            "||" -> castType<BooleanValue, BooleanValue>(node1.eval()) { a -> if (a.value) BooleanValue(true) else node2.eval() as BooleanValue }
+            "&&" -> castType<BooleanValue, BooleanValue>(node1.eval()) { a -> if (!a.value) BooleanValue(false) else node2.eval() as BooleanValue }
 
             else -> throw UnsupportedOperationException()
         }
     }
 
-    fun UnaryOpNode.eval(): NumberValue<*> {
-        val result = node!!.eval() as NumberValue<*>
-        return when (operator) {
-            "+" -> IntValue(0) + result
-            "-" -> IntValue(0) - result
-            "pre++" -> {
-                val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = result + IntValue(1)
-                callStack.currentSymbolTable().assign(variable, newValue)
-                newValue
+    fun UnaryOpNode.eval(): RuntimeValue {
+        val result = node!!.eval()
+        return when (result) {
+            is NumberValue<*> -> when (operator) {
+                "+" -> IntValue(0) + result
+                "-" -> IntValue(0) - result
+                "pre++" -> {
+                    val variable = (node as VariableReferenceNode).transformedRefName!!
+                    val newValue = result + IntValue(1)
+                    callStack.currentSymbolTable().assign(variable, newValue)
+                    newValue
+                }
+                "pre--" -> {
+                    val variable = (node as VariableReferenceNode).transformedRefName!!
+                    val newValue = result - IntValue(1)
+                    callStack.currentSymbolTable().assign(variable, newValue)
+                    newValue
+                }
+                "post++" -> {
+                    val variable = (node as VariableReferenceNode).transformedRefName!!
+                    val newValue = result + IntValue(1)
+                    callStack.currentSymbolTable().assign(variable, newValue)
+                    result
+                }
+                "post--" -> {
+                    val variable = (node as VariableReferenceNode).transformedRefName!!
+                    val newValue = result - IntValue(1)
+                    callStack.currentSymbolTable().assign(variable, newValue)
+                    result
+                }
+                else -> throw UnsupportedOperationException()
             }
-            "pre--" -> {
-                val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = result - IntValue(1)
-                callStack.currentSymbolTable().assign(variable, newValue)
-                newValue
+
+            is BooleanValue -> {
+                when (operator) {
+                    "!" -> BooleanValue(!result.value)
+                    else -> throw UnsupportedOperationException()
+                }
             }
-            "post++" -> {
-                val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = result + IntValue(1)
-                callStack.currentSymbolTable().assign(variable, newValue)
-                result
-            }
-            "post--" -> {
-                val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = result - IntValue(1)
-                callStack.currentSymbolTable().assign(variable, newValue)
-                result
-            }
-            else -> throw UnsupportedOperationException()
+            else -> TODO()
         }
     }
 

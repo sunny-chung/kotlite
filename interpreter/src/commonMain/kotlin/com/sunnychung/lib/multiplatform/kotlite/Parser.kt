@@ -389,6 +389,38 @@ class Parser(lexer: Lexer) {
     }
 
     /**
+     * disjunction:
+     *     conjunction {{NL} '||' {NL} conjunction}
+     */
+    fun disjunction(): ASTNode {
+        var n = conjunction()
+        while (isCurrentTokenExcludingNL(TokenType.Operator, "||")) {
+            repeatedNL()
+            eat(TokenType.Operator, "||")
+            repeatedNL()
+            val n2 = conjunction()
+            n = BinaryOpNode(node1 = n, node2 = n2, operator = "||")
+        }
+        return n
+    }
+
+    /**
+     * conjunction:
+     *     equality {{NL} '&&' {NL} equality}
+     */
+    fun conjunction(): ASTNode {
+        var n = equality()
+        while (isCurrentTokenExcludingNL(TokenType.Operator, "&&")) {
+            repeatedNL()
+            eat(TokenType.Operator, "&&")
+            repeatedNL()
+            val n2 = equality()
+            n = BinaryOpNode(node1 = n, node2 = n2, operator = "&&")
+        }
+        return n
+    }
+
+    /**
      * equality:
      *     comparison {equalityOperator {NL} comparison}
      */
@@ -472,7 +504,7 @@ class Parser(lexer: Lexer) {
      *     disjunction
      */
     fun expression(): ASTNode {
-        return equality() // FIXME
+        return disjunction()
     }
 
     /**
