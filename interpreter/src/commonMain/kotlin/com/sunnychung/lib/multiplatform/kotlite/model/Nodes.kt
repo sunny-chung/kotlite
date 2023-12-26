@@ -74,7 +74,7 @@ data class FunctionValueParameterNode(val name: String, val type: TypeNode, val 
     }
 }
 
-data class BlockNode(val statements: List<ASTNode>, val position: SourcePosition) : ASTNode {
+data class BlockNode(val statements: List<ASTNode>, val position: SourcePosition, val type: ScopeType) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Block Node\"]"
         return statements.joinToString("") { "$self-->${it.toMermaid()}\n" }

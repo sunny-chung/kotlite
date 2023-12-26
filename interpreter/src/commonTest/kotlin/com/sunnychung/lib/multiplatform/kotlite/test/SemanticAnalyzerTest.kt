@@ -349,7 +349,7 @@ class SemanticAnalyzerTest {
     @Test
     fun breakOutsideLoop() {
         val analyzer = build("""
-            val x = 1 + 2
+            val x: Int = 1 + 2
             break
         """.trimIndent())
         assertFailsWith<SemanticException> {
@@ -360,8 +360,40 @@ class SemanticAnalyzerTest {
     @Test
     fun continueOutsideLoop() {
         val analyzer = build("""
-            val x = 1 + 2
+            val x: Int = 1 + 2
             continue
+        """.trimIndent())
+        assertFailsWith<SemanticException> {
+            analyzer.analyze()
+        }
+    }
+
+    @Test
+    fun duplicateFunctionDeclaration1() {
+        val analyzer = build("""
+            fun myFunction() {
+                val a: Int = b + c
+            }
+            fun myFunction() {
+                val d: Int = e + f
+            }
+        """.trimIndent())
+        assertFailsWith<SemanticException> {
+            analyzer.analyze()
+        }
+    }
+
+    @Test
+    fun duplicateFunctionDeclaration2() {
+        val analyzer = build("""
+            fun myFunction() {
+                val a: Int = b + c
+            }
+            fun myFunction2() {
+                fun myFunction() {
+                    val d: Int = e + f
+                }
+            }
         """.trimIndent())
         assertFailsWith<SemanticException> {
             analyzer.analyze()

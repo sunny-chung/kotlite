@@ -18,6 +18,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
@@ -311,7 +312,7 @@ class Parser(lexer: Lexer) {
         val trueBlock = if (isCurrentToken(TokenType.Semicolon, ";") || isCurrentToken(TokenType.Identifier, "else")) {
             null
         } else {
-            controlStructureBody()
+            controlStructureBody(ScopeType.If)
         }
         var hasEatSemicolonAfterCondition = if (isCurrentToken(TokenType.Semicolon, ";")) {
             eat(TokenType.Semicolon, ";")
@@ -325,7 +326,7 @@ class Parser(lexer: Lexer) {
                 eat(TokenType.Semicolon, ";")
                 null
             } else {
-                controlStructureBody()
+                controlStructureBody(ScopeType.If)
             }
         } else null
         if (trueBlock == null && falseBlock == null) {
@@ -501,14 +502,14 @@ class Parser(lexer: Lexer) {
      *     {NL}
      *     '}'
      */
-    fun block(): BlockNode {
+    fun block(type: ScopeType): BlockNode {
         val position = currentToken.position
         eat(TokenType.Symbol, "{")
         repeatedNL()
         val statements = statements()
         repeatedNL()
         eat(TokenType.Symbol, "}")
-        return BlockNode(statements, position)
+        return BlockNode(statements, position, type)
     }
 
     /**
@@ -518,12 +519,12 @@ class Parser(lexer: Lexer) {
      *   | statement
      *   ;
      */
-    fun controlStructureBody(): BlockNode {
+    fun controlStructureBody(type: ScopeType): BlockNode {
         return if (isCurrentToken(TokenType.Symbol, "{")) {
-            block()
+            block(type)
         } else {
             val position = currentToken.position
-            BlockNode(listOf(statement()), position)
+            BlockNode(listOf(statement()), position, type)
         }
     }
 
@@ -675,9 +676,9 @@ class Parser(lexer: Lexer) {
         if (currentToken.type == TokenType.Symbol && currentToken.value == "=") {
             eat(TokenType.Symbol, "=")
             repeatedNL()
-            return BlockNode(listOf(expression()), position)
+            return BlockNode(listOf(expression()), position, ScopeType.Function)
         } else {
-            return block()
+            return block(ScopeType.Function)
         }
     }
 
@@ -791,7 +792,7 @@ class Parser(lexer: Lexer) {
             eat(TokenType.Semicolon, ";")
             null
         } else {
-            controlStructureBody()
+            controlStructureBody(ScopeType.While)
         }
         return WhileNode(condition = condition, body = loopBody)
     }

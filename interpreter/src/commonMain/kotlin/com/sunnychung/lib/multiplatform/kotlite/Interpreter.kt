@@ -11,7 +11,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallStack
-import com.sunnychung.lib.multiplatform.kotlite.model.CallType
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -23,6 +22,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -177,7 +177,7 @@ class Interpreter(val scriptNode: ScriptNode) {
             }
         }
 
-        callStack.push(functionFullQualifiedName = functionName, callType = CallType.Function, callPosition = position)
+        callStack.push(functionFullQualifiedName = functionName, scopeType = ScopeType.Function, callPosition = position)
         try {
             val symbolTable = callStack.currentSymbolTable()
             functionNode.valueParameters.forEachIndexed { index, it ->
@@ -195,18 +195,18 @@ class Interpreter(val scriptNode: ScriptNode) {
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
             return returnValue
         } finally {
-            callStack.pop()
+            callStack.pop(ScopeType.Function)
         }
     }
 
     fun BlockNode.eval(): RuntimeValue {
         // additional scope because new variables can be declared in blocks of `if`, `while`, etc.
         // also, function parameters can be shadowed
-        callStack.push(functionFullQualifiedName = null, callType = CallType.Block, callPosition = position)
+        callStack.push(functionFullQualifiedName = null, scopeType = type, callPosition = position)
         val result = try {
             statements.map { it.eval() as? RuntimeValue }.lastOrNull() ?: UnitValue
         } finally {
-            callStack.pop()
+            callStack.pop(type)
         }
         return result
     }

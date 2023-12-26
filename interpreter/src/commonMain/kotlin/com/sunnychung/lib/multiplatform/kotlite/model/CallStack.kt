@@ -8,12 +8,14 @@ class CallStack {
         activationRecords += ActivationRecord(
             functionFullQualifiedName = ":builtin",
             callPosition = SourcePosition(1, 1),
+            scopeType = ScopeType.Script,
             parent = null,
             scopeLevel = 0
         )
         activationRecords += ActivationRecord(
             functionFullQualifiedName = ":global",
             callPosition = SourcePosition(1, 1),
+            scopeType = ScopeType.Script,
             parent = activationRecords.last(),
             scopeLevel = 1
         )
@@ -29,22 +31,22 @@ class CallStack {
         }
     }
 
-    fun push(functionFullQualifiedName: String?, callType: CallType, callPosition: SourcePosition) {
+    fun push(functionFullQualifiedName: String?, scopeType: ScopeType, callPosition: SourcePosition) {
         activationRecords += ActivationRecord(
             functionFullQualifiedName = functionFullQualifiedName,
             callPosition = callPosition,
             parent = activationRecords.last(),
-            scopeLevel = activationRecords.size
+            scopeLevel = activationRecords.size,
+            scopeType = scopeType,
         )
     }
 
-    fun pop() {
-        activationRecords.removeLast()
+    fun pop(scopeType: ScopeType) {
+        val ar = activationRecords.removeLast()
+        if (ar.scopeType != scopeType) {
+            throw IllegalStateException("A wrong scope is completed")
+        }
     }
 
     fun currentSymbolTable() = activationRecords.last().symbolTable
-}
-
-enum class CallType {
-    Program, Function, Block
 }

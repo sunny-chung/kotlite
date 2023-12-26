@@ -16,6 +16,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
+import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
@@ -24,7 +26,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 class SemanticAnalyzer(val scriptNode: ScriptNode) {
-    val symbolTable = SymbolTable(scopeLevel = 1, scopeName = ":global", parentScope = null)
+    val symbolTable = SymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = null)
     var currentScope = symbolTable
 
     fun ASTNode.visit() {
@@ -44,8 +46,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is FunctionCallNode -> this.visit()
             is BlockNode -> this.visit()
             is ReturnNode -> this.visit()
-            is BreakNode -> {}
-            is ContinueNode -> {}
+            is BreakNode -> this.visit()
+            is ContinueNode -> this.visit()
             is IfNode -> this.visit()
             is WhileNode -> this.visit()
         }
@@ -115,6 +117,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         currentScope = SymbolTable(
             scopeLevel = previousScope.scopeLevel + 1,
             scopeName = name,
+            scopeType = ScopeType.Function,
             parentScope = previousScope
         )
 
@@ -150,6 +153,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         currentScope = SymbolTable(
             scopeLevel = previousScope.scopeLevel + 1,
             scopeName = "<block>",
+            scopeType = type,
             parentScope = previousScope
         )
 
@@ -160,6 +164,31 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
     fun ReturnNode.visit() {
         value?.visit()
+        var s = currentScope
+        while (s.scopeType != ScopeType.Function) {
+            if (s.scopeType == ScopeType.Script || s.parentScope == null) {
+                throw SemanticException("`return` statement should be within a function")
+            }
+            s = s.parentScope!!
+        }
+    }
+
+    fun checkBreakOrContinueScope() {
+        var s = currentScope
+        while (!s.scopeType.isLoop()) {
+            if (s.scopeType in setOf(ScopeType.Script, ScopeType.Function) || s.parentScope == null) {
+                throw SemanticException("`break` statement should be within a function")
+            }
+            s = s.parentScope!!
+        }
+    }
+
+    fun BreakNode.visit() {
+        checkBreakOrContinueScope()
+    }
+
+    fun ContinueNode.visit() {
+        checkBreakOrContinueScope()
     }
 
     fun IfNode.visit() {
