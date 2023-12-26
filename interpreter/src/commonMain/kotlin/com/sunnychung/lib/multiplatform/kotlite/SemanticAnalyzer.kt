@@ -8,6 +8,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -36,6 +37,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is FunctionDeclarationNode -> this.visit()
             is FunctionValueParameterNode -> this.visit()
             is IntegerNode -> {}
+            is DoubleNode -> {}
             is BooleanNode -> {}
             is PropertyDeclarationNode -> this.visit()
             is ScriptNode -> this.visit()

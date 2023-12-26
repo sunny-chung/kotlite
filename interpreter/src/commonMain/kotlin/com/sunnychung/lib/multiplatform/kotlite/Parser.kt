@@ -11,6 +11,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -363,6 +364,10 @@ class Parser(lexer: Lexer) {
             TokenType.Integer -> {
                 eat(TokenType.Integer)
                 return IntegerNode(currentToken.value as Int)
+            }
+            TokenType.Double -> {
+                eat(TokenType.Double)
+                return DoubleNode(currentToken.value as Double)
             }
             TokenType.Identifier -> {
                 when (currentToken.value) {

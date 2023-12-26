@@ -10,11 +10,11 @@ class Lexer(val code: String) {
     var col = 1
     var locationHistory = mutableListOf<SourcePosition>() // TODO optimize
 
-    inline fun currentChar() = if (pos < code.length) code[pos] else null
+    internal inline fun currentChar() = if (pos < code.length) code[pos] else null
 
-    inline fun nextChar() = if (pos + 1 < code.length) code[pos + 1] else null
+    internal inline fun nextChar() = if (pos + 1 < code.length) code[pos + 1] else null
 
-    fun advanceChar() {
+    internal fun advanceChar() {
         if (pos < code.length) {
             if (currentChar() == '\n') {
                 ++lineNum
@@ -29,7 +29,7 @@ class Lexer(val code: String) {
         }
     }
 
-    fun backward() {
+    internal fun backward() {
         if (pos > 0) {
             --pos
             lineNum = locationHistory[pos].lineNum
@@ -37,24 +37,20 @@ class Lexer(val code: String) {
         }
     }
 
-    fun makeSourcePosition() = SourcePosition(lineNum = lineNum, col = col)
+    internal fun makeSourcePosition() = SourcePosition(lineNum = lineNum, col = col)
 
-    fun Char.isIdentifierChar() = !isWhitespace() && this !in setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '\n')
+    internal fun Char.isIdentifierChar() = !isWhitespace() && this !in setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '\n')
 
-    fun readInteger(): Int {
+    internal fun readInteger(): String {
         val sb = StringBuilder()
         while (currentChar()?.isDigit() == true) {
             sb.append(currentChar()!!)
-            // TODO validate
-
-            if (nextChar()?.isDigit() != true) break
             advanceChar() // TODO better structure
         }
-        if (sb.length > 10) throw RuntimeException("Integer `$sb` is too big.")
-        return sb.toString().toIntOrNull() ?: throw RuntimeException("Integer `$sb` is invalid.")
+        return sb.toString()
     }
 
-    fun readIdentifier(): String {
+    internal fun readIdentifier(): String {
         val sb = StringBuilder()
         while (currentChar()?.isIdentifierChar() == true) {
             sb.append(currentChar()!!)
@@ -64,7 +60,7 @@ class Lexer(val code: String) {
         return sb.toString()
     }
 
-    fun readLine(): String {
+    internal fun readLine(): String {
         val sb = StringBuilder()
         while (currentChar() !in setOf(null, '\n')) {
             sb.append(currentChar()!!)
@@ -74,7 +70,7 @@ class Lexer(val code: String) {
         return sb.toString()
     }
 
-    fun readBlockComment(): String {
+    internal fun readBlockComment(): String {
         val sb = StringBuilder()
         while (!(currentChar() == '*' && nextChar() == '/')) {
             sb.append(currentChar()!!)
@@ -84,14 +80,38 @@ class Lexer(val code: String) {
         return sb.toString()
     }
 
-    fun readToken(): Token {
+    internal fun readNumber(): Token {
+        try {
+            val position = makeSourcePosition()
+            val number = readInteger()
+            val hasDot = if (currentChar() == '.') {
+                advanceChar()
+                true
+            } else {
+                // TODO throw error if not followed by whitespaces, symbols or EOF
+                false
+            }
+            if (!hasDot) { // is an integer
+                if (number.length > 10) throw RuntimeException("Integer `$number` is too big.")
+                val value = number.toIntOrNull() ?: throw RuntimeException("Integer `$number` is invalid.")
+                return Token(TokenType.Integer, value, position)
+            }
+            val decimal = readInteger()
+            val value = "$number.$decimal".toDoubleOrNull() ?: throw RuntimeException("Double `$number` is invalid.")
+            return Token(TokenType.Double, value, position)
+        } finally {
+            backward()
+        }
+    }
+
+    internal fun readToken(): Token {
         while (currentChar() != null) {
             val c = currentChar()!!
             try {
                 when {
                     c in setOf('\n') -> return Token(TokenType.NewLine, c.toString(), makeSourcePosition())
                     c.isWhitespace() -> continue
-                    c.isDigit() -> return Token(TokenType.Integer, readInteger(), makeSourcePosition())
+                    c.isDigit() -> return readNumber()
                     c in setOf('(', ')') -> return Token(TokenType.Operator, c.toString(), makeSourcePosition())
                     c in setOf('+', '-', '*', '/', '%') -> {
                         val position = makeSourcePosition()

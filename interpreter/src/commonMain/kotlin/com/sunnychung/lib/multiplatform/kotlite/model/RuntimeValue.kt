@@ -1,13 +1,17 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-sealed interface RuntimeValue
+sealed interface RuntimeValue {
+    fun type(): DataType
+}
 //data class RuntimeValue(val type: DataType, val value: Any?)
 
-enum class DataType {
-    Integer
+data object UnitValue : RuntimeValue {
+    override fun type() = UnitType
+}
+data object NullValue : RuntimeValue {
+    override fun type() = NullType
 }
 
-data object UnitValue : RuntimeValue
-data object NullValue : RuntimeValue
-
-data class BooleanValue(val value: Boolean) : RuntimeValue
+data class BooleanValue(val value: Boolean) : RuntimeValue {
+    override fun type() = BooleanType
+}

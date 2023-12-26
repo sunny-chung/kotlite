@@ -15,6 +15,12 @@ data class IntegerNode(val value: Int) : ASTNode {
     }
 }
 
+data class DoubleNode(val value: Double) : ASTNode {
+    override fun toMermaid(): String {
+        return "${generateId()}[\"Double ${value}\"]\n"
+    }
+}
+
 data class BooleanNode(val value: Boolean) : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Boolean ${value}\"]\n"

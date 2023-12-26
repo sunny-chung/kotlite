@@ -12,6 +12,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallStack
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -19,6 +21,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
@@ -39,6 +42,7 @@ class Interpreter(val scriptNode: ScriptNode) {
             is AssignmentNode -> this.eval()
             is BinaryOpNode -> this.eval()
             is IntegerNode -> this.eval()
+            is DoubleNode -> this.eval()
             is BooleanNode -> this.eval()
             is PropertyDeclarationNode -> this.eval()
             is ScriptNode -> this.eval()
@@ -63,8 +67,8 @@ class Interpreter(val scriptNode: ScriptNode) {
     }
 
     fun BinaryOpNode.eval(): RuntimeValue {
-        val result1 = node1.eval() as IntValue
-        val result2 = node2.eval() as IntValue
+        val result1 = node1.eval() as NumberValue<*>
+        val result2 = node2.eval() as NumberValue<*>
         return when (operator) { // TODO overflow
             "+" -> result1 + result2
             "-" -> result1 - result2
@@ -83,32 +87,32 @@ class Interpreter(val scriptNode: ScriptNode) {
         }
     }
 
-    fun UnaryOpNode.eval(): IntValue {
-        val result = node!!.eval() as IntValue
+    fun UnaryOpNode.eval(): NumberValue<*> {
+        val result = node!!.eval() as NumberValue<*>
         return when (operator) {
-            "+" -> IntValue(+ result.value!!)
-            "-" -> IntValue(- result.value!!)
+            "+" -> IntValue(0) + result
+            "-" -> IntValue(0) - result
             "pre++" -> {
                 val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = IntValue(result.value + 1)
+                val newValue = result + IntValue(1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 newValue
             }
             "pre--" -> {
                 val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = IntValue(result.value - 1)
+                val newValue = result - IntValue(1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 newValue
             }
             "post++" -> {
                 val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = IntValue(result.value + 1)
+                val newValue = result + IntValue(1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 result
             }
             "post--" -> {
                 val variable = (node as VariableReferenceNode).transformedRefName!!
-                val newValue = IntValue(result.value - 1)
+                val newValue = result - IntValue(1)
                 callStack.currentSymbolTable().assign(variable, newValue)
                 result
             }
@@ -135,11 +139,11 @@ class Interpreter(val scriptNode: ScriptNode) {
         } else {
             val existing = callStack.currentSymbolTable().read(transformedRefName!!)
             val newResult = when (operator) {
-                "+=" -> (existing as IntValue) + result as IntValue
-                "-=" -> (existing as IntValue) - result as IntValue
-                "*=" -> (existing as IntValue) * result as IntValue
-                "/=" -> (existing as IntValue) / result as IntValue
-                "%=" -> (existing as IntValue) % result as IntValue
+                "+=" -> (existing as NumberValue<*>) + result as NumberValue<*>
+                "-=" -> (existing as NumberValue<*>) - result as NumberValue<*>
+                "*=" -> (existing as NumberValue<*>) * result as NumberValue<*>
+                "/=" -> (existing as NumberValue<*>) / result as NumberValue<*>
+                "%=" -> (existing as NumberValue<*>) % result as NumberValue<*>
                 else -> throw UnsupportedOperationException()
             }
             newResult
@@ -147,8 +151,8 @@ class Interpreter(val scriptNode: ScriptNode) {
         callStack.currentSymbolTable().assign(transformedRefName!!, finalResult)
     }
 
-    fun VariableReferenceNode.eval(): IntValue {
-        return callStack.currentSymbolTable().read(transformedRefName!!) as IntValue
+    fun VariableReferenceNode.eval(): RuntimeValue {
+        return callStack.currentSymbolTable().read(transformedRefName!!)
     }
 
     fun FunctionDeclarationNode.eval() {
@@ -250,6 +254,7 @@ class Interpreter(val scriptNode: ScriptNode) {
     }
 
     fun IntegerNode.eval() = IntValue(value)
+    fun DoubleNode.eval() = DoubleValue(value)
     fun BooleanNode.eval() = BooleanValue(value)
 
     fun eval() = scriptNode.eval()
