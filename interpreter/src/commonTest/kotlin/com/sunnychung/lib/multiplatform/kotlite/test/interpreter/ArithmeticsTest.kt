@@ -9,7 +9,8 @@ import kotlin.test.assertTrue
 
 class ArithmeticsTest {
     private fun compareNumber(expected: Number, actual: NumberValue<*>) {
-        if (expected is Int) {
+        // check both because the expression `1.2345 is Int` in JS evaluates to true
+        if (expected is Int && actual is IntValue) {
             assertEquals(expected, (actual as IntValue).value)
         } else {
             expected as Double
