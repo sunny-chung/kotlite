@@ -183,7 +183,9 @@ class Interpreter(val scriptNode: ScriptNode) {
 
                 is NavigationNode -> {
                     val obj = subject.subject.eval() as ClassInstance
-                    obj.assign((subject.member as ClassMemberReferenceNode).name, value)
+//                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
+                    // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
+                    obj.assign(obj.clazz.memberProperties[(subject.member as ClassMemberReferenceNode).name]!!.transformedRefName!!, value)
                 }
 
                 else -> throw UnsupportedOperationException()
@@ -475,7 +477,9 @@ class Interpreter(val scriptNode: ScriptNode) {
 
     fun NavigationNode.eval(): RuntimeValue {
         val obj = subject.eval() as ClassInstance
-        return obj.memberPropertyValues[member.name]!!
+//        return obj.memberPropertyValues[member.transformedRefName!!]!!
+        // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
+        return obj.read(obj.clazz.memberProperties[member.name]!!.transformedRefName!!)
     }
 
     fun IntegerNode.eval() = IntValue(value)

@@ -93,7 +93,7 @@ open class CodeGenerator(protected val node: ASTNode) {
                 ++indentLevel
                 val s = declarations.joinToString("") { "${indent()}${it.generate()}\n" }
                 --indentLevel
-                "$s${indent()}}\n"
+                "$s${indent()}}"
             }
 
     protected fun ClassInstanceInitializerNode.generate()

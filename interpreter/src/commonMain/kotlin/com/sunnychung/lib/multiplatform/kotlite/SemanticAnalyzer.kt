@@ -8,6 +8,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
@@ -173,8 +174,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun FunctionCallNode.visit() {
-        val functionName = (function as? VariableReferenceNode ?: throw UnsupportedOperationException("Dynamic functions are not yet supported")).variableName
-//        val functionNode = currentScope.findFunction(functionName) ?: throw SemanticException("Function $functionName not found")
+        val name = (function as? VariableReferenceNode ?: throw UnsupportedOperationException("Dynamic functions are not yet supported")).variableName
+        val functionNode = currentScope.findFunction(name)
+        if (functionNode == null) {
+            currentScope.findClass(name) ?: throw SemanticException("Function $name not found")
+        }
         arguments.forEach { it.visit() }
         // FIXME
     }
@@ -246,6 +250,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun NavigationNode.visit() {
         // TODO visit member property
         subject.visit()
+
+        // at this moment subject must not be a primitive
     }
 
     fun ClassDeclarationNode.visit() {
@@ -274,6 +280,32 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 }
         }
         popScope()
+        currentScope.declareClass(
+            ClassDefinition(
+                name = name,
+                fullQualifiedName = fullQualifiedName,
+                isInstanceCreationAllowed = true,
+                primaryConstructor = primaryConstructor,
+                memberProperties = ((primaryConstructor?.parameters
+                    ?.filter { it.isProperty }
+                    ?.map { it.parameter }
+                    ?.map {
+                        PropertyDeclarationNode(
+                            name = it.name,
+                            type = it.type,
+                            initialValue = it.defaultValue,
+                            transformedRefName = it.transformedRefName
+                        )
+                    } ?: emptyList()) +
+                        declarations.filterIsInstance<PropertyDeclarationNode>())
+                    .associateBy { it.name },
+                memberFunctions = declarations
+                    .filterIsInstance<FunctionDeclarationNode>()
+                    .associateBy { it.name },
+                orderedInitializersAndPropertyDeclarations = declarations
+                    .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
+            )
+        )
     }
 
     fun ClassPrimaryConstructorNode.visit() {

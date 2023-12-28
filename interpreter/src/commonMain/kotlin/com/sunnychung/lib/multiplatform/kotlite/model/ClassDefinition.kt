@@ -14,8 +14,11 @@ class ClassDefinition(
      */
     val orderedInitializersAndPropertyDeclarations: List<ASTNode>,
 
+    // key = original name
     val memberProperties: Map<String, PropertyDeclarationNode>,
     val memberFunctions: Map<String, FunctionDeclarationNode>,
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
-)
+) {
+    val memberPropertiesByTransformedName: Map<String, PropertyDeclarationNode> = memberProperties.values.associateBy { it.transformedRefName!! }
+}

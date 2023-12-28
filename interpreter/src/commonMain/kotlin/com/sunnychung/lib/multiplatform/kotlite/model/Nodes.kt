@@ -190,7 +190,7 @@ data class ClassDeclarationNode(
     }
 }
 
-data class ClassMemberReferenceNode(val name: String) : ASTNode {
+data class ClassMemberReferenceNode(val name: String, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Class Member Reference Node `$name`\"]"
 }
 

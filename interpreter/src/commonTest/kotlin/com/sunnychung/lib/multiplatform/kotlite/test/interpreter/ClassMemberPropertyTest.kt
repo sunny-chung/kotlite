@@ -18,7 +18,7 @@ class ClassMemberPropertyTest {
             val o: MyCls = MyCls()
             val x: Int = o.a
             val y: Int = o.b
-        """.trimIndent())
+        """.trimIndent(), isDebug = true)
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
@@ -40,7 +40,7 @@ class ClassMemberPropertyTest {
             val x: Int = o.a
             val y: Int = o.b
             o.b = 4
-        """.trimIndent())
+        """.trimIndent(), isDebug = true)
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)

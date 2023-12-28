@@ -6,14 +6,14 @@ data class ClassInstance(val clazz: ClassDefinition, val memberPropertyValues: M
 
     fun assign(name: String, value: RuntimeValue) {
         // TODO check type
-        val propertyDefinition = clazz.memberProperties[name]
+        val propertyDefinition = clazz.memberPropertiesByTransformedName[name]
             ?: throw RuntimeException("Property $name is not defined in class ${clazz.name}")
 
         memberPropertyValues[name] = value
     }
 
     fun read(name: String): RuntimeValue {
-        val propertyDefinition = clazz.memberProperties[name]
+        val propertyDefinition = clazz.memberPropertiesByTransformedName[name]
             ?: throw RuntimeException("Property $name is not defined in class ${clazz.name}")
 
         return memberPropertyValues[name]!!
