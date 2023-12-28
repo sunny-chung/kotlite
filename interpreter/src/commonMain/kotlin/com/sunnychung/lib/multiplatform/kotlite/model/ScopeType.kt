@@ -1,7 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 enum class ScopeType {
-    Script, Function,
+    Script, Function, Initializer, ClassInitializer /* for Analyzer and Runtime use */, Class,
     If, For, While, DoWhile;
 
     companion object {

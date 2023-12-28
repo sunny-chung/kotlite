@@ -9,11 +9,24 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
 
     private val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
 
+    private val classDeclarations = mutableMapOf<String, ClassDefinition>()
+
     fun declareProperty(name: String, type: TypeNode) {
         if (hasProperty(name = name, true)) {
             throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Property)
         }
         propertyDeclarations[name] = type
+    }
+
+    fun undeclareProperty(name: String) {
+        if (!hasProperty(name = name, true)) {
+            throw RuntimeException("No such property `$name`")
+        }
+        propertyDeclarations.remove(name)
+    }
+
+    fun undeclarePropertyByDeclaredName(declaredName: String) {
+        undeclareProperty(findTransformedNameByDeclaredName(declaredName))
     }
 
     fun assign(name: String, value: RuntimeValue): Boolean { // TODO check type, modifiable
@@ -27,8 +40,10 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
         }
     }
 
-    fun read(name: String): RuntimeValue {
-        return propertyValues[name] ?: parentScope?.read(name) ?: throw RuntimeException("The variable `$name` has not been declared")
+    fun read(name: String, isThisScopeOnly: Boolean = false): RuntimeValue {
+        return propertyValues[name]
+            ?: Unit.takeIf { isThisScopeOnly }.let { parentScope?.read(name) }
+            ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
     fun hasProperty(name: String, isThisScopeOnly: Boolean = false): Boolean {
@@ -51,9 +66,27 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
         return functionDeclarations[name] ?: parentScope?.findFunction(name)
     }
 
+    fun findTransformedNameByDeclaredName(declaredName: String): String
+        = propertyValues.keys.firstOrNull { it.substring(0 ..< it.lastIndexOf('/')) == declaredName }!!
+
     fun findPropertyByDeclaredName(declaredName: String): RuntimeValue? {
-        return propertyValues.keys.firstOrNull { it.substring(0 ..< it.lastIndexOf('/')) == declaredName }
-            ?.let { transformedName -> propertyValues[transformedName] }
+        return findTransformedNameByDeclaredName(declaredName)
+            .let { transformedName -> propertyValues[transformedName] }
+    }
+
+    fun declareClass(classDefinition: ClassDefinition) {
+        if (findClass(classDefinition.fullQualifiedName) != null) {
+            throw DuplicateIdentifierException(name = classDefinition.fullQualifiedName, classifier = IdentifierClassifier.Class)
+        }
+        classDeclarations[classDefinition.fullQualifiedName] = classDefinition
+    }
+
+    fun findClass(fullQualifiedName: String): ClassDefinition? {
+        if (classDeclarations.containsKey(fullQualifiedName)) {
+            return classDeclarations[fullQualifiedName]
+        } else {
+            return parentScope?.findClass(fullQualifiedName)
+        }
     }
 
     override fun toString(): String {

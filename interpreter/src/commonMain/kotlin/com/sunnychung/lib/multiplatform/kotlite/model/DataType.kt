@@ -8,4 +8,4 @@ data object BooleanType : DataType
 data object StringType : DataType
 data object UnitType : DataType
 data object NullType : DataType
-data object ObjectType : DataType
+data class ObjectType(val clazz: ClassDefinition) : DataType

@@ -39,7 +39,7 @@ class Lexer(val code: String) {
 
     internal fun makeSourcePosition() = SourcePosition(lineNum = lineNum, col = col)
 
-    internal fun Char.isIdentifierChar() = !isWhitespace() && this !in setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '|', '&', '\n')
+    internal fun Char.isIdentifierChar() = !isWhitespace() && this !in setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '|', '&', '.', '?', '\n')
 
     internal fun readInteger(): String {
         val sb = StringBuilder()
@@ -140,8 +140,7 @@ class Lexer(val code: String) {
                     }
                     c in setOf('|', '&') -> {
                         val position = makeSourcePosition()
-                        val withNextChar = "$c${nextChar()}"
-                        when (withNextChar) {
+                        when (val withNextChar = "$c${nextChar()}") {
                             "||", "&&" -> {
                                 advanceChar()
                                 return Token(TokenType.Operator, withNextChar, position)
@@ -149,6 +148,19 @@ class Lexer(val code: String) {
                         }
 //                        return Token(TokenType.Operator, c.toString(), position)
                         throw UnsupportedOperationException("Operator `$c` is not supported")
+                    }
+                    c in setOf('.', '?') -> {
+                        val position = makeSourcePosition()
+                        when (val withNextChar = "$c${nextChar()}") {
+                            "?." -> {
+                                advanceChar()
+                                return Token(TokenType.Operator, withNextChar, position)
+                            }
+                        }
+                        if (c == '.') {
+                            return Token(TokenType.Operator, c.toString(), position)
+                        }
+                        return Token(TokenType.Symbol, c.toString(), position)
                     }
                     c in setOf('<', '>', '=', '!') -> {
                         val position = makeSourcePosition()

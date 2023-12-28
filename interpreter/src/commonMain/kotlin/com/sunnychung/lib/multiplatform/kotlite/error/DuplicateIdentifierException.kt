@@ -4,5 +4,5 @@ class DuplicateIdentifierException(val name: String, val classifier: IdentifierC
     Exception("The ${classifier.toString().lowercase()} `$name` has been declared repeatedly")
 
 enum class IdentifierClassifier {
-    Property, Function
+    Property, Function, Class
 }

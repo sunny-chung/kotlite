@@ -27,6 +27,12 @@ data class BooleanNode(val value: Boolean) : ASTNode {
     }
 }
 
+data object NullNode : ASTNode {
+    override fun toMermaid(): String {
+        return "${generateId()}[\"Null\"]\n"
+    }
+}
+
 data class BinaryOpNode(val node1: ASTNode, val node2: ASTNode, val operator: String) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Binary Op ${operator}\"]"
@@ -48,9 +54,9 @@ data class ScriptNode(val nodes: List<ASTNode>) : ASTNode {
     }
 }
 
-data class TypeNode(val name: String, val argument: TypeNode?) : ASTNode {
+data class TypeNode(val name: String, val argument: TypeNode?, val isNullable: Boolean) : ASTNode {
     override fun toMermaid(): String {
-        return "${generateId()}[\"Type $name\"]" + (if (argument != null) "-->${argument.toMermaid()}" else "") + "\n"
+        return "${generateId()}[\"Type $name${if (isNullable) " ?" else ""}\"]" + (if (argument != null) "-->${argument.toMermaid()}" else "") + "\n"
     }
 }
 
@@ -61,10 +67,11 @@ data class PropertyDeclarationNode(val name: String, val type: TypeNode, val ini
     }
 }
 
-data class AssignmentNode(val variableName: String, val operator: String, val value: ASTNode, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+data class AssignmentNode(val subject: ASTNode, val operator: String, val value: ASTNode, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Assignment Node `$variableName` `$operator`\"]"
-        return "$self-->${value.toMermaid()}"
+        val self = "${generateId()}[\"Assignment Node `$operator`\"]"
+        return "$self-- subject -->${subject.toMermaid()}\n" +
+                "$self-- value -->${value.toMermaid()}\n"
     }
 }
 
@@ -145,5 +152,56 @@ data class WhileNode(val condition: ASTNode, val body: BlockNode?) : ASTNode {
         val self = "${generateId()}[\"While Node\"]"
         return "$self-- condition -->${condition.toMermaid()}\n" +
                 "$self-- loop -->${body?.toMermaid() ?: self}\n"
+    }
+}
+
+data class ClassParameterNode(val isProperty: Boolean, val isMutable: Boolean, val parameter: FunctionValueParameterNode) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Class Primary Constructor Parameter Node isProperty=$isProperty isMutable=$isMutable\"]"
+        return "$self-->${parameter.toMermaid()}\n"
+    }
+}
+
+data class ClassPrimaryConstructorNode(val parameters: List<ClassParameterNode>) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Class Primary Constructor Node\"]"
+        return "$self\n" +
+                parameters.joinToString("") { "$self-->${it.toMermaid()}\n" }
+    }
+}
+
+data class ClassInstanceInitializerNode(val block: BlockNode) : ASTNode {
+    override fun toMermaid(): String {
+        return "${generateId()}[\"Class Init Node\"]-->${block.toMermaid()}\n"
+    }
+}
+
+data class ClassDeclarationNode(
+    val name: String,
+    val primaryConstructor: ClassPrimaryConstructorNode?,
+    val declarations: List<ASTNode>,
+    @ModifyByAnalyzer var fullQualifiedName: String = name,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Class Declaration Node `$name`\"]"
+        return "$self\n" +
+                (primaryConstructor?.let { "$self-- primary constructor -->${it.toMermaid()}\n" } ?: "") +
+                declarations.joinToString("") { "$self-->${it.toMermaid()}\n" }
+    }
+}
+
+data class ClassMemberReferenceNode(val name: String) : ASTNode {
+    override fun toMermaid(): String = "${generateId()}[\"Class Member Reference Node `$name`\"]"
+}
+
+data class NavigationNode(
+    val subject: ASTNode,
+    val operator: String,
+    val member: ClassMemberReferenceNode,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Navigation Node\"]"
+        return "$self-- subject -->${subject.toMermaid()}\n" +
+                "$self-- access -->${member.toMermaid()}\n"
     }
 }

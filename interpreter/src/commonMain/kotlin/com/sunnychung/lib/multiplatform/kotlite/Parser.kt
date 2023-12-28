@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite
 
 import com.sunnychung.lib.multiplatform.kotlite.error.ExpectTokenMismatchException
+import com.sunnychung.lib.multiplatform.kotlite.error.ParseException
 import com.sunnychung.lib.multiplatform.kotlite.error.UnexpectedTokenException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
@@ -10,6 +11,11 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
@@ -17,6 +23,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
+import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
@@ -54,6 +62,11 @@ class Parser(lexer: Lexer) {
 
     private fun lastToken() = allTokens[tokenIndex - 1]
 
+    private fun resetTokenToIndex(index: Int) {
+        tokenIndex = index
+        currentToken = allTokens[index]
+    }
+
     fun eat(tokenType: TokenType): Token {
         if (currentToken.type != tokenType) throw ExpectTokenMismatchException("$tokenType", currentToken.position)
         log.v { "ate $tokenType" }
@@ -75,13 +88,18 @@ class Parser(lexer: Lexer) {
     fun isCurrentToken(type: TokenType, value: Any) =
         currentToken.type == type && currentToken.value == value
 
-    fun isCurrentTokenExcludingNL(type: TokenType, value: Any): Boolean {
+    fun currentTokenExcludingNL(): Token {
         // TODO optimize
         for (i in tokenIndex..< allTokens.size) {
             if (allTokens[i].type == TokenType.NewLine) continue
-            return allTokens[i].type == type && allTokens[i].value == value
+            return allTokens[i]
         }
-        return false
+        throw IndexOutOfBoundsException()
+    }
+
+    fun isCurrentTokenExcludingNL(type: TokenType, value: Any): Boolean {
+        val t = currentTokenExcludingNL()
+        return t.type == type && t.value == value
     }
 
     fun isLastToken(type: TokenType, value: Any): Boolean {
@@ -192,6 +210,49 @@ class Parser(lexer: Lexer) {
     }
 
     /**
+     * navigationSuffix:
+     *     memberAccessOperator {NL} (simpleIdentifier | parenthesizedExpression | 'class')
+     *
+     * memberAccessOperator:
+     *     ({NL} '.')
+     *     | ({NL} safeNav)
+     *     | '::'
+     *
+     * safeNav:
+     *     QUEST_NO_WS '.'
+     *
+     * QUEST_NO_WS:
+     *     '?'
+     *
+     */
+    fun navigationSuffix(subject: ASTNode): NavigationNode {
+        repeatedNL()
+        val operator = eat(TokenType.Operator)
+        if (operator.value !in setOf(".", "?.")) {
+            throw UnexpectedTokenException(operator)
+        }
+        repeatedNL()
+        val memberExpression = if (isCurrentToken(TokenType.Operator, "(")) {
+            /*
+                Use case: https://discuss.kotlinlang.org/t/how-is-parser-able-to-process-function-calls-on-objects-like-a-foo/25579/7
+
+                fun getMember() : Int.() -> Int = { this + 1 }
+
+                fun main() {
+                    println(42.(getMember())())
+                }
+
+                This will only be supported AFTER lambda is supported
+             */
+            throw UnsupportedOperationException("Lambda is not supported")
+//            parenthesizedExpression()
+        } else {
+            ClassMemberReferenceNode(eat(TokenType.Identifier).value as String) // any better node?
+        }
+        return NavigationNode(subject, operator.value as String, memberExpression)
+    }
+
+    /**
      * postfixUnarySuffix:
      *     postfixUnaryOperator
      *     | typeArguments
@@ -204,6 +265,9 @@ class Parser(lexer: Lexer) {
             "(" -> return callSuffix(subject)
             "++" -> { eat(TokenType.Operator, "++"); return UnaryOpNode(subject, "post++") }
             "--" -> { eat(TokenType.Operator, "--"); return UnaryOpNode(subject, "post--") }
+        }
+        when (currentTokenExcludingNL().value) {
+            ".", "?." -> return navigationSuffix(subject)
         }
         return subject
     }
@@ -377,6 +441,7 @@ class Parser(lexer: Lexer) {
                     // literal
                     "true" -> { eat(TokenType.Identifier); return BooleanNode(true) }
                     "false" -> { eat(TokenType.Identifier); return BooleanNode(false) }
+                    "null" -> { eat(TokenType.Identifier); return NullNode }
                 }
 
                 val t = eat(TokenType.Identifier)
@@ -569,6 +634,13 @@ class Parser(lexer: Lexer) {
      * type:
      *     [typeModifiers] (functionType | parenthesizedType | nullableType | typeReference | definitelyNonNullableType)
      *
+     * nullableType:
+     *     (typeReference | parenthesizedType) {NL} (quest {quest})
+     *
+     * quest:
+     *     QUEST_NO_WS
+     *     | QUEST_WS
+     *
      * typeReference:
      *     userType
      *     | 'dynamic'
@@ -603,7 +675,12 @@ class Parser(lexer: Lexer) {
             eat(TokenType.Symbol, ">")
             argument
         } else null
-        return TypeNode(name, argument)
+        val isNullable = if (isCurrentTokenExcludingNL(TokenType.Symbol, "?")) {
+            repeatedNL()
+            eat(TokenType.Symbol, "?")
+            true
+        } else false
+        return TypeNode(name, argument, isNullable)
     }
 
     /**
@@ -753,11 +830,168 @@ class Parser(lexer: Lexer) {
             repeatedNL()
             type
         } else {
-            TypeNode("Unit", null)
+            TypeNode("Unit", null, false)
         }
         // TODO make functionBody optional for interfaces
         val body = functionBody()
         return FunctionDeclarationNode(name = name, type = type, valueParameters = valueParameters, body = body)
+    }
+
+    /**
+     * classParameter:
+     *     [modifiers]
+     *     ['val' | 'var']
+     *     {NL}
+     *     simpleIdentifier
+     *     ':'
+     *     {NL}
+     *     type
+     *     [{NL} '=' {NL} expression]
+     */
+    fun classParameter(): ClassParameterNode {
+        val isMutable = if (currentToken.type == TokenType.Identifier && currentToken.value in setOf("val", "var")) {
+            (currentToken.value == "var").also { eat(TokenType.Identifier) }
+        } else null
+        repeatedNL()
+        val name = userDefinedIdentifier()
+        eat(TokenType.Symbol, ":")
+        repeatedNL()
+        val type = type()
+        val defaultValue = if (isCurrentTokenExcludingNL(TokenType.Symbol, "=")) {
+            repeatedNL()
+            eat(TokenType.Symbol, "=")
+            repeatedNL()
+            expression()
+        } else null
+        return ClassParameterNode(
+            isProperty = isMutable != null,
+            isMutable = isMutable == true,
+            parameter = FunctionValueParameterNode(
+                name = name,
+                type = type,
+                defaultValue = defaultValue
+            )
+        )
+    }
+
+    /**
+     * primaryConstructor:
+     *     [[modifiers] 'constructor' {NL}] classParameters
+     *
+     * classParameters:
+     *     '('
+     *     {NL}
+     *     [classParameter {{NL} ',' {NL} classParameter} [{NL} ',']]
+     *     {NL}
+     *     ')'
+     */
+    fun primaryConstructor() : ClassPrimaryConstructorNode {
+        val parameters = mutableListOf<ClassParameterNode>()
+        if (isCurrentToken(TokenType.Identifier, "constructor")) {
+            eat(TokenType.Identifier, "constructor")
+            repeatedNL()
+        }
+        eat(TokenType.Operator, "(")
+        repeatedNL()
+        var hasEatenComma = false
+        while (!isCurrentTokenExcludingNL(TokenType.Operator, ")")) {
+            if (parameters.isNotEmpty()) {
+                if (!hasEatenComma) {
+                    throw ExpectTokenMismatchException(",", currentToken.position)
+                }
+            }
+            parameters += classParameter()
+            repeatedNL()
+            hasEatenComma = false
+            if (isCurrentToken(TokenType.Symbol, ",")) {
+                eat(TokenType.Symbol, ",")
+                repeatedNL()
+                hasEatenComma = true
+            }
+        }
+        repeatedNL()
+        eat(TokenType.Operator, ")")
+        return ClassPrimaryConstructorNode(parameters)
+    }
+
+    /**
+     * classMemberDeclarations:
+     *     {classMemberDeclaration [semis]}
+     *
+     * classMemberDeclaration:
+     *     declaration
+     *     | companionObject
+     *     | anonymousInitializer
+     *     | secondaryConstructor
+     *
+     * anonymousInitializer:
+     *     'init' {NL} block
+     */
+    fun classMemberDeclarations(): List<ASTNode> {
+        val declarations = mutableListOf<ASTNode>()
+        while (!isCurrentTokenExcludingNL(TokenType.Symbol, "}")) {
+            declarations += if (isCurrentToken(TokenType.Identifier, "init")) {
+                eat(TokenType.Identifier, "init")
+                repeatedNL()
+                val block = block(ScopeType.Initializer)
+                ClassInstanceInitializerNode(block)
+            } else {
+                declaration()
+            }
+
+            if (isSemi()) {
+                semis()
+            }
+        }
+        return declarations
+    }
+
+    /**
+     * classBody:
+     *     '{'
+     *     {NL}
+     *     classMemberDeclarations
+     *     {NL}
+     *     '}'
+     */
+    fun classBody(): List<ASTNode> {
+        eat(TokenType.Symbol, "{")
+        repeatedNL()
+        val declarations = classMemberDeclarations()
+        repeatedNL()
+        eat(TokenType.Symbol, "}")
+        return declarations
+    }
+
+    /**
+     * classDeclaration:
+     *     [modifiers]
+     *     ('class' | (['fun' {NL}] 'interface'))
+     *     {NL}
+     *     simpleIdentifier
+     *     [{NL} typeParameters]
+     *     [{NL} primaryConstructor]
+     *     [{NL} ':' {NL} delegationSpecifiers]
+     *     [{NL} typeConstraints]
+     *     [({NL} classBody) | ({NL} enumClassBody)]
+     */
+    fun classDeclaration(): ClassDeclarationNode {
+        eat(TokenType.Identifier, "class")
+        repeatedNL()
+        val name = userDefinedIdentifier()
+        var token = currentTokenExcludingNL()
+        val primaryConstructor = if (
+            (token.type == TokenType.Identifier && token.value == "constructor")
+            || (token.type == TokenType.Operator && token.value == "(")
+        ) {
+            repeatedNL()
+            primaryConstructor().also { token = currentTokenExcludingNL() }
+        } else null
+        val declarations = if (token.type == TokenType.Symbol && token.value == "{") {
+            repeatedNL()
+            classBody()
+        } else listOf()
+        return ClassDeclarationNode(name = name, primaryConstructor = primaryConstructor, declarations = declarations)
     }
 
     /**
@@ -776,6 +1010,7 @@ class Parser(lexer: Lexer) {
         when (currentToken.value as String) {
             "val", "var" -> return propertyDeclaration()
             "fun" -> return functionDeclaration()
+            "class" -> return classDeclaration()
         }
         throw UnexpectedTokenException(currentToken)
     }
@@ -795,7 +1030,8 @@ class Parser(lexer: Lexer) {
      *
      */
     fun assignment(): ASTNode {
-        val name = userDefinedIdentifier()
+//        val name = userDefinedIdentifier()
+        val subject = assignableExpression()
         val operator = eat(TokenType.Symbol).also {
             if (it.value !in setOf("=", "+=", "-=", "*=", "/=", "%=")) {
                 throw UnexpectedTokenException(it)
@@ -803,7 +1039,7 @@ class Parser(lexer: Lexer) {
         }.value as String
         repeatedNL()
         val expr = expression()
-        return AssignmentNode(variableName = name, operator = operator, value = expr)
+        return AssignmentNode(subject = subject, operator = operator, value = expr)
     }
 
     /**
@@ -855,15 +1091,17 @@ class Parser(lexer: Lexer) {
     fun statement(): ASTNode { // TODO complete
         if (currentToken.type == TokenType.Identifier) {
             when (currentToken.value) {
-                "val", "var", "fun" -> return declaration()
+                "val", "var", "fun", "class" -> return declaration()
                 "for", "while", "do" -> return loopStatement()
             }
-            if (peekNextToken().type == TokenType.Symbol && peekNextToken().value in setOf("=", "+=", "-=", "*=", "/=", "%=")) {
-                return assignment()
-            }
         }
-
-        return expression()
+        val tokenPos = tokenIndex
+        return try {
+            assignment()
+        } catch (_: ParseException) {
+            resetTokenToIndex(tokenPos)
+            expression()
+        }
     }
 
     /**
