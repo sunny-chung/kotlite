@@ -145,14 +145,19 @@ class ClassInitializerTest {
                     c = a
                 }
                 var f: Int = a
+                var g: Int = a
                 init {
                     d = a
                     val a: Int = a + 30
+                    if (a > 10) {
+                        val a: Int = a + 10
+                        g = a
+                    }
                     e = a
                 }
             }
             val o: Cls = Cls(a + 10)
-        """.trimIndent())
+        """.trimIndent(), isDebug = true)
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
@@ -160,12 +165,13 @@ class ClassInitializerTest {
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(6, o.memberPropertyValues.size)
+        assertEquals(7, o.memberPropertyValues.size)
         assertEquals(30, (o.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(20, (o.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(40, (o.findPropertyByDeclaredName("c") as IntValue).value)
         assertEquals(20, (o.findPropertyByDeclaredName("d") as IntValue).value)
         assertEquals(50, (o.findPropertyByDeclaredName("e") as IntValue).value)
         assertEquals(20, (o.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(60, (o.findPropertyByDeclaredName("g") as IntValue).value)
     }
 }

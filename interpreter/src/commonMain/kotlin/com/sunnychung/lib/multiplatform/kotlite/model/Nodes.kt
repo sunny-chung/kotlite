@@ -67,7 +67,7 @@ data class PropertyDeclarationNode(val name: String, val type: TypeNode, val ini
     }
 }
 
-data class AssignmentNode(val subject: ASTNode, val operator: String, val value: ASTNode, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+data class AssignmentNode(val subject: ASTNode, val operator: String, val value: ASTNode, @ModifyByAnalyzer @Deprecated("To be removed") var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Assignment Node `$operator`\"]"
         return "$self-- subject -->${subject.toMermaid()}\n" +
