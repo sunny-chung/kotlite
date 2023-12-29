@@ -59,7 +59,7 @@ open class CodeGenerator(protected val node: ASTNode) {
             is IfNode -> this.generate()
             is IntegerNode -> this.generate()
             is NavigationNode -> this.generate()
-            NullNode -> this.generate()
+            is NullNode -> this.generate()
             is PropertyDeclarationNode -> this.generate()
             is ReturnNode -> this.generate()
             is ScriptNode -> this.generate()
@@ -149,7 +149,7 @@ open class CodeGenerator(protected val node: ASTNode) {
         = "$operator(${node?.let { it.generate() } ?: " "})"
 
     protected fun VariableReferenceNode.generate()
-        = "$variableName<$transformedRefName>"
+        = "${ownerRef?.let { "$ownerRef." } ?: ""}$variableName<$transformedRefName>"
 
     protected fun WhileNode.generate()
         = "while (${condition.generate()})${body?.let { " ${it.generate()}" } ?: ";"}"

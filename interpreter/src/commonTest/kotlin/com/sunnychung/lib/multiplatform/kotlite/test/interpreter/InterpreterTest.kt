@@ -9,7 +9,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-fun interpreter(code: String, isDebug: Boolean = false) = Parser(Lexer(code)).script().let {
+fun interpreter(code: String, isDebug: Boolean = true) = Parser(Lexer(code)).script().let {
     SemanticAnalyzer(it).analyze()
     if (isDebug) {
         println(CodeGenerator(it).generateCode())

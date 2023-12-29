@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite
 
+import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateNullPointerException
+import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateRuntimeException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalBreakException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalContinueException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnException
@@ -120,27 +122,23 @@ class Interpreter(val scriptNode: ScriptNode) {
                 "+" -> IntValue(0) + result
                 "-" -> IntValue(0) - result
                 "pre++" -> {
-                    val variable = (node as VariableReferenceNode).transformedRefName!!
                     val newValue = result + IntValue(1)
-                    callStack.currentSymbolTable().assign(variable, newValue)
+                    node!!.write(newValue)
                     newValue
                 }
                 "pre--" -> {
-                    val variable = (node as VariableReferenceNode).transformedRefName!!
                     val newValue = result - IntValue(1)
-                    callStack.currentSymbolTable().assign(variable, newValue)
+                    node!!.write(newValue)
                     newValue
                 }
                 "post++" -> {
-                    val variable = (node as VariableReferenceNode).transformedRefName!!
                     val newValue = result + IntValue(1)
-                    callStack.currentSymbolTable().assign(variable, newValue)
+                    node!!.write(newValue)
                     result
                 }
                 "post--" -> {
-                    val variable = (node as VariableReferenceNode).transformedRefName!!
                     val newValue = result - IntValue(1)
-                    callStack.currentSymbolTable().assign(variable, newValue)
+                    node!!.write(newValue)
                     result
                 }
                 else -> throw UnsupportedOperationException()
@@ -168,6 +166,27 @@ class Interpreter(val scriptNode: ScriptNode) {
         }
     }
 
+    protected fun ASTNode.write(value: RuntimeValue) {
+        when (this) {
+            is VariableReferenceNode -> {
+                if (this.ownerRef != null) {
+                    NavigationNode(VariableReferenceNode("this"), ".", ClassMemberReferenceNode(this.variableName, this.transformedRefName)).write(value)
+                } else {
+                    callStack.currentSymbolTable().assign(this.transformedRefName ?: this.variableName, value)
+                }
+            }
+
+            is NavigationNode -> {
+                val obj = this.subject.eval() as ClassInstance
+//                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
+                // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
+                obj.assign(obj.clazz.memberProperties[(this.member as ClassMemberReferenceNode).name]!!.transformedRefName!!, value)
+            }
+
+            else -> throw UnsupportedOperationException()
+        }
+    }
+
     fun AssignmentNode.eval() {
         if (subject is NavigationNode && subject.operator == "?.") {
             throw UnsupportedOperationException("?: on left side of assignment is not supported")
@@ -175,22 +194,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         val result = value.eval()
 
         val read = { subject.eval() }
-        val write = { value: RuntimeValue ->
-            when (subject) {
-                is VariableReferenceNode -> {
-                    callStack.currentSymbolTable().assign(subject.transformedRefName ?: subject.variableName, value)
-                }
-
-                is NavigationNode -> {
-                    val obj = subject.subject.eval() as ClassInstance
-//                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
-                    // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-                    obj.assign(obj.clazz.memberProperties[(subject.member as ClassMemberReferenceNode).name]!!.transformedRefName!!, value)
-                }
-
-                else -> throw UnsupportedOperationException()
-            }
-        }
+        val write = { value: RuntimeValue -> subject.write(value) }
 
         val finalResult = if (operator == "=") {
             result as RuntimeValue
@@ -212,6 +216,9 @@ class Interpreter(val scriptNode: ScriptNode) {
     fun VariableReferenceNode.eval(): RuntimeValue {
         // usual variable -> transformedRefName
         // class constructor -> variableName? TODO
+        if (ownerRef != null) {
+            return NavigationNode(VariableReferenceNode("this"), ".", ClassMemberReferenceNode(variableName, transformedRefName)).eval()
+        }
         return callStack.currentSymbolTable().read(transformedRefName ?: variableName)
     }
 
@@ -221,16 +228,36 @@ class Interpreter(val scriptNode: ScriptNode) {
 
     fun FunctionCallNode.eval(): RuntimeValue {
         // TODO move to semantic analyzer
-        val name = (function as? VariableReferenceNode ?: throw UnsupportedOperationException("Dynamic functions are not yet supported")).variableName
-        val functionNode = callStack.currentSymbolTable().findFunction(name)
-        if (functionNode != null) {
-            return evalFunctionCall(functionNode)
+        when (function) {
+            is VariableReferenceNode -> {
+                val name = function.variableName
+
+                val functionNode = callStack.currentSymbolTable().findFunction(name)
+                if (functionNode != null) {
+                    return evalFunctionCall(functionNode)
+                }
+                val classDefinition = callStack.currentSymbolTable().findClass(name)
+
+                if (classDefinition != null) {
+                    return evalCreateClassInstance(classDefinition)
+                }
+                throw RuntimeException("Function $name not found")
+            }
+
+            is NavigationNode -> {
+                val subject = function.subject.eval()
+                if (subject == NullValue) {
+                    if (function.operator == "?.") {
+                        return NullValue
+                    } else {
+                        throw EvaluateNullPointerException()
+                    }
+                }
+                return evalClassMemberFunctionCall(subject as ClassInstance, function.member)
+            }
+
+            else -> throw UnsupportedOperationException("Dynamic functions are not yet supported")
         }
-        val classDefinition = callStack.currentSymbolTable().findClass(name)
-        if (classDefinition != null) {
-            return evalCreateClassInstance(classDefinition)
-        }
-        throw RuntimeException("Function $name not found")
     }
 
     fun FunctionCallNode.evalFunctionCall(functionNode: FunctionDeclarationNode): RuntimeValue {
@@ -286,10 +313,6 @@ class Interpreter(val scriptNode: ScriptNode) {
         // TODO call constructor and initializer
 
         val instance = ClassInstance(clazz)
-//        clazz.memberProperties.forEach { (name, declaration) ->
-//            declaration.initialValue?.eval()
-//                ?.also { instance.memberPropertyValues[name] = it as RuntimeValue }
-//        }
         val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
 
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassInitializer, callPosition = this.position)
@@ -346,18 +369,15 @@ class Interpreter(val scriptNode: ScriptNode) {
                 try {
                     val innerSymbolTable = callStack.currentSymbolTable()
                     nonPropertyArguments.forEach {
-                        innerSymbolTable.declareProperty(it.key, TypeNode("", null, false))
-                        innerSymbolTable.assign(it.key, it.value)
+                        val keyWithIncreasedScope = it.key.replaceAfterLast("/", innerSymbolTable.scopeLevel.toString())
+                        log.v("keyWithIncreasedScope = $keyWithIncreasedScope")
+                        innerSymbolTable.declareProperty(keyWithIncreasedScope, TypeNode("", null, false))
+                        innerSymbolTable.assign(keyWithIncreasedScope, it.value)
                     }
                     when (it) {
                         is PropertyDeclarationNode -> {
                             properties += it.transformedRefName!!
                             val value = it.initialValue!!.eval() as RuntimeValue
-                            // constructor parameter has higher priority than instance member variables
-//                        if (!symbolTable.hasProperty(it.name, isThisScopeOnly = true)) {
-                            symbolTable.declareProperty(it.transformedRefName!!, it.type)
-                            symbolTable.assign(it.transformedRefName!!, value)
-//                        }
                             instance.memberPropertyValues[it.transformedRefName!!] = value
                         }
 
@@ -385,18 +405,32 @@ class Interpreter(val scriptNode: ScriptNode) {
                     callStack.pop(ScopeType.ClassInitializer)
                 }
             }
-
-            properties.forEach {
-                // TODO check for isModifiable
-                // TODO type checking
-                val possiblyModifiedValue = symbolTable.read(it, isThisScopeOnly = true)
-                instance.memberPropertyValues[it] = possiblyModifiedValue
-            }
         } finally {
             callStack.pop(ScopeType.ClassInitializer)
         }
 
         return instance
+    }
+
+    fun FunctionCallNode.evalClassMemberFunctionCall(subject: ClassInstance, member: ClassMemberReferenceNode): RuntimeValue {
+        val function = subject.clazz.memberFunctions[member.name] ?: throw EvaluateRuntimeException("Member function `${member.name}` not found")
+
+        callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
+        try {
+            val symbolTable = callStack.currentSymbolTable()
+            symbolTable.declareProperty("this", TypeNode("", null, false))
+            symbolTable.assign("this", subject)
+
+            val result = evalFunctionCall(
+                callNode = this.copy(function = function),
+                functionNode = function,
+                extraScopeParameters = emptyMap(),
+            )
+
+            return result.result
+        } finally {
+            callStack.pop(ScopeType.ClassMemberFunction)
+        }
     }
 
     fun BlockNode.eval(): RuntimeValue {

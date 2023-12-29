@@ -1,0 +1,21 @@
+= Class
+:toc:
+
+== Context in Semantic Analysis
+
+All properties must be declared into the current scope, even though they are also declared with their owner separately. This is to allow differentiation among properties, constructor parameters and local variables.
+
+== Primary Constructor Parameters
+Due to the behaviour in Kotlin (as of Kotlin 1.9) that primary constructor parameters have higher precedence than member instances, an additional inner scope is introduced to declare constructor parameters. This introduction introduces inconsistency in replaced variable names, so non-property constructor parameters will be copied with a different variable name in the inner scope.
+
+Also, note that member properties declared in primary constructor are immutable in default value expressions, even if these properties are marked as `var`. For example, the following code is invalid:
+```
+class Cls(var a: Int = 60, var b: Int = a++)
+```
+
+And this is valid:
+```
+class Cls(var a: Int = 60) {
+    var b: Int = a++
+}
+```

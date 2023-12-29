@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: ScopeType, val parentScope: SymbolTable?) {
     private val propertyDeclarations = mutableMapOf<String, TypeNode>()
     internal val propertyValues = mutableMapOf<String, RuntimeValue>()
+    internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
 
     private val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
 
@@ -27,6 +28,24 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
 
     fun undeclarePropertyByDeclaredName(declaredName: String) {
         undeclareProperty(findTransformedNameByDeclaredName(declaredName))
+    }
+
+    /**
+     * Only use in SemanticAnalyzer
+     */
+    fun declarePropertyOwner(name: String, owner: String) {
+        propertyOwners[name] = owner
+    }
+
+    /**
+     * Only use in SemanticAnalyzer
+     */
+    fun findPropertyOwner(name: String): String? {
+        if (propertyOwners.containsKey(name)) {
+            return propertyOwners[name]
+        } else {
+            return parentScope?.findPropertyOwner(name)
+        }
     }
 
     fun assign(name: String, value: RuntimeValue): Boolean { // TODO check type, modifiable

@@ -140,8 +140,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
     fun VariableReferenceNode.visit() {
         val l = checkPropertyReadAccess(variableName)
-        if (transformedRefName == null) {
+        if (variableName != "this" && transformedRefName == null) {
             transformedRefName = "$variableName/$l"
+            currentScope.findPropertyOwner(transformedRefName!!)?.let {
+                ownerRef = it
+            }
         }
     }
 
@@ -174,11 +177,23 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun FunctionCallNode.visit() {
-        val name = (function as? VariableReferenceNode ?: throw UnsupportedOperationException("Dynamic functions are not yet supported")).variableName
-        val functionNode = currentScope.findFunction(name)
-        if (functionNode == null) {
-            currentScope.findClass(name) ?: throw SemanticException("Function $name not found")
+        when (function) {
+            is VariableReferenceNode -> {
+                val name = function.variableName
+                val functionNode = currentScope.findFunction(name)
+                if (functionNode == null) {
+                    currentScope.findClass(name) ?: throw SemanticException("Function $name not found")
+                }
+            }
+
+            is NavigationNode -> {
+                function.visit()
+                // TODO
+            }
+
+            else -> throw UnsupportedOperationException("Dynamic functions are not yet supported")
         }
+
         arguments.forEach { it.visit() }
         // FIXME
     }
@@ -252,6 +267,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         subject.visit()
 
         // at this moment subject must not be a primitive
+        member.visit()
     }
 
     fun ClassDeclarationNode.visit() {
@@ -266,17 +282,27 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             }
 
             currentScope.declareProperty("this", TypeNode("", null, false))
+            primaryConstructor?.parameters
+                ?.filter { it.isProperty }
+                ?.map { it.parameter }
+                ?.forEach { currentScope.declarePropertyOwner(it.transformedRefName!!, "this") }
             declarations.filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode }
                 .forEach {
-                    pushScope("init-property", ScopeType.ClassInitializer, currentScope.scopeLevel /* not to increase */)
-                    nonPropertyArguments?.forEach { it.visit() }
+                    pushScope("init-property", ScopeType.ClassInitializer)
+                    nonPropertyArguments?.forEach { it.copy().visit() }
                     pushScope("init-property-inner", ScopeType.ClassInitializer)
                     it.visit()
                     popScope()
                     popScope()
                     if (it is PropertyDeclarationNode) {
                         it.visit(isVisitInitialValue = false)
+                        currentScope.declarePropertyOwner(it.transformedRefName!!, "this")
                     }
+                }
+
+            declarations.filterIsInstance<FunctionDeclarationNode>()
+                .forEach {
+                    it.visit()
                 }
         }
         popScope()
@@ -321,7 +347,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun ClassMemberReferenceNode.visit() {
-
+        // TODO check for write access
+        // check for existence and return error
+        try {
+            val l = checkPropertyReadAccess(name)
+            if (transformedRefName == null) {
+                transformedRefName = "$name/$l"
+            }
+        } catch (_: SemanticException) {}
     }
 
     fun analyze() = scriptNode.visit()

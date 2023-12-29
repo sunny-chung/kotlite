@@ -174,4 +174,31 @@ class ClassInitializerTest {
         assertEquals(20, (o.findPropertyByDeclaredName("f") as IntValue).value)
         assertEquals(60, (o.findPropertyByDeclaredName("g") as IntValue).value)
     }
+
+    @Test
+    fun multipleReadWriteInPropertyInit() {
+        val interpreter = interpreter("""
+            class Cls(var a: Int = 10) {
+                var b: Int = ++a
+                var c: Int = (++a) + (++b)
+                var d: Int = b++
+                var e: Int = b
+                var f: Int = a
+            }
+            val o: Cls = Cls()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
+        val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
+        assertEquals(6, o.memberPropertyValues.size)
+        assertEquals(12, (o.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(13, (o.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(24, (o.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(12, (o.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(13, (o.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(12, (o.findPropertyByDeclaredName("f") as IntValue).value)
+    }
 }
