@@ -313,7 +313,7 @@ class PropertyTypeTest {
             class Cls(var a: Int = 60) {
                 val b: Int = 10
                 fun f(c: Double) {
-                    c = 20
+                    val d: Int = c
                 }
             }
             Cls().f(1)

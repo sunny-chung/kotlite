@@ -31,6 +31,7 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
             throw RuntimeException("No such property `$name`")
         }
         propertyDeclarations.remove(name)
+        propertyValues.remove(name)
     }
 
     fun undeclarePropertyByDeclaredName(declaredName: String) {
@@ -71,6 +72,16 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
         } else {
             throw RuntimeException("The variable `$name` has not been declared")
         }
+    }
+
+    fun hasAssignedInThisScope(name: String): Boolean {
+        return propertyValues[name] != null
+    }
+
+    fun getPropertyType(name: String, isThisScopeOnly: Boolean = false): PropertyType {
+        return propertyDeclarations[name]
+            ?: Unit.takeIf { isThisScopeOnly }.let { parentScope?.getPropertyType(name) }
+            ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
     fun read(name: String, isThisScopeOnly: Boolean = false): RuntimeValue {

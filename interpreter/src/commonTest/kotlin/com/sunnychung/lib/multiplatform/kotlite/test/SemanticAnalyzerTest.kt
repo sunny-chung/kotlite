@@ -7,6 +7,8 @@ import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
+fun semanticAnalyzer(code: String) = SemanticAnalyzer(Parser(Lexer(code)).script())
+
 class SemanticAnalyzerTest {
     fun build(code: String) = SemanticAnalyzer(
         Parser(Lexer(code)).script()

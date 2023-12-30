@@ -28,6 +28,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -81,6 +82,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         return scope.scopeLevel
     }
 
+    /**
+     * This method is stateful and modifies data.
+     */
     fun checkPropertyWriteAccess(name: String): Int {
         if (!currentScope.hasProperty(name)) { // FIXME
             throw SemanticException("Property `$name` is not declared")
@@ -89,6 +93,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         while (!scope.hasProperty(name, isThisScopeOnly = true)) {
             scope = scope.parentScope!!
         }
+
+        val propertyType = scope.getPropertyType(name)
+        if (!propertyType.isMutable && scope.hasAssignedInThisScope(name)) {
+            throw SemanticException("val `$name` cannot be reassigned")
+        }
+        scope.assign(name, SemanticDummyRuntimeValue(propertyType.type))
+
         return scope.scopeLevel
     }
 
@@ -98,6 +109,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
     fun UnaryOpNode.visit() {
         node!!.visit()
+        if (operator in setOf("pre++", "pre--", "post++", "post--") && node is VariableReferenceNode) {
+            checkPropertyWriteAccess((node as VariableReferenceNode).variableName)
+        }
     }
 
     fun BinaryOpNode.visit() {
@@ -118,6 +132,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 if (transformedRefName == null) {
                     transformedRefName = "$variableName/$l"
                 }
+
             }
             is NavigationNode -> {
                 subject.visit()
@@ -135,6 +150,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             throw SemanticException("Property `$name` has already been declared")
         }
         currentScope.declareProperty(name = name, type = type, isMutable = isMutable)
+        if (initialValue != null) {
+            currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.getPropertyType(name).type))
+        }
         transformedRefName = "$name/${scopeLevel}"
     }
 
@@ -204,6 +222,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             throw SemanticException("Property `$name` has already been declared")
         }
         currentScope.declareProperty(name = name, type = type, isMutable = false)
+        currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type))
         transformedRefName = "$name/${currentScope.scopeLevel}"
     }
 
@@ -277,9 +296,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             val nonPropertyArguments = primaryConstructor?.parameters
                 ?.filter { !it.isProperty }
                 ?.map { it.parameter }
-            nonPropertyArguments?.forEach {
-                currentScope.undeclareProperty(it.name)
+            primaryConstructor?.parameters?.forEach {
+                currentScope.undeclareProperty(it.parameter.name)
             }
+            primaryConstructor?.parameters
+                ?.filter { it.isProperty }
+                ?.forEach {
+                    val p = it.parameter
+                    currentScope.declareProperty(name = p.name, type = p.type, isMutable = it.isMutable)
+                    currentScope.assign(p.name, SemanticDummyRuntimeValue(currentScope.getPropertyType(p.name).type))
+                }
 
             currentScope.parentScope!!.declareClass(
                 ClassDefinition(
