@@ -4,7 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierExcepti
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 
 class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: ScopeType, val parentScope: SymbolTable?) {
-    private val propertyDeclarations = mutableMapOf<String, TypeNode>()
+    private val propertyDeclarations = mutableMapOf<String, PropertyType>()
     internal val propertyValues = mutableMapOf<String, RuntimeValue>()
     internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
 
@@ -12,11 +12,18 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
 
     private val classDeclarations = mutableMapOf<String, ClassDefinition>()
 
-    fun declareProperty(name: String, type: TypeNode) {
+    fun declareProperty(name: String, type: TypeNode, isMutable: Boolean) {
         if (hasProperty(name = name, true)) {
             throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Property)
         }
-        propertyDeclarations[name] = type
+        propertyDeclarations[name] = typeNodeToPropertyType(type = type, isMutable = isMutable)
+            ?: throw RuntimeException("Unknown type ${type.name}")
+    }
+
+    fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
+        val primitiveType = type.toPrimitiveDataType()
+        val dataType = primitiveType ?: ObjectType(clazz = findClass(type.name) ?: return null, isNullable = type.isNullable)
+        return PropertyType(type = dataType, isMutable = isMutable)
     }
 
     fun undeclareProperty(name: String) {
@@ -48,8 +55,15 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
         }
     }
 
-    fun assign(name: String, value: RuntimeValue): Boolean { // TODO check type, modifiable
+    fun assign(name: String, value: RuntimeValue): Boolean {
         if (propertyDeclarations.containsKey(name)) {
+            val type = propertyDeclarations[name]!!
+            if (!type.isMutable && propertyValues.containsKey(name)) {
+                throw RuntimeException("val cannot be reassigned")
+            }
+            if (!type.type.isAssignableFrom(value.type())) {
+                throw RuntimeException("Type ${value.type().name} cannot be casted to ${type.type.name}")
+            }
             propertyValues[name] = value
             return true
         } else if (parentScope?.assign(name, value) == true) {
@@ -113,4 +127,5 @@ class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: Sco
                 "propertyDeclarations = $propertyDeclarations\n" +
                 "propertyValues = $propertyValues"
     }
+
 }

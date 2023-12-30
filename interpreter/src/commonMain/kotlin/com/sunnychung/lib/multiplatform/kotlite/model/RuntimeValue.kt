@@ -6,12 +6,12 @@ sealed interface RuntimeValue {
 //data class RuntimeValue(val type: DataType, val value: Any?)
 
 data object UnitValue : RuntimeValue {
-    override fun type() = UnitType
+    override fun type() = UnitType()
 }
 data object NullValue : RuntimeValue {
     override fun type() = NullType
 }
 
 data class BooleanValue(val value: Boolean) : RuntimeValue {
-    override fun type() = BooleanType
+    override fun type() = BooleanType()
 }

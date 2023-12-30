@@ -134,7 +134,7 @@ open class CodeGenerator(protected val node: ASTNode) {
     protected fun NullNode.generate() = "null"
 
     protected fun PropertyDeclarationNode.generate()
-        = "var $name<$transformedRefName>: ${type.generate()}${initialValue?.let { " = ${it.generate()}" } ?: ""}"
+        = "${if (isMutable) "var" else "val"} $name<$transformedRefName>: ${type.generate()}${initialValue?.let { " = ${it.generate()}" } ?: ""}"
 
     protected fun ReturnNode.generate()
         = "return${if (returnToLabel.isNotEmpty()) "@$returnToLabel" else ""}${value?.let { " ${it.generate()}" } ?: ""}"

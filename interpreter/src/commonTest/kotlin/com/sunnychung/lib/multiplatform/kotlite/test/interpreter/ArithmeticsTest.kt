@@ -7,16 +7,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ArithmeticsTest {
-    private fun compareNumber(expected: Number, actual: NumberValue<*>) {
-        // check both because the expression `1.2345 is Int` in JS evaluates to true
-        if (expected is Int && actual is IntValue) {
-            assertEquals(expected, (actual as IntValue).value)
-        } else {
-            expected as Double
-            assertTrue((actual as DoubleValue).value in (expected - 0.0001 .. expected + 0.0001))
-        }
+fun compareNumber(expected: Number, actual: NumberValue<*>) {
+    // check both because the expression `1.2345 is Int` in JS evaluates to true
+    if (expected is Int && actual is IntValue) {
+        assertEquals(expected, (actual as IntValue).value)
+    } else {
+        expected as Double
+        assertTrue((actual as DoubleValue).value in (expected - 0.0001 .. expected + 0.0001))
     }
+}
+
+class ArithmeticsTest {
 
     @Test
     fun simpleAssignmentWithArithmetics() {

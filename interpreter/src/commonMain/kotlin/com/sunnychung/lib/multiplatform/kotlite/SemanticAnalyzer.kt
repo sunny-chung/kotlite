@@ -134,7 +134,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {
             throw SemanticException("Property `$name` has already been declared")
         }
-        currentScope.declareProperty(name = name, type = type)
+        currentScope.declareProperty(name = name, type = type, isMutable = isMutable)
         transformedRefName = "$name/${scopeLevel}"
     }
 
@@ -203,7 +203,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {
             throw SemanticException("Property `$name` has already been declared")
         }
-        currentScope.declareProperty(name = name, type = type)
+        currentScope.declareProperty(name = name, type = type, isMutable = false)
         transformedRefName = "$name/${currentScope.scopeLevel}"
     }
 
@@ -281,7 +281,35 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 currentScope.undeclareProperty(it.name)
             }
 
-            currentScope.declareProperty("this", TypeNode("", null, false))
+            currentScope.parentScope!!.declareClass(
+                ClassDefinition(
+                    currentScope = currentScope.parentScope!!,
+                    name = name,
+                    fullQualifiedName = fullQualifiedName,
+                    isInstanceCreationAllowed = true,
+                    primaryConstructor = primaryConstructor,
+                    rawMemberProperties = ((primaryConstructor?.parameters
+                        ?.filter { it.isProperty }
+                        ?.map {
+                            val p = it.parameter
+                            PropertyDeclarationNode(
+                                name = p.name,
+                                type = p.type,
+                                isMutable = it.isMutable,
+                                initialValue = p.defaultValue,
+                                transformedRefName = p.transformedRefName,
+                            )
+                        } ?: emptyList()) +
+                            declarations.filterIsInstance<PropertyDeclarationNode>()),
+                    memberFunctions = declarations
+                        .filterIsInstance<FunctionDeclarationNode>()
+                        .associateBy { it.name },
+                    orderedInitializersAndPropertyDeclarations = declarations
+                        .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
+                )
+            )
+
+            currentScope.declareProperty("this", TypeNode(name, null, false), false)
             primaryConstructor?.parameters
                 ?.filter { it.isProperty }
                 ?.map { it.parameter }
@@ -306,32 +334,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 }
         }
         popScope()
-        currentScope.declareClass(
-            ClassDefinition(
-                name = name,
-                fullQualifiedName = fullQualifiedName,
-                isInstanceCreationAllowed = true,
-                primaryConstructor = primaryConstructor,
-                memberProperties = ((primaryConstructor?.parameters
-                    ?.filter { it.isProperty }
-                    ?.map { it.parameter }
-                    ?.map {
-                        PropertyDeclarationNode(
-                            name = it.name,
-                            type = it.type,
-                            initialValue = it.defaultValue,
-                            transformedRefName = it.transformedRefName
-                        )
-                    } ?: emptyList()) +
-                        declarations.filterIsInstance<PropertyDeclarationNode>())
-                    .associateBy { it.name },
-                memberFunctions = declarations
-                    .filterIsInstance<FunctionDeclarationNode>()
-                    .associateBy { it.name },
-                orderedInitializersAndPropertyDeclarations = declarations
-                    .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
-            )
-        )
     }
 
     fun ClassPrimaryConstructorNode.visit() {

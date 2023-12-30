@@ -60,7 +60,7 @@ data class TypeNode(val name: String, val argument: TypeNode?, val isNullable: B
     }
 }
 
-data class PropertyDeclarationNode(val name: String, val type: TypeNode, val initialValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+data class PropertyDeclarationNode(val name: String, val type: TypeNode, val isMutable: Boolean, val initialValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self-->${type.toMermaid()}\n$self-->${initialValue?.toMermaid()}\n"

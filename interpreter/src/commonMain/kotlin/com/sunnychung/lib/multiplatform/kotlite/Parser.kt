@@ -700,8 +700,12 @@ class Parser(lexer: Lexer) {
      *     {annotation} {NL} simpleIdentifier [{NL} ':' {NL} type]
      */
     fun propertyDeclaration(): ASTNode {
-        eat(TokenType.Identifier).also {
-            if (it.value !in setOf("val", "var")) throw UnexpectedTokenException(it)
+        val isMutable = eat(TokenType.Identifier).let {
+            when (it.value) {
+                "val" -> false
+                "var" -> true
+                else -> throw UnexpectedTokenException(it)
+            }
         }
         val name = userDefinedIdentifier()
         repeatedNL()
@@ -716,7 +720,7 @@ class Parser(lexer: Lexer) {
         }
 //        repeatedNL() // this would cause the NL before the next statement not recognized
         // TODO getter & setter
-        return PropertyDeclarationNode(name = name, type = type, initialValue = initialValue)
+        return PropertyDeclarationNode(name = name, type = type, isMutable = isMutable, initialValue = initialValue)
     }
 
     /**

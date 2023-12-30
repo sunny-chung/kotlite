@@ -27,7 +27,7 @@ class FunctionTest {
                 val q: Int = a + b * 2
                 return q + 1
             }
-            val x: Int = 1 + 2
+            var x: Int = 1 + 2
             x += myFunction(3, 4) + 1
         """.trimIndent())
         interpreter.eval()
@@ -44,7 +44,7 @@ class FunctionTest {
                 val q: Int = a + b * 2
                 return q + 1
             }
-            val x: Int = 1 + 2
+            var x: Int = 1 + 2
             x += myFunction(b = 3, a = 4) + 1
         """.trimIndent())
         interpreter.eval()
@@ -58,12 +58,12 @@ class FunctionTest {
     fun functionShouldNotContinueExecutionAfterReturn() {
         val interpreter = interpreter("""
             fun myFunction(a: Int, b: Int): Int {
-                val q: Int = a + b
+                var q: Int = a + b
                 return q + 1
                 q = 100
                 return q - 1
             }
-            val x: Int = 1 + 2
+            var x: Int = 1 + 2
             x += myFunction(3, 4) + 1
         """.trimIndent())
         interpreter.eval()
@@ -111,7 +111,7 @@ class FunctionTest {
     fun nestedRecursion() {
         val interpreter = interpreter("""
             fun fib(n: Int): Int {
-                fun f(n: Int) {
+                fun f(n: Int): Int {
                     if (n <= 1) return n
                     return fib(n - 2) + fib(n - 1)
                 }
@@ -133,7 +133,7 @@ class FunctionTest {
                 val q: Int = a + b * 2
                 return q + 1
             }
-            val x: Int = 1 + 2
+            var x: Int = 1 + 2
             x += myFunction(a = 4) + 1
         """.trimIndent())
         interpreter.eval()
@@ -153,7 +153,7 @@ class FunctionTest {
                 val q: Int = a + b * 2
                 return q + 1
             }
-            val x: Int = 1 + 2
+            var x: Int = 1 + 2
             x += myFunction()
         """.trimIndent())
         interpreter.eval()
@@ -170,7 +170,7 @@ class FunctionTest {
                 val q: Int = a + b * 2
                 return q + 1
             }
-            val x: Int = 1 + 2
+            var x: Int = 1 + 2
             x += myFunction(a = 4) + 1
         """.trimIndent())
         interpreter.eval()
@@ -187,7 +187,7 @@ class FunctionTest {
                 val q: Int = a + b * 2
                 return q + 1
             }
-            val x: Int = 1 + 2
+            var x: Int = 1 + 2
             x += myFunction(a = 4, b = 5) + 1
         """.trimIndent())
         interpreter.eval()

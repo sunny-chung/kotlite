@@ -159,10 +159,10 @@ class Interpreter(val scriptNode: ScriptNode) {
         val name = transformedRefName!!
         if (initialValue != null) {
             val value = initialValue.eval()
-            symbolTable.declareProperty(name, type)
+            symbolTable.declareProperty(name, type, isMutable)
             symbolTable.assign(name, value as RuntimeValue)
         } else {
-            symbolTable.declareProperty(name, type)
+            symbolTable.declareProperty(name, type, isMutable)
         }
     }
 
@@ -180,7 +180,7 @@ class Interpreter(val scriptNode: ScriptNode) {
                 val obj = this.subject.eval() as ClassInstance
 //                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
                 // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-                obj.assign(obj.clazz.memberProperties[(this.member as ClassMemberReferenceNode).name]!!.transformedRefName!!, value)
+                obj.assign(obj.clazz.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value)
             }
 
             else -> throw UnsupportedOperationException()
@@ -283,26 +283,37 @@ class Interpreter(val scriptNode: ScriptNode) {
             }
         }
 
+        val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(functionNode.type, false)!!.type
+
         callStack.push(functionFullQualifiedName = functionNode.name, scopeType = ScopeType.Function, callPosition = callNode.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
             extraScopeParameters.forEach {
-                symbolTable.declareProperty(it.key, TypeNode(it.value.type().toString(), null, false)) // TODO change to use DataType directly
+                symbolTable.declareProperty(it.key, TypeNode(it.value.type().name, null, false), false) // TODO change to use DataType directly
                 symbolTable.assign(it.key, it.value)
             }
             functionNode.valueParameters.forEachIndexed { index, it ->
-                symbolTable.declareProperty(it.transformedRefName!!, it.type)
+                symbolTable.declareProperty(it.transformedRefName!!, it.type, false)
                 symbolTable.assign(it.transformedRefName!!, callArguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue))
             }
 
             // execute function
             val returnValue = try {
-                functionNode.body.eval()
+                val result = functionNode.body.eval()
+                if (returnType is UnitType) {
+                    UnitValue
+                } else {
+                    result
+                }
             } catch (r: NormalReturnException) {
                 r.value
             }
 
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
+            if (!returnType.isAssignableFrom(returnValue.type())) {
+                throw RuntimeException("Type ${returnValue.type().name} cannot be casted to ${returnType.name}")
+            }
+
             return FunctionCallResult(returnValue, symbolTable)
         } finally {
             callStack.pop(ScopeType.Function)
@@ -337,16 +348,17 @@ class Interpreter(val scriptNode: ScriptNode) {
             }
 
             val symbolTable = callStack.currentSymbolTable()
-            val nonPropertyArguments = mutableMapOf<String, RuntimeValue>()
+            val nonPropertyArguments = mutableMapOf<String, Pair<TypeNode, RuntimeValue>>()
             clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
                 // no need to use transformedRefName as duplicated declarations are not possible here
                 val value = callArguments[index] ?: (it.parameter.defaultValue!!.eval() as RuntimeValue)
-                symbolTable.declareProperty(it.parameter.transformedRefName!!, it.parameter.type)
+                symbolTable.declareProperty(it.parameter.transformedRefName!!, it.parameter.type, false)
                 symbolTable.assign(it.parameter.transformedRefName!!, value)
                 if (it.isProperty) {
-                    instance.memberPropertyValues[it.parameter.transformedRefName!!] = value
+                    instance.assign(it.parameter.transformedRefName!!, value)
+//                    instance.memberPropertyValues[it.parameter.transformedRefName!!] = value
                 } else {
-                    nonPropertyArguments[it.parameter.transformedRefName!!] = value
+                    nonPropertyArguments[it.parameter.transformedRefName!!] = Pair(it.parameter.type, value)
                 }
             }
 
@@ -357,7 +369,7 @@ class Interpreter(val scriptNode: ScriptNode) {
             }
 
             // variable "this" is available after primary constructor
-            symbolTable.declareProperty("this", TypeNode("", null, false))
+            symbolTable.declareProperty("this", TypeNode(instance.clazz.name, null, false), false)
             symbolTable.assign("this", instance)
 
             clazz.orderedInitializersAndPropertyDeclarations.forEach {
@@ -371,14 +383,15 @@ class Interpreter(val scriptNode: ScriptNode) {
                     nonPropertyArguments.forEach {
                         val keyWithIncreasedScope = it.key.replaceAfterLast("/", innerSymbolTable.scopeLevel.toString())
                         log.v("keyWithIncreasedScope = $keyWithIncreasedScope")
-                        innerSymbolTable.declareProperty(keyWithIncreasedScope, TypeNode("", null, false))
-                        innerSymbolTable.assign(keyWithIncreasedScope, it.value)
+                        innerSymbolTable.declareProperty(keyWithIncreasedScope, it.value.first, false)
+                        innerSymbolTable.assign(keyWithIncreasedScope, it.value.second)
                     }
                     when (it) {
                         is PropertyDeclarationNode -> {
                             properties += it.transformedRefName!!
                             val value = it.initialValue!!.eval() as RuntimeValue
-                            instance.memberPropertyValues[it.transformedRefName!!] = value
+                            instance.assign(it.transformedRefName!!, value)
+//                            instance.memberPropertyValues[it.transformedRefName!!] = value
                         }
 
                         is ClassInstanceInitializerNode -> {
@@ -418,7 +431,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
-            symbolTable.declareProperty("this", TypeNode("", null, false))
+            symbolTable.declareProperty("this", TypeNode(subject.clazz.name, null, false), false)
             symbolTable.assign("this", subject)
 
             val result = evalFunctionCall(
@@ -485,22 +498,24 @@ class Interpreter(val scriptNode: ScriptNode) {
 
     fun ClassDeclarationNode.eval() {
         callStack.currentSymbolTable().declareClass(ClassDefinition(
+            currentScope = callStack.currentSymbolTable(),
             name = name,
             fullQualifiedName = fullQualifiedName,
             isInstanceCreationAllowed = true,
             primaryConstructor = primaryConstructor,
-            memberProperties = ((primaryConstructor?.parameters
+            rawMemberProperties = ((primaryConstructor?.parameters
                 ?.filter { it.isProperty }
-                ?.map { it.parameter }
-                ?.map { PropertyDeclarationNode(
-                    name = it.name,
-                    type = it.type,
-                    initialValue = it.defaultValue,
-                    transformedRefName = it.transformedRefName
-                ) } ?: emptyList()) +
-                    declarations.filterIsInstance<PropertyDeclarationNode>())
-                .associateBy { it.name }
-            ,
+                ?.map {
+                    val p = it.parameter
+                    PropertyDeclarationNode(
+                        name = p.name,
+                        type = p.type,
+                        isMutable = it.isMutable,
+                        initialValue = p.defaultValue,
+                        transformedRefName = p.transformedRefName,
+                    )
+                } ?: emptyList()) +
+                    declarations.filterIsInstance<PropertyDeclarationNode>()),
             memberFunctions = declarations
                 .filterIsInstance<FunctionDeclarationNode>()
                 .associateBy { it.name },
@@ -513,7 +528,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         val obj = subject.eval() as ClassInstance
 //        return obj.memberPropertyValues[member.transformedRefName!!]!!
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-        return obj.read(obj.clazz.memberProperties[member.name]!!.transformedRefName!!)
+        return obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)
     }
 
     fun IntegerNode.eval() = IntValue(value)

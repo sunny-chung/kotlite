@@ -65,7 +65,7 @@ class ClassMemberFunctionTest {
                 
                 fun addA() {
                     a += 10
-                    val a: Int = 100
+                    var a: Int = 100
                 }
                 
                 fun getA(): Int {
@@ -73,7 +73,7 @@ class ClassMemberFunctionTest {
                 }
                 
                 fun addB() {
-                    val b: Int = 200
+                    var b: Int = 200
                     b += 11
                     this.b += 50
                 }
