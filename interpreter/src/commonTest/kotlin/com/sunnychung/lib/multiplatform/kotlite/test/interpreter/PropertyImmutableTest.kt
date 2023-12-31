@@ -179,4 +179,23 @@ class PropertyImmutableTest {
         """.trimIndent())
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
+
+    @Test
+    fun memberPropertySetterArgument() {
+        val analyzer = semanticAnalyzer("""
+            var a: Int = -10
+            class MyCls {
+                var a: Int = 1
+                var b: Int
+                    set(value) {
+                        value = 30
+                        a += value
+                    }
+            }
+            val o: MyCls = MyCls()
+            val x: Int = o.a
+            o.b = 20
+        """.trimIndent())
+        assertFailsWith<SemanticException> { analyzer.analyze() }
+    }
 }

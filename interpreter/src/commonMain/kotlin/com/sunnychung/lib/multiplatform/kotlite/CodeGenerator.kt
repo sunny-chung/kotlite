@@ -21,11 +21,13 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
@@ -67,7 +69,9 @@ open class CodeGenerator(protected val node: ASTNode) {
             is UnaryOpNode -> this.generate()
             is VariableReferenceNode -> this.generate()
             is WhileNode -> this.generate()
-        }
+        is PropertyAccessorsNode -> TODO()
+        is ValueNode -> TODO()
+    }
 
     protected fun AssignmentNode.generate()
         = "${subject.generate()} $operator ${value.generate()}"
@@ -134,7 +138,9 @@ open class CodeGenerator(protected val node: ASTNode) {
     protected fun NullNode.generate() = "null"
 
     protected fun PropertyDeclarationNode.generate()
-        = "${if (isMutable) "var" else "val"} $name<$transformedRefName>: ${type.generate()}${initialValue?.let { " = ${it.generate()}" } ?: ""}"
+        = "${if (isMutable) "var" else "val"} $name<$transformedRefName>: ${type.generate()}${initialValue?.let { " = ${it.generate()}" } ?: ""}" +
+            (accessors?.getter?.let { "\nget() ${it.generate()}" } ?: "" )+
+            (accessors?.setter?.let { "\nset() ${it.generate()}" } ?: "")
 
     protected fun ReturnNode.generate()
         = "return${if (returnToLabel.isNotEmpty()) "@$returnToLabel" else ""}${value?.let { " ${it.generate()}" } ?: ""}"

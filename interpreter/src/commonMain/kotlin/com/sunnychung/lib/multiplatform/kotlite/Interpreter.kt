@@ -35,21 +35,24 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 class Interpreter(val scriptNode: ScriptNode) {
 
-    val callStack = CallStack()
+    internal val callStack = CallStack()
 
     fun ASTNode.eval(): Any {
         return when (this) {
@@ -80,6 +83,8 @@ class Interpreter(val scriptNode: ScriptNode) {
             is ClassPrimaryConstructorNode -> TODO()
             is ClassMemberReferenceNode -> TODO()
             is NavigationNode -> this.eval()
+            is PropertyAccessorsNode -> TODO()
+            is ValueNode -> this.eval()
         }
     }
 
@@ -180,7 +185,13 @@ class Interpreter(val scriptNode: ScriptNode) {
                 val obj = this.subject.eval() as ClassInstance
 //                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
                 // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-                obj.assign(obj.clazz.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value)
+                obj.assign(obj.clazz.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value)?.also {
+                    FunctionCallNode(
+                        it,
+                        listOf(FunctionCallArgumentNode(index = 0, value = ValueNode(value))),
+                        SourcePosition(1, 1)
+                    ).evalClassMemberAnyFunctionCall(obj, it)
+                }
             }
 
             else -> throw UnsupportedOperationException()
@@ -321,8 +332,6 @@ class Interpreter(val scriptNode: ScriptNode) {
     }
 
     fun FunctionCallNode.evalCreateClassInstance(clazz: ClassDefinition): ClassInstance {
-        // TODO call constructor and initializer
-
         val instance = ClassInstance(clazz)
         val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
 
@@ -389,9 +398,10 @@ class Interpreter(val scriptNode: ScriptNode) {
                     when (it) {
                         is PropertyDeclarationNode -> {
                             properties += it.transformedRefName!!
-                            val value = it.initialValue!!.eval() as RuntimeValue
-                            instance.assign(it.transformedRefName!!, value)
-//                            instance.memberPropertyValues[it.transformedRefName!!] = value
+                            val value = it.initialValue?.eval() as RuntimeValue?
+                            value?.let { value ->
+                                instance.assign(it.transformedRefName!!, value)
+                            }
                         }
 
                         is ClassInstanceInitializerNode -> {
@@ -427,7 +437,10 @@ class Interpreter(val scriptNode: ScriptNode) {
 
     fun FunctionCallNode.evalClassMemberFunctionCall(subject: ClassInstance, member: ClassMemberReferenceNode): RuntimeValue {
         val function = subject.clazz.memberFunctions[member.name] ?: throw EvaluateRuntimeException("Member function `${member.name}` not found")
+        return evalClassMemberAnyFunctionCall(subject, function)
+    }
 
+    fun FunctionCallNode.evalClassMemberAnyFunctionCall(subject: ClassInstance, function: FunctionDeclarationNode): RuntimeValue {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
@@ -528,13 +541,24 @@ class Interpreter(val scriptNode: ScriptNode) {
         val obj = subject.eval() as ClassInstance
 //        return obj.memberPropertyValues[member.transformedRefName!!]!!
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-        return obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)
+        return when (val r = obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)) {
+            is RuntimeValue -> r
+            is FunctionDeclarationNode -> {
+                FunctionCallNode(
+                    function = r,
+                    arguments = emptyList(),
+                    position = SourcePosition(1, 1)
+                ).evalClassMemberAnyFunctionCall(obj, r)
+            }
+            else -> throw UnsupportedOperationException()
+        }
     }
 
     fun IntegerNode.eval() = IntValue(value)
     fun DoubleNode.eval() = DoubleValue(value)
     fun BooleanNode.eval() = BooleanValue(value)
     fun NullNode.eval() = NullValue
+    fun ValueNode.eval() = value
 
     fun eval() = scriptNode.eval()
 

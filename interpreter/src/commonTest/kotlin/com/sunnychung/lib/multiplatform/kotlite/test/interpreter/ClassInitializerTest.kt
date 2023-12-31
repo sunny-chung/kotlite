@@ -72,6 +72,27 @@ class ClassInitializerTest {
     }
 
     @Test
+    fun initSeparated() {
+        val interpreter = interpreter("""
+            class Cls {
+                val a: Int
+                init {
+                    a = 25
+                }
+            }
+            val o: Cls = Cls()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
+        val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
+        assertEquals(1, o.memberPropertyValues.size)
+        assertEquals(25, (o.findPropertyByDeclaredName("a") as IntValue).value)
+    }
+
+    @Test
     fun multipleInit() {
         val interpreter = interpreter("""
             class Cls {

@@ -23,6 +23,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
@@ -32,6 +33,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
@@ -68,6 +70,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is ClassParameterNode -> this.visit()
             is ClassPrimaryConstructorNode -> this.visit()
             is NavigationNode -> this.visit()
+            is PropertyAccessorsNode -> TODO()
+            is ValueNode -> {}
         }
     }
 
@@ -86,7 +90,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
      * This method is stateful and modifies data.
      */
     fun checkPropertyWriteAccess(name: String): Int {
-        if (!currentScope.hasProperty(name)) { // FIXME
+        if (!currentScope.hasProperty(name)) {
             throw SemanticException("Property `$name` is not declared")
         }
         var scope = currentScope
@@ -142,15 +146,32 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
     }
 
-    fun PropertyDeclarationNode.visit(isVisitInitialValue: Boolean = true, scopeLevel: Int = currentScope.scopeLevel) {
+    fun PropertyDeclarationNode.visit(isVisitInitialValue: Boolean = true, isClassProperty: Boolean = false, scopeLevel: Int = currentScope.scopeLevel) {
         if (isVisitInitialValue) {
             initialValue?.visit()
         }
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {
             throw SemanticException("Property `$name` has already been declared")
         }
+        if (!isClassProperty && accessors != null) {
+            throw SemanticException("Only class member properties can define custom accessors")
+        }
+//        if (isMutable && accessors != null) {
+//            throw SemanticException("`var` with custom accessors is not supported")
+//        }
+//        if (accessors?.setter != null) {
+//            throw SemanticException("Custom setter is currently not supported")
+//        }
+        if (isVisitInitialValue && accessors != null) {
+            accessors.getter?.visit()
+            accessors.setter?.visit()
+        }
         currentScope.declareProperty(name = name, type = type, isMutable = isMutable)
         if (initialValue != null) {
+            if (accessors != null) {
+                throw SemanticException("Property `$name` with an initial value cannot have custom accessors")
+            }
+
             currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.getPropertyType(name).type))
         }
         transformedRefName = "$name/${scopeLevel}"
@@ -282,7 +303,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun NavigationNode.visit() {
-        // TODO visit member property
         subject.visit()
 
         // at this moment subject must not be a primitive
@@ -345,11 +365,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                     pushScope("init-property", ScopeType.ClassInitializer)
                     nonPropertyArguments?.forEach { it.copy().visit() }
                     pushScope("init-property-inner", ScopeType.ClassInitializer)
-                    it.visit()
+                    if (it is PropertyDeclarationNode) {
+                        it.visit(isClassProperty = true)
+                    } else {
+                        it.visit()
+                    }
                     popScope()
                     popScope()
                     if (it is PropertyDeclarationNode) {
-                        it.visit(isVisitInitialValue = false)
+                        it.visit(isVisitInitialValue = false, isClassProperty = true)
                         currentScope.declarePropertyOwner(it.transformedRefName!!, "this")
                     }
                 }

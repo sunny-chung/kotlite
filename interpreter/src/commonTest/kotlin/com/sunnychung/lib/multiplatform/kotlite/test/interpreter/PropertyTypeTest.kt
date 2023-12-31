@@ -348,4 +348,71 @@ class PropertyTypeTest {
         """.trimIndent())
         assertFails { interpreter.eval() }
     }
+
+    @Test
+    fun classPropertyAccessorsFail1() {
+        val interpreter = interpreter("""
+            class Cls(var a: Int = 60) {
+                var b: Double = 10.0
+                var c: Double
+                    get() = a
+                    set(value) {
+                        b = value
+                    }
+            }
+            val r: Int = Cls().f()
+        """.trimIndent())
+        assertFails { interpreter.eval() }
+    }
+
+    @Test
+    fun classPropertyAccessorsFail2() {
+        val interpreter = interpreter("""
+            class Cls(var a: Int = 60) {
+                var b: Double = 10.0
+                var c: Double
+                    get() = b
+                    set(value) {
+                        a = value
+                    }
+            }
+            val r: Int = Cls().f()
+        """.trimIndent())
+        assertFails { interpreter.eval() }
+    }
+
+    @Test
+    fun classPropertyAccessorsFail3() {
+        val interpreter = interpreter("""
+            class Cls(var a: Int = 60) {
+                var b: Double = 10.0
+                var c: Double
+                    get() {
+                        return a
+                    }
+                    set(value) {
+                        a = value
+                    }
+            }
+            val r: Int = Cls().f()
+        """.trimIndent())
+        assertFails { interpreter.eval() }
+    }
+
+    @Test
+    fun classPropertyAccessorsFail4() {
+        val interpreter = interpreter("""
+            class Cls(var a: Int = 60) {
+                var b: Double = 10.0
+                var c: Double
+                    get() = b
+                    set(value) {
+                        b = value
+                        return a
+                    }
+            }
+            val r: Int = Cls().f()
+        """.trimIndent())
+        assertFails { interpreter.eval() }
+    }
 }

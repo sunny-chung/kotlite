@@ -27,6 +27,12 @@ data class BooleanNode(val value: Boolean) : ASTNode {
     }
 }
 
+data class ValueNode(val value: RuntimeValue) : ASTNode {
+    override fun toMermaid(): String {
+        return "${generateId()}[\"Value ${value}\"]\n"
+    }
+}
+
 data object NullNode : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Null\"]\n"
@@ -60,7 +66,14 @@ data class TypeNode(val name: String, val argument: TypeNode?, val isNullable: B
     }
 }
 
-data class PropertyDeclarationNode(val name: String, val type: TypeNode, val isMutable: Boolean, val initialValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+data class PropertyDeclarationNode(
+    val name: String,
+    val type: TypeNode,
+    val isMutable: Boolean,
+    val initialValue: ASTNode?,
+    val accessors: PropertyAccessorsNode? = null,
+    @ModifyByAnalyzer var transformedRefName: String? = null
+) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self-->${type.toMermaid()}\n$self-->${initialValue?.toMermaid()}\n"
@@ -203,5 +216,16 @@ data class NavigationNode(
         val self = "${generateId()}[\"Navigation Node\"]"
         return "$self-- subject -->${subject.toMermaid()}\n" +
                 "$self-- access -->${member.toMermaid()}\n"
+    }
+}
+
+class PropertyAccessorsNode(
+    val getter: FunctionDeclarationNode?,
+    val setter: FunctionDeclarationNode?,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Navigation Node\"]"
+        return "$self\n${getter?.let {"$self-- getter -->${it.toMermaid()}\n"}}\n" +
+                "${setter?.let {"$self-- setter -->${it.toMermaid()}\n"}}"
     }
 }

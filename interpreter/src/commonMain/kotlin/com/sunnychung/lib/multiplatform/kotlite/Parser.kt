@@ -25,6 +25,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
@@ -88,14 +89,16 @@ class Parser(lexer: Lexer) {
     fun isCurrentToken(type: TokenType, value: Any) =
         currentToken.type == type && currentToken.value == value
 
-    fun currentTokenExcludingNL(): Token {
+    fun currentTokenIndexExcludingNL(): Int {
         // TODO optimize
         for (i in tokenIndex..< allTokens.size) {
             if (allTokens[i].type == TokenType.NewLine) continue
-            return allTokens[i]
+            return i
         }
         throw IndexOutOfBoundsException()
     }
+
+    fun currentTokenExcludingNL(): Token = allTokens[currentTokenIndexExcludingNL()]
 
     fun isCurrentTokenExcludingNL(type: TokenType, value: Any): Boolean {
         val t = currentTokenExcludingNL()
@@ -698,6 +701,7 @@ class Parser(lexer: Lexer) {
      *
      * variableDeclaration:
      *     {annotation} {NL} simpleIdentifier [{NL} ':' {NL} type]
+     *
      */
     fun propertyDeclaration(): ASTNode {
         val isMutable = eat(TokenType.Identifier).let {
@@ -719,8 +723,97 @@ class Parser(lexer: Lexer) {
             null
         }
 //        repeatedNL() // this would cause the NL before the next statement not recognized
-        // TODO getter & setter
-        return PropertyDeclarationNode(name = name, type = type, isMutable = isMutable, initialValue = initialValue)
+
+        fun nextNonNLSemiToken(): Token {
+            var index = currentTokenIndexExcludingNL()
+            if (allTokens[index].type == TokenType.Semicolon) {
+                ++index
+            }
+            return allTokens[index]
+        }
+
+        val nextToken = currentTokenExcludingNL()
+        val accessors = when (nextToken.value.takeIf { nextToken.type == TokenType.Identifier }) {
+            "get" -> {
+                repeatedNL()
+                val getter = getter(type)
+                val next = nextNonNLSemiToken()
+                val setter = if (next.type == TokenType.Identifier && next.value == "set") {
+                    repeatedNL()
+                    if (isSemi()) semi()
+                    setter(type)
+                } else null
+                PropertyAccessorsNode(getter, setter)
+            }
+            "set" -> {
+                repeatedNL()
+                val setter = setter(type)
+                val next = nextNonNLSemiToken()
+                val getter = if (next.type == TokenType.Identifier && next.value == "get") {
+                    repeatedNL()
+                    if (isSemi()) semi()
+                    getter(type)
+                } else null
+                PropertyAccessorsNode(getter, setter)
+            }
+            else -> null
+        }
+        return PropertyDeclarationNode(name = name, type = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
+    }
+
+    /**
+     * getter:
+     *     [modifiers] 'get' [{NL} '(' {NL} ')' [{NL} ':' {NL} type] {NL} functionBody]
+     *
+     */
+    fun getter(type: TypeNode): FunctionDeclarationNode {
+        eat(TokenType.Identifier, "get")
+        repeatedNL()
+        eat(TokenType.Operator, "(")
+        repeatedNL()
+        eat(TokenType.Operator, ")")
+        repeatedNL()
+        val body = functionBody()
+        return FunctionDeclarationNode(name = "get", type = type, valueParameters = emptyList(), body = body)
+    }
+
+    /**
+     * setter:
+     *     [modifiers] 'set' [{NL} '(' {NL} functionValueParameterWithOptionalType [{NL} ','] {NL} ')' [{NL} ':' {NL} type] {NL} functionBody]
+     *
+     * functionValueParameterWithOptionalType:
+     *     [parameterModifiers] parameterWithOptionalType [{NL} '=' {NL} expression]
+     *
+     * parameterWithOptionalType:
+     *     simpleIdentifier {NL} [':' {NL} type]
+     *
+     */
+    fun setter(type: TypeNode): FunctionDeclarationNode {
+        eat(TokenType.Identifier, "set")
+        repeatedNL()
+        eat(TokenType.Operator, "(")
+        repeatedNL()
+        val parameterName = userDefinedIdentifier()
+        repeatedNL()
+        eat(TokenType.Operator, ")")
+        repeatedNL()
+        val returnType = if (false /* Kotlin only permits Unit as return type. No point to support this syntax */
+                && isCurrentToken(TokenType.Symbol, ":")) {
+            eat(TokenType.Symbol, ":")
+            repeatedNL()
+            type().also { repeatedNL() }
+        } else {
+            TypeNode("Unit", null, false)
+        }
+        val body = functionBody()
+        return FunctionDeclarationNode(
+            name = "set",
+            type = returnType,
+            valueParameters = listOf(
+                FunctionValueParameterNode(parameterName, type, null)
+            ),
+            body = body
+        )
     }
 
     /**
