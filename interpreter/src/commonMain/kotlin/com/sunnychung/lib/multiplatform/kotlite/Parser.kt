@@ -743,7 +743,7 @@ class Parser(lexer: Lexer) {
                     if (isSemi()) semi()
                     setter(type)
                 } else null
-                PropertyAccessorsNode(getter, setter)
+                PropertyAccessorsNode(type, getter, setter)
             }
             "set" -> {
                 repeatedNL()
@@ -754,7 +754,7 @@ class Parser(lexer: Lexer) {
                     if (isSemi()) semi()
                     getter(type)
                 } else null
-                PropertyAccessorsNode(getter, setter)
+                PropertyAccessorsNode(type, getter, setter)
             }
             else -> null
         }

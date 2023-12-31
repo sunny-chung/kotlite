@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
+import com.sunnychung.lib.multiplatform.kotlite.model.BooleanType
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
@@ -14,15 +15,20 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
+import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
+import com.sunnychung.lib.multiplatform.kotlite.model.NullType
+import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
@@ -30,9 +36,11 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
+import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
@@ -40,6 +48,33 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 class SemanticAnalyzer(val scriptNode: ScriptNode) {
     val symbolTable = SymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = null)
     var currentScope = symbolTable
+
+    val typeRegistry = listOf(
+        TypeNode("Int", null, false),
+        TypeNode("Double", null, false),
+        TypeNode("Boolean", null, false),
+        TypeNode("String", null, false),
+        TypeNode("Unit", null, false),
+    )
+        .flatMap {
+            listOf(it.name to it, "${it.name}?" to it.copy(isNullable = true))
+        }
+        .let { it + listOf(
+            "Null" to TypeNode("Null", null, true),
+        ) }
+        .toMap()
+
+    fun TypeNode.toNullable() = if (isNullable) {
+        this
+    } else {
+        typeRegistry["$name?"]!!
+    }
+
+    fun DataType.toTypeNode() = if (this !is ObjectType) {
+        typeRegistry["$name${if (isNullable) "?" else ""}"]
+    } else {
+        TypeNode(name, null, isNullable)
+    }
 
     fun ASTNode.visit() {
         when (this) {
@@ -137,10 +172,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                     transformedRefName = "$variableName/$l"
                 }
 
+                log.v { "Assign $variableName type ${subject.type()} <- type ${value.type()}" }
             }
             is NavigationNode -> {
                 subject.visit()
                 // TODO handle NavigationNode
+
+                log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
             }
             else -> SemanticException("$subject cannot be assigned")
         }
@@ -223,11 +261,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 if (functionNode == null) {
                     currentScope.findClass(name) ?: throw SemanticException("Function $name not found")
                 }
+
+                log.v { "Type of call $name -> ${function.type()}" }
             }
 
             is NavigationNode -> {
                 function.visit()
                 // TODO
+
+                log.v { "Type of call ${function.member.name} -> ${function.type()}" }
             }
 
             else -> throw UnsupportedOperationException("Dynamic functions are not yet supported")
@@ -235,6 +277,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
         arguments.forEach { it.visit() }
         // FIXME
+
     }
 
     fun FunctionValueParameterNode.visit() {
@@ -258,6 +301,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         )
 
         statements.forEach { it.visit() }
+
+        returnType = type()
 
         popScope()
     }
@@ -410,4 +455,133 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun analyze() = scriptNode.visit()
+
+    ////////////////////////////////////
+
+    fun ASTNode.type()
+        = when (this) {
+            is AssignmentNode -> typeRegistry["Unit"]!!
+            is BinaryOpNode -> this.type()
+            is UnaryOpNode -> this.type()
+            is BlockNode -> this.type()
+            is BreakNode -> typeRegistry["Unit"]!!
+            is ClassDeclarationNode -> typeRegistry["Unit"]!!
+            is ClassInstanceInitializerNode -> TODO()
+            is ClassMemberReferenceNode -> TODO()
+            is ClassParameterNode -> TODO()
+            is ClassPrimaryConstructorNode -> TODO()
+            is ContinueNode -> typeRegistry["Unit"]!!
+            is FunctionCallArgumentNode -> TODO()
+            is FunctionCallNode -> this.type()
+            is FunctionDeclarationNode -> typeRegistry["Unit"]!!
+            is FunctionValueParameterNode -> TODO()
+            is IfNode -> this.type()
+            is NavigationNode -> this.type()
+            is PropertyAccessorsNode -> this.type
+            is PropertyDeclarationNode -> typeRegistry["Unit"]!!
+            is ReturnNode -> this.type()
+            is ScriptNode -> TODO()
+            is TypeNode -> this
+            is ValueNode -> TODO()
+            is VariableReferenceNode -> this.type()
+            is WhileNode -> typeRegistry["Unit"]!!
+
+            is IntegerNode -> typeRegistry["Int"]!!
+            is DoubleNode -> typeRegistry["Double"]!!
+            is BooleanNode -> typeRegistry["Boolean"]!!
+            NullNode -> typeRegistry["Null"]!!
+        }
+
+    fun BinaryOpNode.type(): TypeNode = type ?: when (operator) {
+        "+", "-", "*", "/", "%" -> {
+            val t1 = node1.type()
+            val t2 = node2.type()
+            if (t1.name == "Double" || t2.name == "Double") {
+                typeRegistry["Double"]!!
+            } else {
+                typeRegistry["Int"]!!
+            }
+        }
+
+        "<", "<=", ">", ">=", "==", "!=", "||", "&&" -> typeRegistry["Boolean"]!!
+
+        else -> throw UnsupportedOperationException()
+    }.also {
+        type = it
+    }
+
+    fun UnaryOpNode.type(): TypeNode = type ?: node!!.type().also { type = it }
+
+    fun VariableReferenceNode.type() = type ?: (
+            currentScope.findClass(variableName)
+                ?.let { TypeNode("Function", TypeNode(variableName, null, false), false) }
+                ?: currentScope.findFunction(variableName)?.let { TypeNode("Function", it.type, false) }
+                ?: currentScope.getPropertyType(variableName).type.toTypeNode()!!
+            ).also { type = it }
+
+    fun NavigationNode.type(): TypeNode {
+        type?.let { return it }
+        val subjectType = when(subject.type().name) {
+            "Function" -> subject.type().argument!!
+            else -> subject.type()
+        }
+        val clazz = currentScope.findClass(subjectType.name) ?: throw SemanticException("Unknown type `${subjectType.name}`")
+        val memberName = member.name
+        clazz.memberFunctions[memberName]?.let {
+            return TypeNode("Function", it.type, false)
+        }
+        clazz.memberPropertyCustomAccessors[memberName]?.let {
+            return it.type()
+        }
+        clazz.memberProperties[memberName]?.let {
+            return it.type.toTypeNode()!!
+        }
+        // TODO extension methods
+
+        throw SemanticException("Could not find member `$memberName` for type ${clazz.name}")
+    }
+
+    fun FunctionCallNode.type(): TypeNode {
+        returnType?.let { return it }
+        val functionType = function.type()
+        if (functionType.name != "Function") {
+            throw SemanticException("Cannot invoke non-function expression")
+        }
+        return functionType.argument!!
+    }
+
+    fun ReturnNode.type(): TypeNode {
+        return value?.type() ?: typeRegistry["Unit"]!!
+    }
+
+    fun IfNode.type(): TypeNode {
+        type?.let { return it }
+        return superTypeOf(trueBlock?.type(), falseBlock?.type())
+            .also { type = it }
+    }
+
+    fun BlockNode.type(): TypeNode {
+        returnType?.let { return it }
+        return (statements.lastOrNull()?.type() ?: typeRegistry["Unit"]!!)
+            .also { returnType = it }
+    }
+
+    fun superTypeOf(vararg types: TypeNode?): TypeNode {
+        val types = types.filterNotNull()
+        if (types.isEmpty()) throw IllegalArgumentException("superTypeOf input cannot be empty")
+
+        fun superTypeOf(type1: TypeNode, type2: TypeNode): TypeNode {
+            if (type1 == type2) return type1
+            if (type1.name == type2.name && (type1.isNullable || type2.isNullable)) {
+                return type1.toNullable()
+            }
+            // TODO return "Any"
+            throw SemanticException("Cannot find super type of ${type1.name} and ${type2.name}")
+        }
+
+        var type = types.first()
+        types.drop(1)
+            .forEach { type = superTypeOf(type, it) }
+        return type
+    }
 }

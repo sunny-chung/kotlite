@@ -1,8 +1,8 @@
-package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
+package com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis
 
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
-import com.sunnychung.lib.multiplatform.kotlite.test.semanticAnalyzer
+import com.sunnychung.lib.multiplatform.kotlite.test.interpreter.interpreter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -11,11 +11,13 @@ class PropertyImmutableTest {
 
     @Test
     fun outerScopeSuccess1() {
-        val interpreter = interpreter("""
+        val interpreter = interpreter(
+            """
             val a: Int = 3
             var b: Int = 4
             b = 5
-        """.trimIndent())
+        """.trimIndent()
+        )
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         assertEquals(2, symbolTable.propertyValues.size)
@@ -25,13 +27,15 @@ class PropertyImmutableTest {
 
     @Test
     fun outerScopeSuccess2() {
-        val interpreter = interpreter("""
+        val interpreter = interpreter(
+            """
             val a: Int
             var b: Int
             b = 4
             a = 3
             b = 5
-        """.trimIndent())
+        """.trimIndent()
+        )
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         assertEquals(2, symbolTable.propertyValues.size)
@@ -41,106 +45,125 @@ class PropertyImmutableTest {
 
     @Test
     fun outerScopeFail1() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             val a: Int = 3
             var b: Int = 4
             b = 5
             a = 6
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun outerScopeFail2() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             val a: Int
             var b: Int
             b = 4
             a = 3
             b = 5
             a = 6
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun blockFail1() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             if (true) {
                 val a: Int = 2
                 a = 30
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun blockFail2() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             val a: Int = 2
             if (true) {
                 a = 30
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun functionArgumentFail() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             fun f(a: Int = 20) {
                 a = 30
             }
             f()
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun functionModifyOutsideFail() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             val a: Int = 2
             fun f() {
                 a = 30
             }
             f()
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun classPrimaryConstructorFail1() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             class Cls(c: Int = 10, var a: Int = 60, var b: Int = c++)
             Cls()
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun classPrimaryConstructorFail2() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             class Cls(var a: Int = 60, var b: Int = a++)
             Cls()
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun classInitFail1() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             class Cls(var a: Int = 60) {
                 val b: Int = 10
                 val c: Int = ++b
             }
             Cls()
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun classInitFail2() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             class Cls(var a: Int = 60) {
                 val b: Int = 10
                 init {
@@ -148,13 +171,15 @@ class PropertyImmutableTest {
                 }
             }
             Cls()
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun classFunctionArgument() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             class Cls(var a: Int = 60) {
                 val b: Int = 10
                 fun f(c: Int) {
@@ -162,13 +187,15 @@ class PropertyImmutableTest {
                 }
             }
             Cls().f(1)
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun classFunction() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             class Cls(var a: Int = 60) {
                 val b: Int = 10
                 fun f() {
@@ -176,13 +203,15 @@ class PropertyImmutableTest {
                 }
             }
             Cls().f()
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 
     @Test
     fun memberPropertySetterArgument() {
-        val analyzer = semanticAnalyzer("""
+        val analyzer = semanticAnalyzer(
+            """
             var a: Int = -10
             class MyCls {
                 var a: Int = 1
@@ -195,7 +224,8 @@ class PropertyImmutableTest {
             val o: MyCls = MyCls()
             val x: Int = o.a
             o.b = 20
-        """.trimIndent())
+        """.trimIndent()
+        )
         assertFailsWith<SemanticException> { analyzer.analyze() }
     }
 }

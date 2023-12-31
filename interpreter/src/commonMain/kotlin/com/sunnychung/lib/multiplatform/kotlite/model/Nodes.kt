@@ -39,14 +39,14 @@ data object NullNode : ASTNode {
     }
 }
 
-data class BinaryOpNode(val node1: ASTNode, val node2: ASTNode, val operator: String) : ASTNode {
+data class BinaryOpNode(val node1: ASTNode, val node2: ASTNode, val operator: String, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Binary Op ${operator}\"]"
         return "$self-->${node1.toMermaid()}\n$self-->${node2.toMermaid()}\n"
     }
 }
 
-data class UnaryOpNode(var node: ASTNode?, val operator: String) : ASTNode {
+data class UnaryOpNode(var node: ASTNode?, val operator: String, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Unary Op ${operator}\"]"
         return "$self-->${node?.toMermaid()}\n"
@@ -88,7 +88,7 @@ data class AssignmentNode(val subject: ASTNode, val operator: String, val value:
     }
 }
 
-data class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: String? = null) : ASTNode {
+data class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: String? = null, @ModifyByAnalyzer var type: TypeNode? = null) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 
@@ -100,7 +100,7 @@ data class FunctionValueParameterNode(val name: String, val type: TypeNode, val 
     }
 }
 
-data class BlockNode(val statements: List<ASTNode>, val position: SourcePosition, val type: ScopeType) : ASTNode {
+data class BlockNode(val statements: List<ASTNode>, val position: SourcePosition, val type: ScopeType, @ModifyByAnalyzer var returnType: TypeNode? = null,) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Block Node\"]"
         return statements.joinToString("") { "$self-->${it.toMermaid()}\n" }
@@ -122,7 +122,12 @@ data class FunctionCallArgumentNode(val index: Int, val name: String? = null, va
     }
 }
 
-data class FunctionCallNode(val function: ASTNode, val arguments: List<FunctionCallArgumentNode>, val position: SourcePosition) : ASTNode {
+data class FunctionCallNode(
+    val function: ASTNode,
+    val arguments: List<FunctionCallArgumentNode>,
+    val position: SourcePosition,
+    @ModifyByAnalyzer var returnType: TypeNode? = null,
+) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"
         return "$self-- function -->${function.toMermaid()}\n" +
@@ -151,7 +156,7 @@ data class BreakNode(val returnToLabel: String, @ModifyByAnalyzer var returnToAd
     }
 }
 
-data class IfNode(val condition: ASTNode, val trueBlock: BlockNode?, val falseBlock: BlockNode?) : ASTNode {
+data class IfNode(val condition: ASTNode, val trueBlock: BlockNode?, val falseBlock: BlockNode?, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"If Node\"]"
         return "$self-- condition -->${condition.toMermaid()}\n" +
@@ -211,6 +216,7 @@ data class NavigationNode(
     val subject: ASTNode,
     val operator: String,
     val member: ClassMemberReferenceNode,
+    @ModifyByAnalyzer var type: TypeNode? = null,
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Navigation Node\"]"
@@ -220,6 +226,7 @@ data class NavigationNode(
 }
 
 class PropertyAccessorsNode(
+    val type: TypeNode,
     val getter: FunctionDeclarationNode?,
     val setter: FunctionDeclarationNode?,
 ) : ASTNode {

@@ -1,4 +1,4 @@
-package com.sunnychung.lib.multiplatform.kotlite.test
+package com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis
 
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
@@ -8,6 +8,10 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 fun semanticAnalyzer(code: String) = SemanticAnalyzer(Parser(Lexer(code)).script())
+fun assertSemanticFail(code: String) {
+    val a = semanticAnalyzer(code)
+    assertFailsWith<SemanticException> { a.analyze() }
+}
 
 class SemanticAnalyzerTest {
     fun build(code: String) = SemanticAnalyzer(

@@ -360,7 +360,9 @@ class PropertyTypeTest {
                         b = value
                     }
             }
-            val r: Int = Cls().f()
+            val o: Cls = Cls()
+            val a: Double = o.c
+            o.c = 20.0
         """.trimIndent())
         assertFails { interpreter.eval() }
     }
@@ -376,7 +378,9 @@ class PropertyTypeTest {
                         a = value
                     }
             }
-            val r: Int = Cls().f()
+            val o: Cls = Cls()
+            val a: Double = o.c
+            o.c = 20.0
         """.trimIndent())
         assertFails { interpreter.eval() }
     }
@@ -394,7 +398,9 @@ class PropertyTypeTest {
                         a = value
                     }
             }
-            val r: Int = Cls().f()
+            val o: Cls = Cls()
+            val a: Double = o.c
+            o.c = 20.0
         """.trimIndent())
         assertFails { interpreter.eval() }
     }
@@ -411,7 +417,9 @@ class PropertyTypeTest {
                         return a
                     }
             }
-            val r: Int = Cls().f()
+            val o: Cls = Cls()
+            val a: Double = o.c
+            o.c = 20.0
         """.trimIndent())
         assertFails { interpreter.eval() }
     }
