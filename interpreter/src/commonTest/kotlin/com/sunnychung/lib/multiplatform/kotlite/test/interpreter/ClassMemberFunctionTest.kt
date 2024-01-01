@@ -55,7 +55,7 @@ class ClassMemberFunctionTest {
         assertEquals(31, (symbolTable.findPropertyByDeclaredName("a2") as IntValue).value)
         assertEquals(24, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
     }
-    
+
     @Test
     fun nestedFunctionCalls() {
         val interpreter = interpreter("""
