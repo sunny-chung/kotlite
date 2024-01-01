@@ -13,6 +13,7 @@ class SymbolTable(
     private val propertyDeclarations = mutableMapOf<String, PropertyType>()
     internal val propertyValues = mutableMapOf<String, RuntimeValue>()
     internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
+    internal val functionOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
 
     private val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
     private val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
@@ -54,6 +55,13 @@ class SymbolTable(
 
     /**
      * Only use in SemanticAnalyzer
+     */
+    fun declareFunctionOwner(name: String, owner: String) {
+        functionOwners[name] = owner
+    }
+
+    /**
+     * Only use in SemanticAnalyzer
      *
      * @param name use transformed name
      */
@@ -62,6 +70,17 @@ class SymbolTable(
             return propertyOwners[name]
         } else {
             return parentScope?.findPropertyOwner(name)
+        }
+    }
+
+    /**
+     * Only use in SemanticAnalyzer
+     */
+    fun findFunctionOwner(name: String): String? {
+        if (functionOwners.containsKey(name)) {
+            return functionOwners[name]
+        } else {
+            return parentScope?.findFunctionOwner(name)
         }
     }
 

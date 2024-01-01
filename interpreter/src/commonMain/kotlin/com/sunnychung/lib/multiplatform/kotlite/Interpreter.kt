@@ -251,6 +251,10 @@ class Interpreter(val scriptNode: ScriptNode) {
             is VariableReferenceNode -> {
                 val name = function.variableName
 
+                if (this.function.ownerRef != null) {
+                    return this.copy(function = NavigationNode(VariableReferenceNode(this.function.ownerRef!!), ".", ClassMemberReferenceNode(name))).eval()
+                }
+
                 val functionNode = callStack.currentSymbolTable().findFunction(name)
                 if (functionNode != null) {
                     return evalFunctionCall(functionNode)

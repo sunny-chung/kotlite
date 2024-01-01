@@ -333,9 +333,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is VariableReferenceNode -> {
                 val name = function.variableName
                 val functionNode = currentScope.findFunction(name)
-                if (functionNode == null) {
-                    currentScope.findClass(name) ?: throw SemanticException("Function $name not found")
+                functionNode?.also {
+                    val owner = currentScope.findFunctionOwner(name)
+                    function.ownerRef = owner
                 }
+                    ?: currentScope.findClass(name)
+                    ?: throw SemanticException("Function $name not found")
 
                 log.v { "Type of call $name -> ${function.type()}" }
             }
@@ -533,6 +536,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
                     it.visit()
+                    currentScope.declareFunctionOwner(it.name, "this")
                 }
         }
         popScope()

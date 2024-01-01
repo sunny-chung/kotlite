@@ -55,6 +55,52 @@ class ClassMemberFunctionTest {
         assertEquals(31, (symbolTable.findPropertyByDeclaredName("a2") as IntValue).value)
         assertEquals(24, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
     }
+    
+    @Test
+    fun nestedFunctionCalls() {
+        val interpreter = interpreter("""
+            class MyCls {
+                var a: Int = 1
+                var b: Int = 2
+                
+                fun addB() {
+                    this.b += 11
+                }
+                
+                fun addA() {
+                    a += 10
+                    addB()
+                }
+                
+                fun getA(): Int {
+                    return this.a
+                }
+                
+                fun getB(): Int {
+                    return b
+                }
+            }
+            val o1: MyCls = MyCls()
+            val o2: MyCls = MyCls()
+            o1.addA()
+            o2.addA()
+            o1.addA()
+            val a1: Int = o1.getA()
+            val b1: Int = o1.getB()
+            val a2: Int = o2.getA()
+            val b2: Int = o2.getB()
+        """.trimIndent(), isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("o1") is ClassInstance)
+        assertTrue(symbolTable.findPropertyByDeclaredName("o2") is ClassInstance)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals(24, (symbolTable.findPropertyByDeclaredName("b1") as IntValue).value)
+        assertEquals(11, (symbolTable.findPropertyByDeclaredName("a2") as IntValue).value)
+        assertEquals(13, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
+    }
 
     @Test
     fun functionsWithShadowVariables() {
