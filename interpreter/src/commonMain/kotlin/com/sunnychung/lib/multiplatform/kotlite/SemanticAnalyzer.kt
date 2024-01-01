@@ -309,9 +309,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             currentScope.declareProperty(name = "this", type = TypeNode(receiver, null, false), isMutable = false)
             val clazz = currentScope.findClass(receiver) ?: throw SemanticException("Class `$receiver` not found")
             clazz.memberProperties.forEach {
-                val transformedName = clazz.memberPropertyNameToTransformedName[it.key]!!
                 currentScope.declareProperty(name = it.key, type = it.value.type.toTypeNode(), isMutable = it.value.isMutable)
-                currentScope.declarePropertyOwner(name = transformedName, owner = "this")
+                currentScope.declarePropertyOwner(name = "${it.key}/${currentScope.scopeLevel}", owner = "this/$receiver")
+            }
+            clazz.memberFunctions.forEach {
+                currentScope.declareFunction(name = it.key, node = it.value)
+                currentScope.declareFunctionOwner(name = it.key, owner = "this/$receiver")
             }
         }
 
@@ -465,6 +468,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun ClassDeclarationNode.visit() {
+        val fullQualifiedClassName = name
         pushScope(name, ScopeType.Class)
         run {
             primaryConstructor?.visit()
@@ -514,7 +518,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             primaryConstructor?.parameters
                 ?.filter { it.isProperty }
                 ?.map { it.parameter }
-                ?.forEach { currentScope.declarePropertyOwner(it.transformedRefName!!, "this") }
+                ?.forEach { currentScope.declarePropertyOwner(it.transformedRefName!!, "this/$fullQualifiedClassName") }
             declarations.filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode }
                 .forEach {
                     pushScope("init-property", ScopeType.ClassInitializer)
@@ -529,14 +533,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                     popScope()
                     if (it is PropertyDeclarationNode) {
                         it.visit(isVisitInitialValue = false, isClassProperty = true)
-                        currentScope.declarePropertyOwner(it.transformedRefName!!, "this")
+                        currentScope.declarePropertyOwner(it.transformedRefName!!, "this/$fullQualifiedClassName")
                     }
                 }
 
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
                     it.visit()
-                    currentScope.declareFunctionOwner(it.name, "this")
+                    currentScope.declareFunctionOwner(it.name, "this/$fullQualifiedClassName")
                 }
         }
         popScope()

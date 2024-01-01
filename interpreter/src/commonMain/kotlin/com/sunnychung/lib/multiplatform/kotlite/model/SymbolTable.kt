@@ -11,7 +11,7 @@ class SymbolTable(
     val returnType: DataType? = null,
 ) {
     private val propertyDeclarations = mutableMapOf<String, PropertyType>()
-    internal val propertyValues = mutableMapOf<String, RuntimeValue>()
+    internal val propertyValues = mutableMapOf<String, RuntimeValueAccessor>()
     internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
     internal val functionOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
 
@@ -87,13 +87,13 @@ class SymbolTable(
     fun assign(name: String, value: RuntimeValue): Boolean {
         if (propertyDeclarations.containsKey(name)) {
             val type = propertyDeclarations[name]!!
-            if (!type.isMutable && propertyValues.containsKey(name)) {
-                throw RuntimeException("val cannot be reassigned")
-            }
+//            if (!type.isMutable && propertyValues.containsKey(name)) {
+//                throw RuntimeException("val cannot be reassigned")
+//            }
             if (!type.type.isAssignableFrom(value.type())) {
                 throw RuntimeException("Type ${value.type().name} cannot be casted to ${type.type.name}")
             }
-            propertyValues[name] = value
+            propertyValues.getOrPut(name) { RuntimeValueHolder(type.type, type.isMutable, null) }.assign(value)
             return true
         } else if (parentScope?.assign(name, value) == true) {
             return true
@@ -113,8 +113,22 @@ class SymbolTable(
     }
 
     fun read(name: String, isThisScopeOnly: Boolean = false): RuntimeValue {
-        return propertyValues[name]
+        return propertyValues[name]?.read()
             ?: Unit.takeIf { isThisScopeOnly }.let { parentScope?.read(name) }
+            ?: throw RuntimeException("The variable `$name` has not been declared")
+    }
+
+    fun putPropertyHolder(name: String, holder: RuntimeValueAccessor) {
+        if (propertyValues.containsKey(name)) {
+            throw RuntimeException("Property `$name` has already been defined")
+        }
+        propertyDeclarations[name] = PropertyType(holder.type, false)
+        propertyValues[name] = holder
+    }
+
+    fun getPropertyHolder(name: String, isThisScopeOnly: Boolean = false): RuntimeValueAccessor {
+        return propertyValues[name]
+            ?: Unit.takeIf { isThisScopeOnly }.let { parentScope?.getPropertyHolder(name) }
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
@@ -155,7 +169,7 @@ class SymbolTable(
 
     fun findPropertyByDeclaredName(declaredName: String): RuntimeValue? {
         return findTransformedNameByDeclaredName(declaredName)
-            .let { transformedName -> propertyValues[transformedName] }
+            .let { transformedName -> propertyValues[transformedName]?.read() }
     }
 
     fun declareClass(classDefinition: ClassDefinition) {

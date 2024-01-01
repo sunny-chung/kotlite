@@ -55,6 +55,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 class Interpreter(val scriptNode: ScriptNode) {
 
     internal val callStack = CallStack()
+    val globalScope = callStack.currentSymbolTable()
 
     fun DataType.toTypeNode() = TypeNode(name, null, isNullable)
 
@@ -179,7 +180,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         when (this) {
             is VariableReferenceNode -> {
                 if (this.ownerRef != null) {
-                    NavigationNode(VariableReferenceNode("this"), ".", ClassMemberReferenceNode(this.variableName, this.transformedRefName)).write(value)
+                    NavigationNode(VariableReferenceNode(ownerRef!!), ".", ClassMemberReferenceNode(this.variableName, this.transformedRefName)).write(value)
                 } else {
                     callStack.currentSymbolTable().assign(this.transformedRefName ?: this.variableName, value)
                 }
@@ -189,13 +190,13 @@ class Interpreter(val scriptNode: ScriptNode) {
                 val obj = this.subject.eval() as ClassInstance
 //                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
                 // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-                obj.assign(obj.clazz.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value)?.also {
+                obj.assign(obj.clazz.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value)/*?.also {
                     FunctionCallNode(
                         it,
                         listOf(FunctionCallArgumentNode(index = 0, value = ValueNode(value))),
                         SourcePosition(1, 1)
                     ).evalClassMemberAnyFunctionCall(obj, it)
-                }
+                } // TODO remove */
             }
 
             else -> throw UnsupportedOperationException()
@@ -232,7 +233,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         // usual variable -> transformedRefName
         // class constructor -> variableName? TODO
         if (ownerRef != null) {
-            return NavigationNode(VariableReferenceNode("this"), ".", ClassMemberReferenceNode(variableName, transformedRefName)).eval()
+            return NavigationNode(VariableReferenceNode(ownerRef!!), ".", ClassMemberReferenceNode(variableName, transformedRefName)).eval()
         }
         return callStack.currentSymbolTable().read(transformedRefName ?: variableName)
     }
@@ -241,7 +242,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         if (receiver == null) {
             callStack.currentSymbolTable().declareFunction(name, this)
         } else {
-            callStack.currentSymbolTable().declareExtensionFunction(transformedRefName!!, this)
+            globalScope.declareExtensionFunction(transformedRefName!!, this)
         }
     }
 
@@ -349,7 +350,7 @@ class Interpreter(val scriptNode: ScriptNode) {
     }
 
     fun FunctionCallNode.evalCreateClassInstance(clazz: ClassDefinition): ClassInstance {
-        val instance = ClassInstance(clazz)
+        val instance = ClassInstance(this@Interpreter, clazz)
         val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
 
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassInitializer, callPosition = this.position)
@@ -391,12 +392,17 @@ class Interpreter(val scriptNode: ScriptNode) {
             // move nonPropertyArguments from outer scope into inner scope
             nonPropertyArguments.keys.forEach {
                 symbolTable.undeclareProperty(it)
-//                symbolTable.undeclarePropertyByDeclaredName(it)
             }
+//            clazz.primaryConstructor?.parameters?.forEach {
+//                symbolTable.undeclareProperty(it.parameter.transformedRefName!!)
+//            }
 
             // variable "this" is available after primary constructor
-            symbolTable.declareProperty("this", TypeNode(instance.clazz.name, null, false), false)
-            symbolTable.assign("this", instance)
+            symbolTable.declareProperty("this/${instance.clazz.fullQualifiedName}", TypeNode(instance.clazz.name, null, false), false)
+            symbolTable.assign("this/${instance.clazz.fullQualifiedName}", instance)
+//            instance.memberPropertyValues.forEach {
+//                symbolTable.putPropertyHolder(instance.clazz.memberPropertyNameToTransformedName[it.key]!!, it.value)
+//            }
 
             clazz.orderedInitializersAndPropertyDeclarations.forEach {
                 callStack.push(
@@ -461,8 +467,17 @@ class Interpreter(val scriptNode: ScriptNode) {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
+            symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
+            symbolTable.assign("this/${subject.type().name}", subject)
             symbolTable.declareProperty("this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
+
+//            // TODO optimize to only copy needed members
+//            if (subject is ClassInstance) {
+//                subject.memberPropertyValues.forEach {
+//                    symbolTable.putPropertyHolder(subject.clazz.memberPropertyNameToTransformedName[it.key]!!, it.value)
+//                }
+//            }
 
             val result = evalFunctionCall(
                 callNode = this.copy(function = function),
@@ -548,10 +563,16 @@ class Interpreter(val scriptNode: ScriptNode) {
                     declarations.filterIsInstance<PropertyDeclarationNode>()),
             memberFunctions = declarations
                 .filterIsInstance<FunctionDeclarationNode>()
+                .filter { it.receiver == null }
                 .associateBy { it.name },
             orderedInitializersAndPropertyDeclarations = declarations
                 .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
         ))
+        // register extension functions in global scope
+        declarations
+            .filterIsInstance<FunctionDeclarationNode>()
+            .filter { it.receiver != null }
+            .forEach { globalScope.declareExtensionFunction(it.transformedRefName!!, it) }
     }
 
     fun NavigationNode.eval(): RuntimeValue {
@@ -560,13 +581,13 @@ class Interpreter(val scriptNode: ScriptNode) {
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)) {
             is RuntimeValue -> r
-            is FunctionDeclarationNode -> {
+            /*is FunctionDeclarationNode -> {
                 FunctionCallNode(
                     function = r,
                     arguments = emptyList(),
                     position = SourcePosition(1, 1)
                 ).evalClassMemberAnyFunctionCall(obj, r)
-            }
+            } // TODO remove */
             else -> throw UnsupportedOperationException()
         }
     }

@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
+import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -143,5 +144,90 @@ class ExtensionFunctionTest {
         assertEquals(2, symbolTable.propertyValues.size)
         println(symbolTable.propertyValues)
         assertEquals(22, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun extensionInsideClassAccessingProperties() {
+        val interpreter = interpreter("""
+            class B(var a: Int)
+            class A(val b: B, var c: Int) {
+                fun B.f() {
+                    a += c++
+                }
+                
+                fun a() {
+                    b.f()
+                }
+            }
+            val o: A = A(B(30), 9)
+            o.a()
+            o.a()
+            val x: Int = o.b.a
+            val y: Int = o.c
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(49, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(11, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun extensionsInsideClassAreNotCallableOutside() {
+        assertSemanticFail("""
+            class B(var a: Int)
+            class A(val b: B, var c: Int) {
+                fun B.f() {
+                    a += c++
+                }
+                
+                fun a() {
+                    b.f()
+                }
+            }
+            val b: B = B(30)
+            val o: A = A(b, 9)
+            o.a()
+            o.a()
+            val x: Int = o.b.a
+            val y: Int = o.c
+            b.f()
+        """.trimIndent())
+    }
+
+    @Test
+    fun extensionInsideClassAccessingFunctions() {
+        val interpreter = interpreter("""
+            class B(var a: Int) {
+                fun inc(x: Int) {
+                    a += x
+                }
+            }
+            class A(val b: B, var c: Int) {
+                fun addC(): Int {
+                    return c++
+                }
+                
+                fun B.f() {
+                    inc(addC())
+                }
+                
+                fun a() {
+                    b.f()
+                }
+            }
+            val o: A = A(B(30), 9)
+            o.a()
+            o.a()
+            val x: Int = o.b.a
+            val y: Int = o.c
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(49, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(11, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
     }
 }
