@@ -1,12 +1,12 @@
 package com.sunnychung.lib.multiplatform.kotlite
 
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
+import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
-import com.sunnychung.lib.multiplatform.kotlite.model.BooleanType
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
@@ -27,7 +27,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
-import com.sunnychung.lib.multiplatform.kotlite.model.NullType
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
@@ -36,7 +35,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
-import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -44,6 +42,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
+import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 
 class SemanticAnalyzer(val scriptNode: ScriptNode) {
     val symbolTable = SymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = null)
@@ -74,6 +73,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         typeRegistry["$name${if (isNullable) "?" else ""}"]
     } else {
         TypeNode(name, null, isNullable)
+    }
+
+    fun TypeNode.toDataType(): DataType {
+        return currentScope.typeNodeToPropertyType(this, false)?.type
+            ?: throw SemanticException("Unknown type `$name`")
     }
 
     fun ASTNode.visit() {
@@ -156,6 +160,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun BinaryOpNode.visit() {
         node1.visit()
         node2.visit()
+        type()
     }
 
     fun AssignmentNode.visit() {
@@ -163,6 +168,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             throw SemanticException("$subject cannot be assigned")
         }
         value.visit()
+        val valueType = value.type().toDataType()
         when (subject) {
             is VariableReferenceNode -> {
                 subject.visit()
@@ -181,6 +187,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
             }
             else -> SemanticException("$subject cannot be assigned")
+        }
+        val subjectType = subject.type().toDataType()
+
+        if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
+            if (!valueType.isNonNullNumberType()) {
+                throw TypeMismatchException("non-null number type", valueType.nameWithNullable)
+            }
+            if (subjectType is DoubleType) {
+                return // ok
+            }
+        }
+
+        if (!subjectType.isAssignableFrom(valueType)) {
+            throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
         }
     }
 
@@ -204,6 +224,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             accessors.getter?.visit()
             accessors.setter?.visit()
         }
+        if (initialValue != null) {
+            val valueType = initialValue.type().toDataType()
+            val subjectType = type.toDataType()
+            if (!subjectType.isAssignableFrom(valueType)) {
+                throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
+            }
+        }
         currentScope.declareProperty(name = name, type = type, isMutable = isMutable)
         if (initialValue != null) {
             if (accessors != null) {
@@ -225,11 +252,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
     }
 
-    fun pushScope(scopeName: String, scopeType: ScopeType, overrideScopeLevel: Int = currentScope.scopeLevel + 1) {
+    fun pushScope(scopeName: String, scopeType: ScopeType, returnType: DataType? = null, overrideScopeLevel: Int = currentScope.scopeLevel + 1) {
         currentScope = SymbolTable(
             scopeLevel = overrideScopeLevel,
             scopeName = scopeName,
             scopeType = scopeType,
+            returnType = returnType,
             parentScope = currentScope
         )
     }
@@ -243,12 +271,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         pushScope(
             scopeName = name,
             scopeType = ScopeType.Function,
+            returnType = type.toDataType(),
         )
 
         valueParameters.forEach { it.visit() }
         previousScope.declareFunction(name, this)
 
         body.visit()
+
+        // TODO check for return
+
+        val valueType = body.type().toDataType()
+        val subjectType = type.toDataType()
+        if (subjectType !is UnitType && !subjectType.isAssignableFrom(valueType)) {
+            throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
+        }
 
         popScope()
     }
@@ -285,6 +322,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {
             throw SemanticException("Property `$name` has already been declared")
         }
+        if (defaultValue != null) {
+            val valueType = defaultValue.type().toDataType()
+            val subjectType = type.toDataType()
+            if (!subjectType.isAssignableFrom(valueType)) {
+                throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
+            }
+        }
         currentScope.declareProperty(name = name, type = type, isMutable = false)
         currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type))
         transformedRefName = "$name/${currentScope.scopeLevel}"
@@ -297,7 +341,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun BlockNode.visit() {
         pushScope(
             scopeName = "<block>",
-            scopeType = type,
+            scopeType = if (type == ScopeType.Function) ScopeType.FunctionBlock else type,
         )
 
         statements.forEach { it.visit() }
@@ -316,13 +360,18 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             }
             s = s.parentScope!!
         }
+        // s.scopeType == ScopeType.Function
+        val valueType = value?.type()?.toDataType() ?: UnitType()
+        if (!s.returnType!!.isAssignableFrom(valueType)) {
+            throw TypeMismatchException(s.returnType!!.nameWithNullable, valueType.nameWithNullable)
+        }
     }
 
     fun checkBreakOrContinueScope() {
         var s = currentScope
         while (!s.scopeType.isLoop()) {
             if (s.scopeType in setOf(ScopeType.Script, ScopeType.Function) || s.parentScope == null) {
-                throw SemanticException("`break` statement should be within a function")
+                throw SemanticException("`break` statement should be within a loop")
             }
             s = s.parentScope!!
         }
@@ -494,12 +543,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
     fun BinaryOpNode.type(): TypeNode = type ?: when (operator) {
         "+", "-", "*", "/", "%" -> {
-            val t1 = node1.type()
-            val t2 = node2.type()
-            if (t1.name == "Double" || t2.name == "Double") {
+            val t1 = node1.type().toDataType()
+            val t2 = node2.type().toDataType()
+            if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
+                || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
+            ) {
                 typeRegistry["Double"]!!
-            } else {
+            } else if (t1 == IntType(isNullable = false) && t2 == IntType(isNullable = false)) {
                 typeRegistry["Int"]!!
+            } else {
+                throw SemanticException("Types ${t1.nameWithNullable} and ${t2.nameWithNullable} cannot be applied with operator `$operator`")
             }
         }
 
@@ -573,6 +626,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         fun superTypeOf(type1: TypeNode, type2: TypeNode): TypeNode {
             if (type1 == type2) return type1
             if (type1.name == type2.name && (type1.isNullable || type2.isNullable)) {
+                return type1.toNullable()
+            }
+            if (type1.name == "Null" && type2.name != type1.name) {
+                return type2.toNullable()
+            }
+            if (type2.name == "Null" && type2.name != type1.name) {
                 return type1.toNullable()
             }
             // TODO return "Any"

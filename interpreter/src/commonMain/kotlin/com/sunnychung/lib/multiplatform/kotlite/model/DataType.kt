@@ -5,6 +5,8 @@ sealed interface DataType {
     val name: String
     val isNullable: Boolean
 
+    val nameWithNullable get() = "$name${if (isNullable) "?" else ""}"
+
     // Let class B extends A
     // A.isAssignableFrom(B) = true
     // A.isAssignableTo(B) = false
@@ -45,5 +47,12 @@ fun TypeNode.toPrimitiveDataType() = when(this.name) {
     "Boolean" -> BooleanType(isNullable = isNullable)
     "String" -> StringType(isNullable = isNullable)
     "Unit" -> UnitType(isNullable = isNullable)
+    "Null" -> NullType
     else -> null //ObjectType(clazz = clazz!!, isNullable = isNullable)
+}
+
+fun DataType.isNonNullNumberType() = when (this) {
+    is DoubleType -> !isNullable
+    is IntType -> !isNullable
+    else -> false
 }

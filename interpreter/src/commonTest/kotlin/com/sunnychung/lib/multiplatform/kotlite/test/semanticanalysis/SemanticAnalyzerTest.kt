@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
+import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -11,6 +12,10 @@ fun semanticAnalyzer(code: String) = SemanticAnalyzer(Parser(Lexer(code)).script
 fun assertSemanticFail(code: String) {
     val a = semanticAnalyzer(code)
     assertFailsWith<SemanticException> { a.analyze() }
+}
+fun assertTypeCheckFail(code: String) {
+    val a = semanticAnalyzer(code)
+    assertFailsWith<TypeMismatchException> { a.analyze() }
 }
 
 class SemanticAnalyzerTest {

@@ -3,7 +3,13 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierException
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 
-class SymbolTable(val scopeLevel: Int, val scopeName: String, val scopeType: ScopeType, val parentScope: SymbolTable?) {
+class SymbolTable(
+    val scopeLevel: Int,
+    val scopeName: String,
+    val scopeType: ScopeType,
+    val parentScope: SymbolTable?,
+    val returnType: DataType? = null,
+) {
     private val propertyDeclarations = mutableMapOf<String, PropertyType>()
     internal val propertyValues = mutableMapOf<String, RuntimeValue>()
     internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
