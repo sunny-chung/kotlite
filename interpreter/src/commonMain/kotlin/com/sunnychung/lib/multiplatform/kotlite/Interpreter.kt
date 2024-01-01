@@ -21,6 +21,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
@@ -35,6 +36,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
@@ -53,6 +55,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 class Interpreter(val scriptNode: ScriptNode) {
 
     internal val callStack = CallStack()
+
+    fun DataType.toTypeNode() = TypeNode(name, null, isNullable)
 
     fun ASTNode.eval(): Any {
         return when (this) {
@@ -234,7 +238,11 @@ class Interpreter(val scriptNode: ScriptNode) {
     }
 
     fun FunctionDeclarationNode.eval() {
-        callStack.currentSymbolTable().declareFunction(name, this)
+        if (receiver == null) {
+            callStack.currentSymbolTable().declareFunction(name, this)
+        } else {
+            callStack.currentSymbolTable().declareExtensionFunction(transformedRefName!!, this)
+        }
     }
 
     fun FunctionCallNode.eval(): RuntimeValue {
@@ -259,10 +267,15 @@ class Interpreter(val scriptNode: ScriptNode) {
                 val subject = function.subject.eval()
                 if (subject == NullValue) {
                     if (function.operator == "?.") {
-                        return NullValue
+                        return NullValue // TODO not always true for extension functions
                     } else {
                         throw EvaluateNullPointerException()
                     }
+                }
+                if (functionRefName != null) { // an extension function
+                    val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
+                        ?: throw RuntimeException("Analysed function $functionRefName not found")
+                    return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
                 }
                 return evalClassMemberFunctionCall(subject as ClassInstance, function.member)
             }
@@ -406,10 +419,10 @@ class Interpreter(val scriptNode: ScriptNode) {
 
                         is ClassInstanceInitializerNode -> {
                             val init = FunctionDeclarationNode(
-                                "init",
-                                TypeNode("Unit", null, false),
-                                emptyList(),
-                                it.block
+                                name = "init",
+                                type = TypeNode("Unit", null, false),
+                                valueParameters = emptyList(),
+                                body = it.block
                             )
                             evalFunctionCall(
                                 callNode = FunctionCallNode(
@@ -440,11 +453,11 @@ class Interpreter(val scriptNode: ScriptNode) {
         return evalClassMemberAnyFunctionCall(subject, function)
     }
 
-    fun FunctionCallNode.evalClassMemberAnyFunctionCall(subject: ClassInstance, function: FunctionDeclarationNode): RuntimeValue {
+    fun FunctionCallNode.evalClassMemberAnyFunctionCall(subject: RuntimeValue, function: FunctionDeclarationNode): RuntimeValue {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
-            symbolTable.declareProperty("this", TypeNode(subject.clazz.name, null, false), false)
+            symbolTable.declareProperty("this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
 
             val result = evalFunctionCall(

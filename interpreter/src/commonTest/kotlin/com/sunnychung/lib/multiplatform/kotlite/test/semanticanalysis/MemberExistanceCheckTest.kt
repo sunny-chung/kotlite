@@ -28,7 +28,6 @@ class MemberExistanceCheckTest {
     }
 
     @Test
-    @Ignore // not yet implement
     fun nonexistMemberFunctionAfterInterCall1() {
         assertSemanticFail("""
             class A {
@@ -54,7 +53,6 @@ class MemberExistanceCheckTest {
     }
 
     @Test
-    @Ignore // not yet implement
     fun nonexistMemberFunctionAfterInterCall2() {
         assertSemanticFail("""
             class A {

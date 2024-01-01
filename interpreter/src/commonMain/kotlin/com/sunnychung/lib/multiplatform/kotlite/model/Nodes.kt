@@ -107,7 +107,14 @@ data class BlockNode(val statements: List<ASTNode>, val position: SourcePosition
     }
 }
 
-data class FunctionDeclarationNode(val name: String, val type: TypeNode, val valueParameters: List<FunctionValueParameterNode>, val body: BlockNode) : ASTNode {
+data class FunctionDeclarationNode(
+    val name: String,
+    val receiver: String? = null,
+    val type: TypeNode,
+    val valueParameters: List<FunctionValueParameterNode>,
+    val body: BlockNode,
+    @ModifyByAnalyzer var transformedRefName: String? = null,
+) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name`\"]"
         return "$self-- type -->${type.toMermaid()}\n" +
@@ -127,6 +134,7 @@ data class FunctionCallNode(
     val arguments: List<FunctionCallArgumentNode>,
     val position: SourcePosition,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
+    @ModifyByAnalyzer var functionRefName: String? = null,
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"

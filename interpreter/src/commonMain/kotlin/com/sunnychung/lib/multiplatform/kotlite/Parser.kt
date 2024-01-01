@@ -910,14 +910,33 @@ class Parser(lexer: Lexer) {
      *
      *
      *
+     * receiverType:
+     *     [typeModifiers] (parenthesizedType | nullableType | typeReference)
+     *
+     * nullableType:
+     *     (typeReference | parenthesizedType) {NL} (quest {quest})
+     *
+     * typeReference:
+     *     userType
+     *     | 'dynamic'
+     *
      */
     fun functionDeclaration(): FunctionDeclarationNode {
         eat(TokenType.Identifier).also {
             if (it.value !in setOf("fun")) throw UnexpectedTokenException(it)
         }
         repeatedNL()
-        val name = userDefinedIdentifier()
-        repeatedNL()
+        val identifiers = mutableListOf<String>()
+        do {
+            if (identifiers.isNotEmpty()) {
+                eat(TokenType.Operator, ".")
+            }
+            identifiers += userDefinedIdentifier()
+            // TODO handle nullable type
+            repeatedNL()
+        } while (isCurrentToken(TokenType.Operator, "."))
+        val name = identifiers.removeLast()
+        val receiver = identifiers.takeIf { it.isNotEmpty() }?.joinToString(".")
         val valueParameters = functionValueParameters()
         repeatedNL()
         val type = if (isCurrentToken(type = TokenType.Symbol, value = ":")) {
@@ -931,7 +950,7 @@ class Parser(lexer: Lexer) {
         }
         // TODO make functionBody optional for interfaces
         val body = functionBody()
-        return FunctionDeclarationNode(name = name, type = type, valueParameters = valueParameters, body = body)
+        return FunctionDeclarationNode(name = name, receiver = receiver, type = type, valueParameters = valueParameters, body = body)
     }
 
     /**

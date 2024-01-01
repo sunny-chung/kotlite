@@ -72,6 +72,35 @@ class PropertyImmutableTest {
     }
 
     @Test
+    fun outerScopeFail3() {
+        val analyzer = semanticAnalyzer(
+            """
+            val a: Int
+            var b: Int
+            b = 4
+            a = 3
+            b += 5
+            a += 6
+        """.trimIndent()
+        )
+        assertFailsWith<SemanticException> { analyzer.analyze() }
+    }
+
+    @Test
+    fun outerScopeUnary() {
+        val analyzer = semanticAnalyzer(
+            """
+            val a: Int
+            var b: Int
+            b = 4
+            a = 3
+            a++
+        """.trimIndent()
+        )
+        assertFailsWith<SemanticException> { analyzer.analyze() }
+    }
+
+    @Test
     fun blockFail1() {
         val analyzer = semanticAnalyzer(
             """

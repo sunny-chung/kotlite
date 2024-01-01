@@ -120,10 +120,10 @@ open class CodeGenerator(protected val node: ASTNode) {
         = (name?.let { "$name = " } ?: "") + value.generate()
 
     protected fun FunctionCallNode.generate()
-        = "${function.generate()}(${arguments.joinToString(", ") { it.generate() }})"
+        = "${functionRefName ?: function.generate()}(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
-        = "fun $name(${valueParameters.joinToString(", ") { it.generate() }}): ${type.generate()} ${body.generate()}"
+        = "fun ${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${type.generate()} ${body.generate()}"
 
     protected fun FunctionValueParameterNode.generate()
         = "$name<$transformedRefName>: ${type.generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"

@@ -15,6 +15,7 @@ class SymbolTable(
     internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
 
     private val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
+    private val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
 
     private val classDeclarations = mutableMapOf<String, ClassDefinition>()
 
@@ -53,6 +54,8 @@ class SymbolTable(
 
     /**
      * Only use in SemanticAnalyzer
+     *
+     * @param name use transformed name
      */
     fun findPropertyOwner(name: String): String? {
         if (propertyOwners.containsKey(name)) {
@@ -114,6 +117,18 @@ class SymbolTable(
 
     fun findFunction(name: String): FunctionDeclarationNode? {
         return functionDeclarations[name] ?: parentScope?.findFunction(name)
+    }
+
+    fun declareExtensionFunction(name: String, node: FunctionDeclarationNode) {
+        val functionSignature = "$name"
+        if (extensionFunctionDeclarations.containsKey(functionSignature)) {
+            throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Function)
+        }
+        extensionFunctionDeclarations[functionSignature] = node
+    }
+
+    fun findExtensionFunction(name: String): FunctionDeclarationNode? {
+        return extensionFunctionDeclarations[name] ?: parentScope?.findExtensionFunction(name)
     }
 
     fun findTransformedNameByDeclaredName(declaredName: String): String

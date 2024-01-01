@@ -85,17 +85,17 @@ class Lexer(val code: String) {
             val position = makeSourcePosition()
             val number = readInteger()
             val hasDot = if (currentChar() == '.') {
-                advanceChar()
                 true
             } else {
                 // TODO throw error if not followed by whitespaces, symbols or EOF
                 false
             }
-            if (!hasDot) { // is an integer
+            if (!hasDot || !nextChar()!!.isDigit()) { // is an integer
                 if (number.length > 10) throw RuntimeException("Integer `$number` is too big.")
                 val value = number.toIntOrNull() ?: throw RuntimeException("Integer `$number` is invalid.")
                 return Token(TokenType.Integer, value, position)
             }
+            advanceChar() // eat the '.'
             val decimal = readInteger()
             val value = "$number.$decimal".toDoubleOrNull() ?: throw RuntimeException("Double `$number` is invalid.")
             return Token(TokenType.Double, value, position)
