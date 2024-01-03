@@ -35,6 +35,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
+import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -127,6 +129,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is NavigationNode -> this.visit()
             is PropertyAccessorsNode -> TODO()
             is ValueNode -> {}
+            is StringLiteralNode -> {}
+            is StringNode -> this.visit()
         }
     }
 
@@ -569,6 +573,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         } catch (_: SemanticException) {}
     }
 
+    fun StringNode.visit() {
+        nodes.forEach { it.visit() }
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -605,7 +613,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is DoubleNode -> typeRegistry["Double"]!!
             is BooleanNode -> typeRegistry["Boolean"]!!
             NullNode -> typeRegistry["Null"]!!
-        }
+        is StringLiteralNode -> TODO()
+        is StringNode -> typeRegistry["String"]!!
+    }
 
     fun BinaryOpNode.type(): TypeNode = type ?: when (operator) {
         "+", "-", "*", "/", "%" -> {

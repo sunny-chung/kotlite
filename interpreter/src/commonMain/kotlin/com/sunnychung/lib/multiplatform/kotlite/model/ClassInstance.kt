@@ -95,5 +95,7 @@ class ClassInstance(interpreter: Interpreter, val clazz: ClassDefinition, val me
         return memberPropertyValues[declaredName]!!.read()
     }
 
+    override fun convertToString(): String = "${clazz.fullQualifiedName}()" // TODO
+
     override fun toString(): String = "${clazz.fullQualifiedName}($memberPropertyValues)"
 }

@@ -1,20 +1,35 @@
 package com.sunnychung.lib.multiplatform.kotlite.lexer
 
+import com.sunnychung.lib.multiplatform.kotlite.extension.removeAfterIndex
+import com.sunnychung.lib.multiplatform.kotlite.log
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 
+private val NON_IDENTIFIER_CHARACTERS = setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '|', '&', '.', '?', '"', '\n', '\\')
+
 class Lexer(val code: String) {
-    var pos: Int = 0
-    var lineNum = 1
-    var col = 1
-    var locationHistory = mutableListOf<SourcePosition>() // TODO optimize
+    private var pos: Int = 0
+    private var lineNum = 1
+    private var col = 1
+    private var locationHistory = mutableListOf(SourcePosition(1, 1)) // TODO optimize
+    private var mode = mutableListOf(Mode.Main)
+
+    fun switchToMode(mode: Mode) {
+        this.mode += mode
+    }
+
+    fun switchToPreviousMode() {
+        this.mode.removeLast()
+    }
+
+    fun currentCursor() = pos
 
     internal inline fun currentChar() = if (pos < code.length) code[pos] else null
 
     internal inline fun nextChar() = if (pos + 1 < code.length) code[pos + 1] else null
 
-    internal fun advanceChar() {
+    internal fun advanceChar(): Char? {
         if (pos < code.length) {
             if (currentChar() == '\n') {
                 ++lineNum
@@ -22,11 +37,10 @@ class Lexer(val code: String) {
             } else {
                 ++col
             }
-            if (pos >= locationHistory.size) {
-                locationHistory += SourcePosition(lineNum, col)
-            }
+            locationHistory += SourcePosition(lineNum, col)
             ++pos
         }
+        return if (pos < code.length) code[pos] else null
     }
 
     internal fun backward() {
@@ -34,12 +48,23 @@ class Lexer(val code: String) {
             --pos
             lineNum = locationHistory[pos].lineNum
             col = locationHistory[pos].col
+            locationHistory.removeLast()
         }
+    }
+
+    fun resetCursorTo(index: Int) {
+        log.v { "lexer reset to $index" }
+        pos = index
+        locationHistory.removeAfterIndex(pos)
+        lineNum = locationHistory[pos].lineNum
+        col = locationHistory[pos].col
     }
 
     internal fun makeSourcePosition() = SourcePosition(lineNum = lineNum, col = col)
 
-    internal fun Char.isIdentifierChar() = !isWhitespace() && this !in setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '|', '&', '.', '?', '\n')
+    internal fun Char.isIdentifierChar() = !isWhitespace() && this !in NON_IDENTIFIER_CHARACTERS
+
+    internal fun Char.isFieldIdentifierChar() = isIdentifierChar() && this !in setOf('$')
 
     internal fun readInteger(): String {
         val sb = StringBuilder()
@@ -53,6 +78,16 @@ class Lexer(val code: String) {
     internal fun readIdentifier(): String {
         val sb = StringBuilder()
         while (currentChar()?.isIdentifierChar() == true) {
+            sb.append(currentChar()!!)
+            advanceChar()
+        }
+        backward()
+        return sb.toString()
+    }
+
+    internal fun readFieldIdentifier(): String {
+        val sb = StringBuilder()
+        while (currentChar()?.isFieldIdentifierChar() == true) {
             sb.append(currentChar()!!)
             advanceChar()
         }
@@ -104,81 +139,159 @@ class Lexer(val code: String) {
         }
     }
 
-    internal fun readToken(): Token {
+    internal fun readStringContent(): Token {
+        val sb = StringBuilder()
+        val position = makeSourcePosition()
+        while (currentChar() !in setOf('"', '$', null)) {
+            if (currentChar() == '\\') {
+                advanceChar()
+                sb.append(when (currentChar()) {
+                    't' -> '\t'
+                    'b' -> '\b'
+                    'r' -> '\r'
+                    'n' -> '\n'
+                    '\'' -> '\''
+                    '"' -> '"'
+                    '\\' -> '\\'
+                    '$' -> '$'
+                    'u' -> {
+                        val hex = (1..4).map { advanceChar() }.joinToString("")
+                        var code = hex.toInt(16)
+                        if (code in (0xD800 .. 0xDFFF)) { // surrogates
+                            if (advanceChar() != '\\' || advanceChar() != 'u') throw RuntimeException("Expect another \\u for a surrogate pair")
+                            val lowSurrogateHex = (1..4).map { advanceChar() }.joinToString("")
+                            val lowSurrogateCode = lowSurrogateHex.toInt(16)
+                            // decode according to https://en.wikipedia.org/wiki/UTF-16#Examples
+                            code = ((code - 0xD800) * 0x400) + (lowSurrogateCode - 0xDC00) + 0x10000
+                        }
+                        hexToUtf8String(code)
+                    }
+                    else -> throw RuntimeException("Unsupported escape \\${currentChar()}")
+                })
+            } else {
+                sb.append(currentChar())
+            }
+            advanceChar()
+        }
+        backward()
+        return Token(TokenType.StringLiteral, sb.toString(), position)
+    }
+
+    fun readToken(): Token {
         while (currentChar() != null) {
             val c = currentChar()!!
             try {
-                when {
-                    c in setOf('\n') -> return Token(TokenType.NewLine, c.toString(), makeSourcePosition())
-                    c.isWhitespace() -> continue
-                    c.isDigit() -> return readNumber()
-                    c in setOf('(', ')') -> return Token(TokenType.Operator, c.toString(), makeSourcePosition())
-                    c in setOf('+', '-', '*', '/', '%') -> {
-                        val position = makeSourcePosition()
-                        if (nextChar() == '=') {
-                            advanceChar()
-                            return Token(TokenType.Symbol, "$c=", position)
-                        }
-                        val withNextChar = "$c${nextChar()}"
-                        when (withNextChar) {
-                            "++", "--" -> {
+                when (mode.last()) {
+                    Mode.Main -> when {
+                        c in setOf('\n') -> return Token(TokenType.NewLine, c.toString(), makeSourcePosition())
+                        c.isWhitespace() -> continue
+                        c.isDigit() -> return readNumber()
+                        c in setOf('(', ')') -> return Token(TokenType.Operator, c.toString(), makeSourcePosition())
+                        c in setOf('+', '-', '*', '/', '%') -> {
+                            val position = makeSourcePosition()
+                            if (nextChar() == '=') {
                                 advanceChar()
-                                return Token(TokenType.Operator, withNextChar, position)
+                                return Token(TokenType.Symbol, "$c=", position)
                             }
-                            "//" -> {
-                                advanceChar()
-                                readLine()
-                                continue // discard
+                            val withNextChar = "$c${nextChar()}"
+                            when (withNextChar) {
+                                "++", "--" -> {
+                                    advanceChar()
+                                    return Token(TokenType.Operator, withNextChar, position)
+                                }
+
+                                "//" -> {
+                                    advanceChar()
+                                    readLine()
+                                    continue // discard
+                                }
+
+                                "/*" -> {
+                                    advanceChar()
+                                    readBlockComment()
+                                    continue // discard
+                                }
                             }
-                            "/*" -> {
-                                advanceChar()
-                                readBlockComment()
-                                continue // discard
-                            }
-                        }
-                        return Token(TokenType.Operator, c.toString(), position)
-                    }
-                    c in setOf('|', '&') -> {
-                        val position = makeSourcePosition()
-                        when (val withNextChar = "$c${nextChar()}") {
-                            "||", "&&" -> {
-                                advanceChar()
-                                return Token(TokenType.Operator, withNextChar, position)
-                            }
-                        }
-//                        return Token(TokenType.Operator, c.toString(), position)
-                        throw UnsupportedOperationException("Operator `$c` is not supported")
-                    }
-                    c in setOf('.', '?') -> {
-                        val position = makeSourcePosition()
-                        when (val withNextChar = "$c${nextChar()}") {
-                            "?." -> {
-                                advanceChar()
-                                return Token(TokenType.Operator, withNextChar, position)
-                            }
-                        }
-                        if (c == '.') {
                             return Token(TokenType.Operator, c.toString(), position)
                         }
-                        return Token(TokenType.Symbol, c.toString(), position)
+
+                        c in setOf('|', '&') -> {
+                            val position = makeSourcePosition()
+                            when (val withNextChar = "$c${nextChar()}") {
+                                "||", "&&" -> {
+                                    advanceChar()
+                                    return Token(TokenType.Operator, withNextChar, position)
+                                }
+                            }
+//                        return Token(TokenType.Operator, c.toString(), position)
+                            throw UnsupportedOperationException("Operator `$c` is not supported")
+                        }
+
+                        c in setOf('.', '?') -> {
+                            val position = makeSourcePosition()
+                            when (val withNextChar = "$c${nextChar()}") {
+                                "?." -> {
+                                    advanceChar()
+                                    return Token(TokenType.Operator, withNextChar, position)
+                                }
+                            }
+                            if (c == '.') {
+                                return Token(TokenType.Operator, c.toString(), position)
+                            }
+                            return Token(TokenType.Symbol, c.toString(), position)
+                        }
+
+                        c in setOf('<', '>', '=', '!') -> {
+                            val position = makeSourcePosition()
+                            val token = if (nextChar() == '=') {
+                                advanceChar()
+                                "$c="
+                            } else {
+                                "$c"
+                            }
+                            if (token == "=") {
+                                return Token(TokenType.Symbol, token, position)
+                            } else {
+                                return Token(TokenType.Operator, token, position)
+                            }
+                        }
+
+                        c in setOf(':', ',', '{', '}', '"') -> return Token(
+                            TokenType.Symbol,
+                            c.toString(),
+                            makeSourcePosition()
+                        )
+
+                        c in setOf(';') -> return Token(TokenType.Semicolon, c.toString(), makeSourcePosition())
+                        c.isIdentifierChar() -> return Token(
+                            TokenType.Identifier,
+                            readIdentifier(),
+                            makeSourcePosition()
+                        )
                     }
-                    c in setOf('<', '>', '=', '!') -> {
-                        val position = makeSourcePosition()
-                        val token = if (nextChar() == '=') {
+
+                    Mode.QuotedString -> return when {
+                        c == '$' && nextChar() == '{' -> {
+                            val position = makeSourcePosition()
                             advanceChar()
-                            "$c="
-                        } else {
-                            "$c"
+                            Token(TokenType.Symbol, "\${", position)
                         }
-                        if (token == "=") {
-                            return Token(TokenType.Symbol, token, position)
-                        } else {
-                            return Token(TokenType.Operator, token, position)
+                        c == '$' -> {
+                            val position = makeSourcePosition()
+                            if (advanceChar() != '"') {
+                                Token(
+                                    TokenType.StringFieldIdentifier,
+                                    readFieldIdentifier(),
+                                    position
+                                )
+                            } else {
+                                backward()
+                                Token(TokenType.StringLiteral, "$", position)
+                            }
                         }
+                        c == '"' -> Token(TokenType.Symbol, "$c", makeSourcePosition())
+                        else -> readStringContent()
                     }
-                    c in setOf(':', ',', '{', '}') -> return Token(TokenType.Symbol, c.toString(), makeSourcePosition())
-                    c in setOf(';') -> return Token(TokenType.Semicolon, c.toString(), makeSourcePosition())
-                    c.isIdentifierChar() -> return Token(TokenType.Identifier, readIdentifier(), makeSourcePosition())
                 }
             } finally {
                 advanceChar()
@@ -198,4 +311,34 @@ class Lexer(val code: String) {
         } while (t.type != TokenType.EOF)
         return result
     }
+
+    enum class Mode {
+        Main, QuotedString
+    }
+}
+
+@OptIn(ExperimentalStdlibApi::class) // this opt-in is only for logging
+fun hexToUtf8String(code: Int): String {
+    log.v { "hexToUtf8String(${code.toHexString()})" }
+    // convert to bytes according to https://en.wikipedia.org/wiki/UTF-8#Encoding
+    val bytes = when {
+        code <= 0x007F -> byteArrayOf(code.toByte())
+        code <= 0x07FF -> byteArrayOf(
+            ((code shr 6) or 0b110_00000).toByte(),
+            ((code and 0b00_111111) or 0b10_000000).toByte()
+        )
+        code <= 0xFFFF -> byteArrayOf(
+            ((code shr 12) or 0b1110_0000).toByte(),
+            (((code shr 6) and 0b111111) or 0b10_000000).toByte(),
+            ((code and 0b111111) or 0b10_000000).toByte(),
+        )
+        code <= 0x10FFFF -> byteArrayOf(
+            ((code shr 18) or 0b11110_000).toByte(),
+            (((code shr 12) and 0b111111) or 0b10_000000).toByte(),
+            (((code shr 6) and 0b111111) or 0b10_000000).toByte(),
+            ((code and 0b111111) or 0b10_000000).toByte(),
+        )
+        else -> throw RuntimeException("Unsupported unicode character \\u${code.toHexString()}")
+    }
+    return bytes.decodeToString()
 }

@@ -6,6 +6,8 @@ enum class TokenType {
     Operator,
     Symbol,
     Identifier,
+    StringLiteral,
+    StringFieldIdentifier,
     NewLine,
     Semicolon,
     EOF,

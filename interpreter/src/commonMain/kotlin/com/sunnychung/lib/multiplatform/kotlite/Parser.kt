@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite
 import com.sunnychung.lib.multiplatform.kotlite.error.ExpectTokenMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.error.ParseException
 import com.sunnychung.lib.multiplatform.kotlite.error.UnexpectedTokenException
+import com.sunnychung.lib.multiplatform.kotlite.extension.removeAfterIndex
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
@@ -30,6 +31,9 @@ import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringFieldIdentifierNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
@@ -40,32 +44,62 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 /**
  * Reference grammar: https://kotlinlang.org/spec/syntax-and-grammar.html#grammar-rule-expression
  */
-class Parser(lexer: Lexer) {
-    private val allTokens = lexer.readAllTokens()
+class Parser(protected val lexer: Lexer) {
+    internal val allTokens = mutableListOf<Token>()
+    internal val tokenCharIndexes = mutableListOf<Int>()
 
-    private var currentToken: Token = allTokens.first()
-    private var tokenIndex = 0
+    internal var currentToken: Token
+
+    /**
+     * Current token index
+     */
+    internal var tokenIndex = 0
 
     init {
-        log.v { "Tokens = $allTokens" }
+//        log.v { "Tokens = $allTokens" }
+        tokenCharIndexes += lexer.currentCursor()
+        currentToken = readToken()
+        tokenIndex = 0
     }
 
-    private fun readToken(): Token {
+    internal fun readToken(): Token {
         if (tokenIndex + 1 < allTokens.size) {
-            currentToken = allTokens[++tokenIndex]
-            return currentToken
-        } else {
+            return allTokens[tokenIndex + 1]
+        } else if (allTokens.lastOrNull()?.type == TokenType.EOF) {
             throw IndexOutOfBoundsException()
+        }
+        return lexer.readToken().also {
+            currentToken = it
+            allTokens += it
+            tokenCharIndexes += lexer.currentCursor()
+            ++tokenIndex
         }
     }
 
-    private fun peekNextToken() = allTokens[tokenIndex + 1]
+    private fun peekNextToken(): Token {
+        val originalTokenIndex = tokenIndex
+        val t = readToken()
+        resetTokenToIndex(originalTokenIndex)
+        return t
+    }
 
     private fun lastToken() = allTokens[tokenIndex - 1]
 
-    private fun resetTokenToIndex(index: Int) {
+    internal fun resetTokenToIndex(index: Int) {
         tokenIndex = index
         currentToken = allTokens[index]
+        lexer.resetCursorTo(tokenCharIndexes[index + 1]) // cursor pointing to start of next token
+        // discard already read tokens, because they are invalid after changing mode
+        allTokens.removeAfterIndex(index)
+        tokenCharIndexes.removeAfterIndex(index + 1)
+    }
+
+    private fun switchMode(mode: Lexer.Mode) {
+        lexer.switchToMode(mode)
+    }
+
+    private fun exitMode() {
+        lexer.switchToPreviousMode()
     }
 
     fun eat(tokenType: TokenType): Token {
@@ -89,16 +123,17 @@ class Parser(lexer: Lexer) {
     fun isCurrentToken(type: TokenType, value: Any) =
         currentToken.type == type && currentToken.value == value
 
-    fun currentTokenIndexExcludingNL(): Int {
-        // TODO optimize
-        for (i in tokenIndex..< allTokens.size) {
-            if (allTokens[i].type == TokenType.NewLine) continue
-            return i
+    fun currentTokenExcludingNL(isResetIndex: Boolean = true): Token {
+        val originalTokenIndex = tokenIndex
+        var t: Token = currentToken
+        while (t.type == TokenType.NewLine) {
+            t = readToken()
         }
-        throw IndexOutOfBoundsException()
+        if (isResetIndex) {
+            resetTokenToIndex(originalTokenIndex)
+        }
+        return t
     }
-
-    fun currentTokenExcludingNL(): Token = allTokens[currentTokenIndexExcludingNL()]
 
     fun isCurrentTokenExcludingNL(type: TokenType, value: Any): Boolean {
         val t = currentTokenExcludingNL()
@@ -404,6 +439,69 @@ class Parser(lexer: Lexer) {
     }
 
     /**
+     *
+     * lineStringLiteral:
+     *     '"' {lineStringContent | lineStringExpression} '"'
+     *
+     * lineStringContent:
+     *     LineStrText
+     *     | LineStrEscapedChar
+     *     | LineStrRef
+     *
+     * lineStringExpression:
+     *     '${'
+     *     {NL}
+     *     expression
+     *     {NL}
+     *     '}'
+     *
+     */
+    fun lineStringLiteral(): ASTNode {
+        val nodes = mutableListOf<ASTNode>()
+        switchMode(Lexer.Mode.QuotedString) // switch mode before reading next token
+        eat(TokenType.Symbol, "\"")
+        while (!isCurrentToken(TokenType.Symbol, "\"")) {
+            when (currentToken.type) {
+                TokenType.StringLiteral -> {
+                    val t = eat(TokenType.StringLiteral)
+                    nodes += StringLiteralNode(t.value as String)
+                }
+                TokenType.StringFieldIdentifier -> {
+                    val t = eat(TokenType.StringFieldIdentifier)
+                    nodes += StringFieldIdentifierNode(t.value as String)
+                }
+                TokenType.Symbol -> {
+                    if (currentToken.value == "\${") {
+                        switchMode(Lexer.Mode.Main)
+                        eat(TokenType.Symbol, "\${")
+                        repeatedNL()
+                        nodes += expression()
+                        repeatedNL()
+                        exitMode() // switch mode before reading next token
+                        eat(TokenType.Symbol, "}")
+                    } else {
+                        throw UnexpectedTokenException(currentToken)
+                    }
+                }
+                else -> throw UnexpectedTokenException(currentToken)
+            }
+        }
+        exitMode()
+        eat(TokenType.Symbol, "\"")
+        return StringNode(nodes)
+    }
+
+    /**
+     * stringLiteral:
+     *     lineStringLiteral
+     *     | multiLineStringLiteral
+     *
+     */
+    fun stringLiteral(): ASTNode {
+        return lineStringLiteral()
+    }
+
+    /**
      * primaryExpression:
      *     parenthesizedExpression
      *     | simpleIdentifier
@@ -449,6 +547,11 @@ class Parser(lexer: Lexer) {
 
                 val t = eat(TokenType.Identifier)
                 return VariableReferenceNode(t.value as String)
+            }
+            TokenType.Symbol -> {
+                if (currentToken.value in setOf("\"", "\"\"\"")) {
+                    return stringLiteral()
+                }
             }
             // TODO other token types
             else -> Unit
@@ -725,11 +828,13 @@ class Parser(lexer: Lexer) {
 //        repeatedNL() // this would cause the NL before the next statement not recognized
 
         fun nextNonNLSemiToken(): Token {
-            var index = currentTokenIndexExcludingNL()
-            if (allTokens[index].type == TokenType.Semicolon) {
-                ++index
+            val originalTokenIndex = tokenIndex
+            var token = currentTokenExcludingNL(isResetIndex = false)
+            if (token.type == TokenType.Semicolon) {
+                token = readToken()
             }
-            return allTokens[index]
+            resetTokenToIndex(originalTokenIndex)
+            return token
         }
 
         val nextToken = currentTokenExcludingNL()

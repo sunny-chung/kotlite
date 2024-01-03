@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -412,6 +413,7 @@ class SemanticAnalyzerTest {
     }
 
     @Test
+    @Ignore
     fun primaryConstructorParametersOrPropertiesCannotBeReassigned() {
         """
             class Cls(var a: Int = 10, var e: Int = 60, var f: Int = e++) {
@@ -421,5 +423,21 @@ class SemanticAnalyzerTest {
             }
             val o: Cls = Cls()
         """.trimIndent()
+    }
+
+    @Test
+    fun stringFieldReferenceToNonExistField() {
+        assertSemanticFail("""
+            val s: String = "abc${'$'}x.def"
+            val x: Int = 30
+        """.trimIndent())
+    }
+
+    @Test
+    fun stringInterpolationReferenceToNonExistField() {
+        assertSemanticFail("""
+            val s: String = "abc${'$'}{x * 2 + 1}def"
+            val x: Int = 30
+        """.trimIndent())
     }
 }

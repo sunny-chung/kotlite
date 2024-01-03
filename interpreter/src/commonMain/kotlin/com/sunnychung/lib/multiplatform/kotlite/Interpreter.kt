@@ -36,14 +36,15 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
-import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
-import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
+import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
@@ -90,6 +91,8 @@ class Interpreter(val scriptNode: ScriptNode) {
             is NavigationNode -> this.eval()
             is PropertyAccessorsNode -> TODO()
             is ValueNode -> this.eval()
+            is StringLiteralNode -> this.eval()
+            is StringNode -> this.eval()
         }
     }
 
@@ -591,6 +594,12 @@ class Interpreter(val scriptNode: ScriptNode) {
             else -> throw UnsupportedOperationException()
         }
     }
+
+    fun StringNode.eval(): StringValue {
+        return StringValue(nodes.joinToString("") { (it.eval() as RuntimeValue).convertToString() })
+    }
+
+    fun StringLiteralNode.eval() = StringValue(content)
 
     fun IntegerNode.eval() = IntValue(value)
     fun DoubleNode.eval() = DoubleValue(value)

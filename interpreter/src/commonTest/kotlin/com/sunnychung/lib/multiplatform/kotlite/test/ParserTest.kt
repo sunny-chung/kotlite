@@ -5,12 +5,19 @@ import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.Token
+import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ParserTest {
     private fun parser(code: String) = Parser(Lexer(code))
+
+    fun Token.assertToken(type: TokenType, value: Any) {
+        assertEquals(type, this.type)
+        assertEquals(value, this.value)
+    }
 
     @Test
     fun expressionWithBracketsAndBinaryOpsAndUnaryOps() {
@@ -29,7 +36,7 @@ class ParserTest {
     }
 
     @Test
-    fun canParseFunctionCals() {
+    fun canParseFunctionCalls() {
         parser("""
             fun abc(a: Int, b : Int) {
                 val x: Int = 1 + a - b
@@ -41,5 +48,87 @@ class ParserTest {
         """.trimIndent()).script()
             .nodes.any { it is FunctionCallNode }
             .apply { assertTrue(this) }
+    }
+
+    @Test
+    fun read() {
+        val parser = parser("a = b + c")
+        assertEquals(0, parser.tokenIndex)
+        assertEquals(1, parser.allTokens.size)
+        assertEquals(2, parser.tokenCharIndexes.size)
+        assertEquals(0, parser.tokenCharIndexes[0])
+        parser.currentToken.assertToken(TokenType.Identifier, "a")
+
+        parser.readToken().assertToken(TokenType.Symbol, "=")
+        parser.currentToken.assertToken(TokenType.Symbol, "=")
+        assertEquals(1, parser.tokenIndex)
+        assertEquals(2, parser.allTokens.size)
+        assertEquals(3, parser.tokenCharIndexes.size)
+        assertEquals(0, parser.tokenCharIndexes[0])
+        assertEquals(1, parser.tokenCharIndexes[1])
+
+        parser.readToken().assertToken(TokenType.Identifier, "b")
+        parser.currentToken.assertToken(TokenType.Identifier, "b")
+        assertEquals(2, parser.tokenIndex)
+        assertEquals(3, parser.allTokens.size)
+        assertEquals(4, parser.tokenCharIndexes.size)
+        assertEquals(0, parser.tokenCharIndexes[0])
+        assertEquals(1, parser.tokenCharIndexes[1])
+        assertEquals(3, parser.tokenCharIndexes[2])
+
+        parser.resetTokenToIndex(1)
+        parser.currentToken.assertToken(TokenType.Symbol, "=")
+        assertEquals(1, parser.tokenIndex)
+        assertEquals(2, parser.allTokens.size)
+        assertEquals(3, parser.tokenCharIndexes.size)
+        assertEquals(0, parser.tokenCharIndexes[0])
+        assertEquals(1, parser.tokenCharIndexes[1])
+
+        parser.readToken().assertToken(TokenType.Identifier, "b")
+        parser.currentToken.assertToken(TokenType.Identifier, "b")
+        assertEquals(2, parser.tokenIndex)
+        assertEquals(3, parser.allTokens.size)
+        assertEquals(4, parser.tokenCharIndexes.size)
+        assertEquals(0, parser.tokenCharIndexes[0])
+        assertEquals(1, parser.tokenCharIndexes[1])
+        assertEquals(3, parser.tokenCharIndexes[2])
+    }
+
+    @Test
+    fun currentTokenExcludingNL() {
+        val parser = parser("a = \n\n\n\n b + c")
+        assertEquals(0, parser.tokenIndex)
+        assertEquals(1, parser.allTokens.size)
+        assertEquals(2, parser.tokenCharIndexes.size)
+        assertEquals(0, parser.tokenCharIndexes[0])
+        parser.currentToken.assertToken(TokenType.Identifier, "a")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "a")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "a")
+
+        parser.readToken().assertToken(TokenType.Symbol, "=")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Symbol, "=")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Symbol, "=")
+
+        parser.readToken().assertToken(TokenType.NewLine, "\n")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "b")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "b")
+
+        parser.readToken().assertToken(TokenType.NewLine, "\n")
+        parser.readToken().assertToken(TokenType.NewLine, "\n")
+        parser.readToken().assertToken(TokenType.NewLine, "\n")
+
+        parser.readToken().assertToken(TokenType.Identifier, "b")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "b")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "b")
+
+        parser.readToken().assertToken(TokenType.Operator, "+")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Operator, "+")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Operator, "+")
+
+        parser.readToken().assertToken(TokenType.Identifier, "c")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "c")
+        parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "c")
+
+        parser.readToken().assertToken(TokenType.EOF, '\u0000')
     }
 }

@@ -88,7 +88,7 @@ data class AssignmentNode(val subject: ASTNode, val operator: String, val value:
     }
 }
 
-data class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: String? = null, @ModifyByAnalyzer var type: TypeNode? = null) : ASTNode {
+open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: String? = null, @ModifyByAnalyzer var type: TypeNode? = null) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 
@@ -242,5 +242,22 @@ class PropertyAccessorsNode(
         val self = "${generateId()}[\"Navigation Node\"]"
         return "$self\n${getter?.let {"$self-- getter -->${it.toMermaid()}\n"}}\n" +
                 "${setter?.let {"$self-- setter -->${it.toMermaid()}\n"}}"
+    }
+}
+
+class StringLiteralNode(val content: String) : ASTNode {
+    override fun toMermaid(): String = "${generateId()}[\"String Node `$content`\"]"
+}
+
+class StringFieldIdentifierNode(fieldIdentifier: String) : VariableReferenceNode(fieldIdentifier) {
+    override fun toMermaid(): String = "${generateId()}[\"String Field Identifier Node `$variableName`\"]"
+}
+
+class StringNode(
+    val nodes: List<ASTNode>
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"String Node\"]"
+        return "$self\n${nodes.forEach {"$self-->${it.toMermaid()}\n"}}"
     }
 }

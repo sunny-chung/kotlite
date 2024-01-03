@@ -42,6 +42,21 @@ class PropertyTypeTest {
     }
 
     @Test
+    fun stringAssignToInt1() {
+        assertTypeCheckFail("""
+            var a: Int = 3
+            a = "def"
+        """.trimIndent())
+    }
+
+    @Test
+    fun stringAssignToInt2() {
+        assertTypeCheckFail("""
+            var a: Int = "def"
+        """.trimIndent())
+    }
+
+    @Test
     fun assignToIntNullableSuccess() {
         val interpreter = interpreter("""
             var a: Int? = 3

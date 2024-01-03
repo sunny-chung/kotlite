@@ -25,6 +25,9 @@ import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringFieldIdentifierNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
@@ -42,6 +45,7 @@ open class CodeGenerator(protected val node: ASTNode) {
 
     protected fun ASTNode.generate(): String
         = when (this) {
+            is StringFieldIdentifierNode -> this.generate()
             is AssignmentNode -> this.generate()
             is BinaryOpNode -> this.generate()
             is BlockNode -> this.generate()
@@ -71,6 +75,8 @@ open class CodeGenerator(protected val node: ASTNode) {
             is WhileNode -> this.generate()
         is PropertyAccessorsNode -> TODO()
         is ValueNode -> TODO()
+        is StringLiteralNode -> this.generate()
+        is StringNode -> this.generate()
     }
 
     protected fun AssignmentNode.generate()
@@ -159,5 +165,18 @@ open class CodeGenerator(protected val node: ASTNode) {
 
     protected fun WhileNode.generate()
         = "while (${condition.generate()})${body?.let { " ${it.generate()}" } ?: ";"}"
+
+    protected fun StringNode.generate()
+        = "\"${nodes.joinToString("") {
+            if (it is StringLiteralNode) {
+                it.generate()
+            } else {
+                "\${${it.generate()}}"
+            }
+        }}\""
+
+    protected fun StringLiteralNode.generate() = content
+
+    protected fun StringFieldIdentifierNode.generate(): String = (this as VariableReferenceNode).generate()
 
 }

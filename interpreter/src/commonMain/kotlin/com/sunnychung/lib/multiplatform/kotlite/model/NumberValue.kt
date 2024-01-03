@@ -57,4 +57,6 @@ sealed interface NumberValue<T : Number> : RuntimeValue, Comparable<NumberValue<
         }
         return (value.toDouble()).compareTo(other.value.toDouble())
     }
+
+    override fun convertToString() = value.toString()
 }
