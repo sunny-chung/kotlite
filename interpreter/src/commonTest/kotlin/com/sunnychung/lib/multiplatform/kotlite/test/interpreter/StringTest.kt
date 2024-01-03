@@ -96,13 +96,23 @@ class StringTest {
     fun nestedStringInterpolation() {
         val interpreter = interpreter("""
             val x: Int = 30
-            val s: String = "abc${'$'}{if (x < 20) { "smaller${'$'}{x + 10}" } else { "great${'$'}{ if (x >= 30) { "--${'$'}{"<${'$'}{x * 2}>"}--" } else "mid${'$'}x" }er" } }def"
+            val s: String = "abc${'$'}{
+                if (x < 20) {
+                    "smaller${'$'}{x + 10}"
+                } else {
+                    "great${'$'}{ if (x >= 30) {
+                        "--${'$'}{
+                            "${'$'}x<${'$'}{x * 2}>"
+                        }--"
+                    } else "mid${'$'}x" }er"
+                }
+            }def"
         """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
-        assertEquals("abcgreat--<60>--erdef", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
+        assertEquals("abcgreat--30<60>--erdef", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
     }
 
     @Test

@@ -410,4 +410,16 @@ class PropertyTypeTest {
             o.c = 20.0
         """.trimIndent())
     }
+
+    @Test
+    fun invalidTypeAssignmentInsideStringInterpolation() {
+        assertTypeCheckFail("""
+            val s: String = "${'$'}{
+                if (true) {
+                    val x: Int = "def"
+                    x
+                }
+            }"
+        """.trimIndent())
+    }
 }
