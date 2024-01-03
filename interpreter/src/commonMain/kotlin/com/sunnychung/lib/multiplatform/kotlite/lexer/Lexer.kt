@@ -27,7 +27,7 @@ class Lexer(val code: String) {
 
     internal inline fun currentChar() = if (pos < code.length) code[pos] else null
 
-    internal inline fun nextChar() = if (pos + 1 < code.length) code[pos + 1] else null
+    internal inline fun nextChar(howMany: Int = 1) = if (pos + howMany < code.length) code[pos + howMany] else null
 
     internal fun advanceChar(): Char? {
         if (pos < code.length) {
@@ -177,6 +177,17 @@ class Lexer(val code: String) {
         return Token(TokenType.StringLiteral, sb.toString(), position)
     }
 
+    internal fun readMultilineStringContent(): Token {
+        val sb = StringBuilder()
+        val position = makeSourcePosition()
+        while (currentChar() !in setOf('"', '$', null)) {
+            sb.append(currentChar())
+            advanceChar()
+        }
+        backward()
+        return Token(TokenType.StringLiteral, sb.toString(), position)
+    }
+
     fun readToken(): Token {
         while (currentChar() != null) {
             val c = currentChar()!!
@@ -256,7 +267,18 @@ class Lexer(val code: String) {
                             }
                         }
 
-                        c in setOf(':', ',', '{', '}', '"') -> return Token(
+                        c == '"' -> {
+                            val position = makeSourcePosition()
+                            return if (nextChar() == '"' && nextChar(howMany = 2) == '"') {
+                                advanceChar()
+                                advanceChar()
+                                Token(TokenType.Symbol, "\"\"\"", position)
+                            } else {
+                                Token(TokenType.Symbol, "$c", position)
+                            }
+                        }
+
+                        c in setOf(':', ',', '{', '}') -> return Token(
                             TokenType.Symbol,
                             c.toString(),
                             makeSourcePosition()
@@ -292,6 +314,34 @@ class Lexer(val code: String) {
                         c == '"' -> Token(TokenType.Symbol, "$c", makeSourcePosition())
                         else -> readStringContent()
                     }
+
+                    Mode.MultilineString -> return when {
+                        c == '$' && nextChar() == '{' -> {
+                            val position = makeSourcePosition()
+                            advanceChar()
+                            Token(TokenType.Symbol, "\${", position)
+                        }
+                        c == '$' -> {
+                            val position = makeSourcePosition()
+                            if (advanceChar() != '"') {
+                                Token(
+                                    TokenType.StringFieldIdentifier,
+                                    readFieldIdentifier(),
+                                    position
+                                )
+                            } else {
+                                backward()
+                                Token(TokenType.StringLiteral, "$", position)
+                            }
+                        }
+                        c == '"' && nextChar() == '"' && nextChar(howMany = 2) == '"' ->
+                            Token(TokenType.Symbol, "\"\"\"", makeSourcePosition()).also {
+                                advanceChar()
+                                advanceChar()
+                            }
+                        c == '"' -> Token(TokenType.StringLiteral, "$c", makeSourcePosition())
+                        else -> readMultilineStringContent()
+                    }
                 }
             } finally {
                 advanceChar()
@@ -313,7 +363,7 @@ class Lexer(val code: String) {
     }
 
     enum class Mode {
-        Main, QuotedString
+        Main, QuotedString, MultilineString
     }
 }
 

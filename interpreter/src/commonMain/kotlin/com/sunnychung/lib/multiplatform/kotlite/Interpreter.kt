@@ -44,6 +44,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -218,9 +219,9 @@ class Interpreter(val scriptNode: ScriptNode) {
         if (subject is NavigationNode && subject.operator == "?.") {
             throw UnsupportedOperationException("?: on left side of assignment is not supported")
         }
-        val result = value.eval()
+        val result = value.eval() as RuntimeValue
 
-        val read = { subject.eval() }
+        val read = { subject.eval() as RuntimeValue }
         val write = { value: RuntimeValue -> subject.write(value) }
 
         val finalResult = if (operator == "=") {
@@ -228,7 +229,13 @@ class Interpreter(val scriptNode: ScriptNode) {
         } else {
             val existing = read()
             val newResult = when (operator) {
-                "+=" -> (existing as NumberValue<*>) + result as NumberValue<*>
+                "+=" -> {
+                    if (subject.declaredType() is StringType) {
+                        StringValue(existing.convertToString() + result.convertToString())
+                    }  else {
+                        (existing as NumberValue<*>) + result as NumberValue<*>
+                    }
+                }
                 "-=" -> (existing as NumberValue<*>) - result as NumberValue<*>
                 "*=" -> (existing as NumberValue<*>) * result as NumberValue<*>
                 "/=" -> (existing as NumberValue<*>) / result as NumberValue<*>
@@ -614,6 +621,21 @@ class Interpreter(val scriptNode: ScriptNode) {
     fun BooleanNode.eval() = BooleanValue(value)
     fun NullNode.eval() = NullValue
     fun ValueNode.eval() = value
+
+    fun ASTNode.declaredType(): DataType = when (this) {
+        is NavigationNode -> this.declaredType()
+        is VariableReferenceNode -> this.declaredType()
+        else -> throw UnsupportedOperationException()
+    }
+
+
+    fun NavigationNode.declaredType(): DataType {
+        return callStack.currentSymbolTable().typeNodeToPropertyType(type!!, false)!!.type
+    }
+
+    fun VariableReferenceNode.declaredType(): DataType {
+        return callStack.currentSymbolTable().typeNodeToPropertyType(type!!, false)!!.type
+    }
 
     fun eval() = scriptNode.eval()
 

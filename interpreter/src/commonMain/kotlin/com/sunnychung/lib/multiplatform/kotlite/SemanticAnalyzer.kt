@@ -222,6 +222,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         val subjectType = subject.type().toDataType()
 
         if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
+            if (operator == "+=" && subjectType is StringType) {
+                return // string can concat anything
+            }
             if (!valueType.isNonNullNumberType()) {
                 throw TypeMismatchException("non-null number type", valueType.nameWithNullable)
             }
@@ -661,17 +664,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         val clazz = currentScope.findClass(subjectType.name) ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
         clazz.memberFunctions[memberName]?.let {
-            return TypeNode("Function", it.type, false)
+            return TypeNode("Function", it.type, false).also { type = it }
         }
         clazz.memberPropertyCustomAccessors[memberName]?.let {
-            return it.type()
+            return it.type().also { type = it }
         }
         clazz.memberProperties[memberName]?.let {
-            return it.type.toTypeNode()!!
+            return it.type.toTypeNode().also { type = it }
         }
 
         findExtensionFunction(subjectType.toDataType(), memberName)?.let {
-            return TypeNode("Function", it.type, false)
+            return TypeNode("Function", it.type, false).also { type = it }
         }
 
         throw SemanticException("Could not find member `$memberName` for type ${clazz.name}")

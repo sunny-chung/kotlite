@@ -440,4 +440,25 @@ class SemanticAnalyzerTest {
             val x: Int = 30
         """.trimIndent())
     }
+
+    @Test
+    fun multilineStringFieldReferenceToNonExistField() {
+        assertSemanticFail("""
+            val s: String = ${"\"\"\""}
+                multiline
+                abc${'$'}x.def
+            ${"\"\"\""}
+            val x: Int = 30
+        """.trimIndent())
+    }
+
+    @Test
+    fun multilineStringInterpolationReferenceToNonExistField() {
+        assertSemanticFail("""
+            val s: String = ${"\"\"\""}
+                abc${'$'}{x * 2 + 1}def
+            ${"\"\"\""}
+            val x: Int = 30
+        """.trimIndent())
+    }
 }

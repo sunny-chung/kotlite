@@ -438,6 +438,33 @@ class Parser(protected val lexer: Lexer) {
         return IfNode(condition = condition, trueBlock = trueBlock, falseBlock = falseBlock)
     }
 
+    fun stringContentOrExpression(addNode: (ASTNode) -> Unit) {
+        when (currentToken.type) {
+            TokenType.StringLiteral -> {
+                val t = eat(TokenType.StringLiteral)
+                addNode(StringLiteralNode(t.value as String))
+            }
+            TokenType.StringFieldIdentifier -> {
+                val t = eat(TokenType.StringFieldIdentifier)
+                addNode(StringFieldIdentifierNode(t.value as String))
+            }
+            TokenType.Symbol -> {
+                if (currentToken.value == "\${") {
+                    switchMode(Lexer.Mode.Main)
+                    eat(TokenType.Symbol, "\${")
+                    repeatedNL()
+                    addNode(expression())
+                    repeatedNL()
+                    exitMode() // switch mode before reading next token
+                    eat(TokenType.Symbol, "}")
+                } else {
+                    throw UnexpectedTokenException(currentToken)
+                }
+            }
+            else -> throw UnexpectedTokenException(currentToken)
+        }
+    }
+
     /**
      *
      * lineStringLiteral:
@@ -461,33 +488,38 @@ class Parser(protected val lexer: Lexer) {
         switchMode(Lexer.Mode.QuotedString) // switch mode before reading next token
         eat(TokenType.Symbol, "\"")
         while (!isCurrentToken(TokenType.Symbol, "\"")) {
-            when (currentToken.type) {
-                TokenType.StringLiteral -> {
-                    val t = eat(TokenType.StringLiteral)
-                    nodes += StringLiteralNode(t.value as String)
-                }
-                TokenType.StringFieldIdentifier -> {
-                    val t = eat(TokenType.StringFieldIdentifier)
-                    nodes += StringFieldIdentifierNode(t.value as String)
-                }
-                TokenType.Symbol -> {
-                    if (currentToken.value == "\${") {
-                        switchMode(Lexer.Mode.Main)
-                        eat(TokenType.Symbol, "\${")
-                        repeatedNL()
-                        nodes += expression()
-                        repeatedNL()
-                        exitMode() // switch mode before reading next token
-                        eat(TokenType.Symbol, "}")
-                    } else {
-                        throw UnexpectedTokenException(currentToken)
-                    }
-                }
-                else -> throw UnexpectedTokenException(currentToken)
-            }
+            stringContentOrExpression { nodes += it }
         }
         exitMode()
         eat(TokenType.Symbol, "\"")
+        return StringNode(nodes)
+    }
+
+    /**
+     * multiLineStringLiteral:
+     *     '"""' {multiLineStringContent | multiLineStringExpression | '"'} TRIPLE_QUOTE_CLOSE
+     *
+     * multiLineStringContent:
+     *     MultiLineStrText
+     *     | '"'
+     *     | MultiLineStrRef
+     *
+     * multiLineStringExpression:
+     *     '${'
+     *     {NL}
+     *     expression
+     *     {NL}
+     *     '}'
+     */
+    fun multiLineStringLiteral(): ASTNode {
+        val nodes = mutableListOf<ASTNode>()
+        switchMode(Lexer.Mode.MultilineString) // switch mode before reading next token
+        eat(TokenType.Symbol, "\"\"\"")
+        while (!isCurrentToken(TokenType.Symbol, "\"\"\"")) {
+            stringContentOrExpression { nodes += it }
+        }
+        exitMode()
+        eat(TokenType.Symbol, "\"\"\"")
         return StringNode(nodes)
     }
 
@@ -498,7 +530,12 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun stringLiteral(): ASTNode {
-        return lineStringLiteral()
+        if (currentToken.type != TokenType.Symbol) throw UnexpectedTokenException(currentToken)
+        return when (currentToken.value) {
+            "\"" -> lineStringLiteral()
+            "\"\"\"" -> multiLineStringLiteral()
+            else -> throw UnexpectedTokenException(currentToken)
+        }
     }
 
     /**

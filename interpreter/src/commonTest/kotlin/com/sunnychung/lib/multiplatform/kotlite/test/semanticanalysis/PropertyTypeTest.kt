@@ -418,7 +418,7 @@ class PropertyTypeTest {
                 if (true) {
                     val x: Int = "def"
                     x
-                }
+                } else 1
             }"
         """.trimIndent())
     }
