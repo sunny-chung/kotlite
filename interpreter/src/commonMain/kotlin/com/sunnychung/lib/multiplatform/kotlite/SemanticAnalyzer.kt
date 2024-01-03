@@ -27,6 +27,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
+import com.sunnychung.lib.multiplatform.kotlite.model.NullType
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
@@ -37,6 +38,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
+import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -621,7 +623,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         "+", "-", "*", "/", "%" -> {
             val t1 = node1.type().toDataType()
             val t2 = node2.type().toDataType()
-            if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
+            if (t1 is StringType || t1 is NullType || t2 is StringType || t2 is NullType) {
+                typeRegistry["String"]!!
+            } else if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
                 || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
             ) {
                 typeRegistry["Double"]!!

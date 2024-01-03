@@ -108,7 +108,15 @@ class Interpreter(val scriptNode: ScriptNode) {
 
     fun BinaryOpNode.eval(): RuntimeValue {
         return when (operator) { // TODO overflow
-            "+" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a + b }
+            "+" -> {
+                val r1 = node1.eval() as RuntimeValue
+                val r2 = node2.eval() as RuntimeValue
+                if (r1 is StringValue || r1 is NullValue || r2 is StringValue || r2 is NullValue) {
+                    StringValue(r1.convertToString() + r2.convertToString())
+                } else {
+                    castType<NumberValue<*>, NumberValue<*>>(r1, r2) { a, b -> a + b }
+                }
+            }
             "-" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a - b }
             "*" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a * b }
             "/" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a / b }
