@@ -13,6 +13,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallStack
+import com.sunnychung.lib.multiplatform.kotlite.model.CallableNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
@@ -28,10 +29,13 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallResult
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
@@ -94,6 +98,7 @@ class Interpreter(val scriptNode: ScriptNode) {
             is ValueNode -> this.eval()
             is StringLiteralNode -> this.eval()
             is StringNode -> this.eval()
+            is LambdaLiteralNode -> this.eval()
         }
     }
 
@@ -278,11 +283,17 @@ class Interpreter(val scriptNode: ScriptNode) {
                 if (functionNode != null) {
                     return evalFunctionCall(functionNode)
                 }
-                val classDefinition = callStack.currentSymbolTable().findClass(name)
 
+                val classDefinition = callStack.currentSymbolTable().findClass(name)
                 if (classDefinition != null) {
                     return evalCreateClassInstance(classDefinition)
                 }
+
+                val variable = callStack.currentSymbolTable().read(function.transformedRefName!!)
+                if (variable is LambdaValue) {
+                    return evalFunctionCall(variable.value)
+                }
+
                 throw RuntimeException("Function $name not found")
             }
 
@@ -307,11 +318,11 @@ class Interpreter(val scriptNode: ScriptNode) {
         }
     }
 
-    fun FunctionCallNode.evalFunctionCall(functionNode: FunctionDeclarationNode): RuntimeValue {
+    fun FunctionCallNode.evalFunctionCall(functionNode: CallableNode): RuntimeValue {
         return evalFunctionCall(this, functionNode, emptyMap()).result
     }
 
-    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: FunctionDeclarationNode, extraScopeParameters: Map<String, RuntimeValue>): FunctionCallResult {
+    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>): FunctionCallResult {
         // TODO optimize to remove most loops
         val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
         callNode.arguments.forEach { a ->
@@ -330,7 +341,7 @@ class Interpreter(val scriptNode: ScriptNode) {
             }
         }
 
-        val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(functionNode.type, false)!!.type
+        val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(functionNode.returnType, false)!!.type
 
         callStack.push(functionFullQualifiedName = functionNode.name, scopeType = ScopeType.Function, callPosition = callNode.position)
         try {
@@ -608,6 +619,10 @@ class Interpreter(val scriptNode: ScriptNode) {
             } // TODO remove */
             else -> throw UnsupportedOperationException()
         }
+    }
+
+    fun LambdaLiteralNode.eval(): RuntimeValue {
+        return LambdaValue(this, callStack.currentSymbolTable().typeNodeToDataType(type!!) as FunctionType)
     }
 
     fun StringNode.eval(): StringValue {

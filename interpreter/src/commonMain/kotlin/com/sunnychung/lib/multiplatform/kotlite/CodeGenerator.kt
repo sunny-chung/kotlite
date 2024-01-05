@@ -16,9 +16,11 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
@@ -69,6 +71,7 @@ open class CodeGenerator(protected val node: ASTNode) {
             is PropertyDeclarationNode -> this.generate()
             is ReturnNode -> this.generate()
             is ScriptNode -> this.generate()
+            is FunctionTypeNode -> this.generate()
             is TypeNode -> this.generate()
             is UnaryOpNode -> this.generate()
             is VariableReferenceNode -> this.generate()
@@ -77,6 +80,7 @@ open class CodeGenerator(protected val node: ASTNode) {
         is ValueNode -> TODO()
         is StringLiteralNode -> this.generate()
         is StringNode -> this.generate()
+        is LambdaLiteralNode -> this.generate()
     }
 
     protected fun AssignmentNode.generate()
@@ -144,7 +148,7 @@ open class CodeGenerator(protected val node: ASTNode) {
     protected fun NullNode.generate() = "null"
 
     protected fun PropertyDeclarationNode.generate()
-        = "${if (isMutable) "var" else "val"} $name<$transformedRefName>: ${type.generate()}${initialValue?.let { " = ${it.generate()}" } ?: ""}" +
+        = "${if (isMutable) "var" else "val"} $name<$transformedRefName>: ${(type as ASTNode).generate()}${initialValue?.let { " = ${it.generate()}" } ?: ""}" +
             (accessors?.getter?.let { "\nget() ${it.generate()}" } ?: "" )+
             (accessors?.setter?.let { "\nset() ${it.generate()}" } ?: "")
 
@@ -154,8 +158,11 @@ open class CodeGenerator(protected val node: ASTNode) {
     protected fun ScriptNode.generate()
         = nodes.joinToString("") { "${it.generate()}\n" }
 
+    protected fun FunctionTypeNode.generate(): String
+        = "(${parameterTypes.joinToString(", ") {(it as ASTNode).generate()}}) -> ${(returnType as ASTNode).generate()}"
+
     protected fun TypeNode.generate(): String
-        = "$name${argument?.let { "<${it.generate()}>" } ?: ""}${if (isNullable) "?" else ""}"
+        = "$name${arguments?.let { "<${it.joinToString(", ") { (it as ASTNode).generate() }}>" } ?: ""}${if (isNullable) "?" else ""}"
 
     protected fun UnaryOpNode.generate()
         = "$operator(${node?.let { it.generate() } ?: " "})"
@@ -178,5 +185,15 @@ open class CodeGenerator(protected val node: ASTNode) {
     protected fun StringLiteralNode.generate() = content
 
     protected fun StringFieldIdentifierNode.generate(): String = (this as VariableReferenceNode).generate()
+
+    protected fun LambdaLiteralNode.generate()
+        = "{${valueParameters.joinToString(", ") {it.generate()}}${if (valueParameters.isNotEmpty()) " ->" else ""}\n" +
+            run {
+                ++indentLevel
+                val s = body.statements.joinToString("") { "${indent()}${it.generate()}\n" }
+                --indentLevel
+                s
+            } +
+            "${indent()}}"
 
 }

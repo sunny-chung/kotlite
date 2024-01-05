@@ -60,9 +60,41 @@ data class ScriptNode(val nodes: List<ASTNode>) : ASTNode {
     }
 }
 
-data class TypeNode(val name: String, val argument: TypeNode?, val isNullable: Boolean) : ASTNode {
+open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNullable: Boolean) : ASTNode {
+    init {
+        if (arguments?.isEmpty() == true) throw IllegalArgumentException("empty argument")
+        if (name == "Function" && this !is FunctionTypeNode) throw IllegalArgumentException("function type node should be a FunctionTypeNode instance")
+    }
+
+    fun descriptiveName(): String = "$name${arguments?.let { "<${it.joinToString(", ") { it.descriptiveName() }}>" } ?: ""}${if (isNullable) "?" else ""}"
+
     override fun toMermaid(): String {
-        return "${generateId()}[\"Type $name${if (isNullable) " ?" else ""}\"]" + (if (argument != null) "-->${argument.toMermaid()}" else "") + "\n"
+        val self = "${generateId()}[\"Type $name${if (isNullable) " ?" else ""}\"]"
+        return "$self\n" + (arguments?.forEach { "$self-->${it.toMermaid()}\n" } ?: "")
+    }
+
+    open fun copy(isNullable: Boolean) = TypeNode(
+        name = name,
+        arguments = arguments,
+        isNullable = isNullable,
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is TypeNode) return false
+
+        if (name != other.name) return false
+        if (arguments != other.arguments) return false
+        if (isNullable != other.isNullable) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = name.hashCode()
+        result = 31 * result + (arguments?.hashCode() ?: 0)
+        result = 31 * result + isNullable.hashCode()
+        return result
     }
 }
 
@@ -107,14 +139,24 @@ data class BlockNode(val statements: List<ASTNode>, val position: SourcePosition
     }
 }
 
+interface CallableNode {
+    val valueParameters: List<FunctionValueParameterNode>
+    val body: BlockNode
+    val returnType: TypeNode
+    val name: String?
+}
+
 data class FunctionDeclarationNode(
-    val name: String,
+    override val name: String,
     val receiver: String? = null,
     val type: TypeNode,
-    val valueParameters: List<FunctionValueParameterNode>,
-    val body: BlockNode,
+    override val valueParameters: List<FunctionValueParameterNode>,
+    override val body: BlockNode,
     @ModifyByAnalyzer var transformedRefName: String? = null,
-) : ASTNode {
+) : ASTNode, CallableNode {
+    override val returnType: TypeNode
+        get() = type
+
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name`\"]"
         return "$self-- type -->${type.toMermaid()}\n" +
@@ -259,5 +301,35 @@ class StringNode(
     override fun toMermaid(): String {
         val self = "${generateId()}[\"String Node\"]"
         return "$self\n${nodes.forEach {"$self-->${it.toMermaid()}\n"}}"
+    }
+}
+
+data class LambdaLiteralNode(
+    override val valueParameters: List<FunctionValueParameterNode>,
+    override val body: BlockNode,
+    @ModifyByAnalyzer var type: FunctionTypeNode? = null,
+) : ASTNode, CallableNode {
+    override val returnType: TypeNode
+        get() = type!!.returnType
+
+    override val name: String?
+        get() = null
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Lambda Node\"]"
+        return valueParameters.joinToString("") { "$self-- parameter -->${it.toMermaid() }\n" } +
+                "$self-->${body.toMermaid()}\n"
+    }
+}
+
+class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: List<TypeNode>, val returnType: TypeNode, isNullable: Boolean)
+    : TypeNode("Function", parameterTypes + returnType, isNullable) {
+    override fun copy(isNullable: Boolean): FunctionTypeNode {
+        return FunctionTypeNode(
+            receiverType = receiverType,
+            parameterTypes = parameterTypes,
+            returnType = returnType,
+            isNullable = isNullable,
+        )
     }
 }

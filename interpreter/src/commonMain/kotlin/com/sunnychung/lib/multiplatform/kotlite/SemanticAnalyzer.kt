@@ -21,10 +21,13 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullType
@@ -89,8 +92,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         typeRegistry["$name?"]!!
     }
 
-    fun DataType.toTypeNode() = if (this !is ObjectType) {
+    fun DataType.toTypeNode(): TypeNode = if (this !is ObjectType && this !is FunctionType) {
         typeRegistry["$name${if (isNullable) "?" else ""}"]!!
+    } else if (this is FunctionType) {
+        FunctionTypeNode(
+            parameterTypes = arguments.map { it.toTypeNode() },
+            returnType = returnType.toTypeNode(),
+            isNullable = isNullable,
+        )
     } else {
         TypeNode(name, null, isNullable)
     }
@@ -133,6 +142,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is ValueNode -> {}
             is StringLiteralNode -> {}
             is StringNode -> this.visit()
+            is LambdaLiteralNode -> this.visit()
         }
     }
 
@@ -350,6 +360,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                     function.ownerRef = owner
                 }
                     ?: currentScope.findClass(name)
+                    ?: currentScope.getPropertyTypeOrNull(name)?.type.takeIf { it is FunctionType }?.also {
+                        val l = checkPropertyReadAccess(name)
+                        if (function.transformedRefName == null) {
+                            function.transformedRefName = "$name/$l"
+                            currentScope.findPropertyOwner(function.transformedRefName!!)?.let {
+                                function.ownerRef = it
+                            }
+                        }
+                    }
                     ?: throw SemanticException("Function $name not found")
 
                 log.v { "Type of call $name -> ${function.type()}" }
@@ -582,6 +601,23 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         nodes.forEach { it.visit() }
     }
 
+    fun LambdaLiteralNode.visit() {
+//        val type = type() as FunctionTypeNode
+
+        pushScope(
+            scopeName = "<lambda>",
+            scopeType = ScopeType.Function,
+            returnType = null //type.returnType.toDataType(),
+        )
+
+        valueParameters.forEach { it.visit() }
+        // TODO provide receiver to scope if exists
+
+        body.visit()
+
+        popScope()
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -602,7 +638,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is FunctionCallArgumentNode -> TODO()
             is FunctionCallNode -> this.type()
             is FunctionDeclarationNode -> typeRegistry["Unit"]!!
-            is FunctionValueParameterNode -> TODO()
+            is FunctionValueParameterNode -> type
             is IfNode -> this.type()
             is NavigationNode -> this.type()
             is PropertyAccessorsNode -> this.type
@@ -620,6 +656,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             NullNode -> typeRegistry["Null"]!!
         is StringLiteralNode -> TODO()
         is StringNode -> typeRegistry["String"]!!
+        is LambdaLiteralNode -> this.type()
     }
 
     fun BinaryOpNode.type(): TypeNode = type ?: when (operator) {
@@ -648,23 +685,24 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
     fun UnaryOpNode.type(): TypeNode = type ?: node!!.type().also { type = it }
 
+    // e.g. `name()`, where name is a VariableReferenceNode
     fun VariableReferenceNode.type() = type ?: (
             currentScope.findClass(variableName)
-                ?.let { TypeNode("Function", TypeNode(variableName, null, false), false) }
-                ?: currentScope.findFunction(variableName)?.let { TypeNode("Function", it.type, false) }
+                ?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = TypeNode(variableName, null, false), isNullable = false) }
+                ?: currentScope.findFunction(variableName)?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false) }
                 ?: currentScope.getPropertyType(variableName).type.toTypeNode()!!
             ).also { type = it }
 
     fun NavigationNode.type(): TypeNode {
         type?.let { return it }
-        val subjectType = when(subject.type().name) {
-            "Function" -> subject.type().argument!!
-            else -> subject.type()
+        val subjectType = when(val type = subject.type()) {
+            is FunctionTypeNode -> type.returnType
+            else -> type
         }
         val clazz = currentScope.findClass(subjectType.name) ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
         clazz.memberFunctions[memberName]?.let {
-            return TypeNode("Function", it.type, false).also { type = it }
+            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false).also { type = it }
         }
         clazz.memberPropertyCustomAccessors[memberName]?.let {
             return it.type().also { type = it }
@@ -674,7 +712,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
 
         findExtensionFunction(subjectType.toDataType(), memberName)?.let {
-            return TypeNode("Function", it.type, false).also { type = it }
+            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false).also { type = it }
         }
 
         throw SemanticException("Could not find member `$memberName` for type ${clazz.name}")
@@ -683,10 +721,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun FunctionCallNode.type(): TypeNode {
         returnType?.let { return it }
         val functionType = function.type()
-        if (functionType.name != "Function") {
+        if (functionType !is FunctionTypeNode) {
             throw SemanticException("Cannot invoke non-function expression")
         }
-        return functionType.argument!!
+        return functionType.returnType
     }
 
     fun ReturnNode.type(): TypeNode {
@@ -705,6 +743,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             .also { returnType = it }
     }
 
+    fun LambdaLiteralNode.type(): TypeNode {
+        type?.let { return it }
+        return FunctionTypeNode(parameterTypes = valueParameters.map { it.type() }, returnType = body.type(), isNullable = false)
+            .also { type = it }
+    }
+
     fun superTypeOf(vararg types: TypeNode?): TypeNode {
         val types = types.filterNotNull()
         if (types.isEmpty()) throw IllegalArgumentException("superTypeOf input cannot be empty")
@@ -721,7 +765,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 return type1.toNullable()
             }
             // TODO return "Any"
-            throw SemanticException("Cannot find super type of ${type1.name} and ${type2.name}")
+            throw SemanticException("Cannot find super type of ${type1.descriptiveName()} and ${type2.descriptiveName()}")
         }
 
         var type = types.first()

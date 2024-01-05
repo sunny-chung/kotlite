@@ -22,8 +22,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
@@ -539,6 +541,69 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * lambdaLiteral:
+     *     '{'
+     *     {NL}
+     *     [[lambdaParameters] {NL} '->' {NL}]
+     *     statements
+     *     {NL}
+     *     '}'
+     *
+     * lambdaParameters:
+     *     lambdaParameter {{NL} ',' {NL} lambdaParameter} [{NL} ',']
+     *
+     * lambdaParameter:
+     *     variableDeclaration
+     *     | (multiVariableDeclaration [{NL} ':' {NL} type])
+     *
+     */
+    fun lambdaLiteral(): ASTNode {
+        val parameters = mutableListOf<FunctionValueParameterNode>()
+
+        val position = eat(TokenType.Symbol, "{").position
+        repeatedNL()
+
+        val originalIndex = tokenIndex
+        try {
+            var hasEatenComma = false
+            while (!isCurrentTokenExcludingNL(TokenType.Symbol, "->")) {
+                if (parameters.isNotEmpty() && !hasEatenComma) {
+                    throw ExpectTokenMismatchException(",", currentToken.position)
+                }
+                val (name, type) = variableDeclaration()
+                parameters += FunctionValueParameterNode(name = name, type = type, defaultValue = null)
+                if (isCurrentTokenExcludingNL(TokenType.Symbol, ",")) {
+                    repeatedNL()
+                    eat(TokenType.Symbol, ",")
+                    repeatedNL()
+                    hasEatenComma = true
+                }
+            }
+            eat(TokenType.Symbol, "->")
+            repeatedNL()
+        } catch (_: ParseException) {
+            resetTokenToIndex(originalIndex)
+            parameters.clear()
+        }
+
+        val statements = statements()
+
+        repeatedNL()
+        eat(TokenType.Symbol, "}")
+
+        return LambdaLiteralNode(parameters, BlockNode(statements, position, ScopeType.FunctionBlock))
+    }
+
+    /**
+     *
+     * functionLiteral:
+     *     lambdaLiteral
+     *     | anonymousFunction
+     *
+     */
+    fun functionLiteral() = lambdaLiteral()
+
+    /**
      * primaryExpression:
      *     parenthesizedExpression
      *     | simpleIdentifier
@@ -586,8 +651,9 @@ class Parser(protected val lexer: Lexer) {
                 return VariableReferenceNode(t.value as String)
             }
             TokenType.Symbol -> {
-                if (currentToken.value in setOf("\"", "\"\"\"")) {
-                    return stringLiteral()
+                when (currentToken.value) {
+                    "\"", "\"\"\"" -> return stringLiteral()
+                    "{" -> return functionLiteral()
                 }
             }
             // TODO other token types
@@ -774,9 +840,6 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
-     * type:
-     *     [typeModifiers] (functionType | parenthesizedType | nullableType | typeReference | definitelyNonNullableType)
-     *
      * nullableType:
      *     (typeReference | parenthesizedType) {NL} (quest {quest})
      *
@@ -807,7 +870,7 @@ class Parser(protected val lexer: Lexer) {
      *     ([typeProjectionModifiers] type)
      *     | '*'
      */
-    fun type(): TypeNode {
+    fun typeReference(): TypeNode {
         val name = eat(TokenType.Identifier).value as String
         val argument = if (currentToken.type == TokenType.Symbol && currentToken.value == "<") {
             eat(TokenType.Symbol, "<")
@@ -816,7 +879,7 @@ class Parser(protected val lexer: Lexer) {
             val argument = type()
             repeatedNL()
             eat(TokenType.Symbol, ">")
-            argument
+            listOf(argument)
         } else null
         val isNullable = if (isCurrentTokenExcludingNL(TokenType.Symbol, "?")) {
             repeatedNL()
@@ -824,6 +887,78 @@ class Parser(protected val lexer: Lexer) {
             true
         } else false
         return TypeNode(name, argument, isNullable)
+    }
+
+    /**
+     * functionType:
+     *     [receiverType {NL} '.' {NL}]
+     *     functionTypeParameters
+     *     {NL}
+     *     '->'
+     *     {NL}
+     *     type
+     *
+     * functionTypeParameters:
+     *     '('
+     *     {NL}
+     *     [parameter | type]
+     *     {{NL} ',' {NL} (parameter | type)}
+     *     [{NL} ',']
+     *     {NL}
+     *     ')'
+     *
+     */
+    fun functionType(): FunctionTypeNode {
+        val typeParameters = mutableListOf<TypeNode>()
+        eat(TokenType.Operator, "(")
+        repeatedNL()
+        var hasEatenComma = false
+        while (!isCurrentTokenExcludingNL(TokenType.Operator, ")")) {
+            if (typeParameters.isNotEmpty() && !hasEatenComma) {
+                throw ExpectTokenMismatchException(",", currentToken.position)
+            }
+            typeParameters += type()
+            repeatedNL()
+            if (isCurrentToken(TokenType.Symbol, ",")) {
+                eat(TokenType.Symbol, ",")
+                repeatedNL()
+                hasEatenComma = true
+            }
+        }
+        eat(TokenType.Operator, ")")
+
+        repeatedNL()
+        eat(TokenType.Symbol, "->")
+        repeatedNL()
+        val returnType = type()
+
+        return FunctionTypeNode(parameterTypes = typeParameters, returnType = returnType, isNullable = false)
+    }
+
+    /**
+     * type:
+     *     [typeModifiers] (functionType | parenthesizedType | nullableType | typeReference | definitelyNonNullableType)
+     *
+     */
+    fun type(): TypeNode {
+        return when {
+            isCurrentToken(TokenType.Operator, "(") -> functionType()
+            else -> typeReference()
+        }
+    }
+
+    /**
+     * variableDeclaration:
+     *     {annotation} {NL} simpleIdentifier [{NL} ':' {NL} type]
+     *
+     */
+    fun variableDeclaration(): Pair<String, TypeNode> {
+        val name = userDefinedIdentifier()
+        repeatedNL()
+        eat(TokenType.Symbol, ":")
+        repeatedNL()
+        val type = type()
+        return name to type
     }
 
     /**
@@ -839,8 +974,6 @@ class Parser(protected val lexer: Lexer) {
      *     {NL}
      *     (([getter] [{NL} [semi] setter]) | ([setter] [{NL} [semi] getter]))
      *
-     * variableDeclaration:
-     *     {annotation} {NL} simpleIdentifier [{NL} ':' {NL} type]
      *
      */
     fun propertyDeclaration(): ASTNode {
@@ -851,11 +984,9 @@ class Parser(protected val lexer: Lexer) {
                 else -> throw UnexpectedTokenException(it)
             }
         }
-        val name = userDefinedIdentifier()
         repeatedNL()
-        eat(TokenType.Symbol, ":")
-        repeatedNL()
-        val type = type()
+        val (name, type) = variableDeclaration()
+
         val initialValue = if (currentToken.type == TokenType.Symbol && currentToken.value == "=") {
             eat(TokenType.Symbol, "=")
             expression()
@@ -993,9 +1124,6 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
-     * functionValueParameter:
-     *     [parameterModifiers] parameter [{NL} '=' {NL} expression]
-     *
      * parameter:
      *     simpleIdentifier
      *     {NL}
@@ -1004,12 +1132,22 @@ class Parser(protected val lexer: Lexer) {
      *     type
      *
      */
-    fun functionValueParameter(): FunctionValueParameterNode {
+    fun parameter(): Pair<String, TypeNode> {
         val name = userDefinedIdentifier()
         repeatedNL()
         eat(TokenType.Symbol, ":")
         repeatedNL()
         val type = type()
+        return name to type
+    }
+
+    /**
+     * functionValueParameter:
+     *     [parameterModifiers] parameter [{NL} '=' {NL} expression]
+     *
+     */
+    fun functionValueParameter(): FunctionValueParameterNode {
+        val (name, type) = parameter()
         repeatedNL()
         val defaultValue = if (currentToken.type == TokenType.Symbol && currentToken.value == "=") {
             eat(TokenType.Symbol, "=")

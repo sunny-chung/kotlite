@@ -204,11 +204,15 @@ class Lexer(val code: String) {
                                 advanceChar()
                                 return Token(TokenType.Symbol, "$c=", position)
                             }
-                            val withNextChar = "$c${nextChar()}"
-                            when (withNextChar) {
+                            when (val withNextChar = "$c${nextChar()}") {
                                 "++", "--" -> {
                                     advanceChar()
                                     return Token(TokenType.Operator, withNextChar, position)
+                                }
+
+                                "->" -> {
+                                    advanceChar()
+                                    return Token(TokenType.Symbol, withNextChar, position)
                                 }
 
                                 "//" -> {

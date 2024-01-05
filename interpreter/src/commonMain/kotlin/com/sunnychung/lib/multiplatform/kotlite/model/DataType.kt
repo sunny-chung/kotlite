@@ -40,6 +40,9 @@ data object NullType : DataType {
 data class ObjectType(val clazz: ClassDefinition, override val isNullable: Boolean = false) : DataType {
     override val name: String = clazz.name
 }
+data class FunctionType(val arguments: List<DataType>, val returnType: DataType, override val isNullable: Boolean) : DataType {
+    override val name: String = "Function"
+}
 
 fun TypeNode.toPrimitiveDataType() = when(this.name) {
     "Int" -> IntType(isNullable = isNullable)

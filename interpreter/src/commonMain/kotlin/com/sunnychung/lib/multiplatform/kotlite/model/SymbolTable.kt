@@ -28,9 +28,20 @@ class SymbolTable(
             ?: throw RuntimeException("Unknown type ${type.name}")
     }
 
-    fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
+    fun typeNodeToDataType(type: TypeNode): DataType? {
+        if (type is FunctionTypeNode) {
+            return FunctionType(
+                arguments = type.parameterTypes.map { typeNodeToDataType(it)!! },
+                returnType = typeNodeToDataType(type.returnType)!!,
+                isNullable = type.isNullable,
+            )
+        }
         val primitiveType = type.toPrimitiveDataType()
-        val dataType = primitiveType ?: ObjectType(clazz = findClass(type.name) ?: return null, isNullable = type.isNullable)
+        return primitiveType ?: ObjectType(clazz = findClass(type.name) ?: return null, isNullable = type.isNullable)
+    }
+
+    fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
+        val dataType = typeNodeToDataType(type) ?: return null
         return PropertyType(type = dataType, isMutable = isMutable)
     }
 
@@ -106,15 +117,19 @@ class SymbolTable(
         return propertyValues[name] != null
     }
 
-    fun getPropertyType(name: String, isThisScopeOnly: Boolean = false): PropertyType {
+    fun getPropertyTypeOrNull(name: String, isThisScopeOnly: Boolean = false): PropertyType? {
         return propertyDeclarations[name]
-            ?: Unit.takeIf { isThisScopeOnly }.let { parentScope?.getPropertyType(name) }
+            ?: Unit.takeIf { !isThisScopeOnly }.let { parentScope?.getPropertyTypeOrNull(name) }
+    }
+
+    fun getPropertyType(name: String, isThisScopeOnly: Boolean = false): PropertyType {
+        return getPropertyTypeOrNull(name = name, isThisScopeOnly = isThisScopeOnly)
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
     fun read(name: String, isThisScopeOnly: Boolean = false): RuntimeValue {
         return propertyValues[name]?.read()
-            ?: Unit.takeIf { isThisScopeOnly }.let { parentScope?.read(name) }
+            ?: Unit.takeIf { !isThisScopeOnly }.let { parentScope?.read(name) }
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
@@ -128,7 +143,7 @@ class SymbolTable(
 
     fun getPropertyHolder(name: String, isThisScopeOnly: Boolean = false): RuntimeValueAccessor {
         return propertyValues[name]
-            ?: Unit.takeIf { isThisScopeOnly }.let { parentScope?.getPropertyHolder(name) }
+            ?: Unit.takeIf { !isThisScopeOnly }.let { parentScope?.getPropertyHolder(name) }
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
