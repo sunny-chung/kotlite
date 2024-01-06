@@ -413,16 +413,15 @@ class SemanticAnalyzerTest {
     }
 
     @Test
-    @Ignore
     fun primaryConstructorParametersOrPropertiesCannotBeReassigned() {
-        """
+        assertSemanticFail("""
             class Cls(var a: Int = 10, var e: Int = 60, var f: Int = e++) {
                 var b: Int = ++a
                 var c: Int = (++a) + (++b)
                 var d: Int = b++
             }
             val o: Cls = Cls()
-        """.trimIndent()
+        """.trimIndent())
     }
 
     @Test

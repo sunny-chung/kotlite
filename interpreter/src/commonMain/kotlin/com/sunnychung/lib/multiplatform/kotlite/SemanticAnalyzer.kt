@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite
 
+import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
@@ -111,9 +112,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             ?: throw SemanticException("Unknown type `$name`")
     }
 
-    fun isLocalAndNotCurrentScope(scopeLevel: Int): Boolean {
-        val recorder = symbolRecorders.lastOrNull() ?: return false
-        return scopeLevel > 1 && scopeLevel <= recorder.scopeLevel
+    protected fun isLocalAndNotCurrentScope(scopeLevel: Int): Boolean {
+        return scopeLevel > 1 && scopeLevel <= (symbolRecorders.lastOrNull()?.scopeLevel ?: currentScope.scopeLevel)
     }
 
     fun ASTNode.visit() {
@@ -255,6 +255,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
     }
 
+    fun evaluateAndRegisterReturnType(node: ASTNode) {
+        val type = node.type()
+        if (symbolRecorders.isNotEmpty()) {
+            val symbols = symbolRecorders.last()
+            val typesToResolve = mutableSetOf(type) + (type.arguments ?: emptyList())
+            typesToResolve.forEach {
+                val find = currentScope.findClass(it.name)
+                if (find != null && isLocalAndNotCurrentScope(find.second.scopeLevel)) {
+                    symbols.classes += find.first.fullQualifiedName
+                }
+            }
+        }
+    }
+
     fun PropertyDeclarationNode.visit(isVisitInitialValue: Boolean = true, isClassProperty: Boolean = false, scopeLevel: Int = currentScope.scopeLevel) {
         if (isVisitInitialValue) {
             initialValue?.visit()
@@ -291,6 +305,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.getPropertyType(name).first.type))
         }
         transformedRefName = "$name/${scopeLevel}"
+        currentScope.registerTransformedSymbol(IdentifierClassifier.Property, transformedRefName!!, name)
+
+        evaluateAndRegisterReturnType(this)
     }
 
     fun VariableReferenceNode.visit() {
@@ -310,6 +327,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 symbols.properties += variableName
             }
         }
+
+        evaluateAndRegisterReturnType(this)
     }
 
     fun pushScope(scopeName: String, scopeType: ScopeType, returnType: DataType? = null, overrideScopeLevel: Int = currentScope.scopeLevel + 1) {
@@ -338,11 +357,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         if (receiver == null) {
             previousScope.declareFunction(name, this)
             transformedRefName = name
+            previousScope.registerTransformedSymbol(IdentifierClassifier.Function, transformedRefName!!, name)
         } else {
             previousScope.declareExtensionFunction("$receiver/$name", this)
             transformedRefName = "$receiver/$name/${++functionDefIndex}"
 
             currentScope.declareProperty(name = "this", type = TypeNode(receiver, null, false), isMutable = false)
+            currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
             val clazz = currentScope.findClass(receiver)?.first ?: throw SemanticException("Class `$receiver` not found")
             clazz.memberProperties.forEach {
                 currentScope.declareProperty(name = it.key, type = it.value.type.toTypeNode(), isMutable = it.value.isMutable)
@@ -365,6 +386,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
 
         popScope()
+
+        evaluateAndRegisterReturnType(this)
     }
 
     fun FunctionCallNode.visit() {
@@ -454,6 +477,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         arguments.forEach { it.visit() }
         // FIXME
 
+        evaluateAndRegisterReturnType(this)
+
     }
 
     fun FunctionValueParameterNode.visit() {
@@ -471,6 +496,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         currentScope.declareProperty(name = name, type = type, isMutable = false)
         currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type))
         transformedRefName = "$name/${currentScope.scopeLevel}"
+        currentScope.registerTransformedSymbol(IdentifierClassifier.Property, transformedRefName!!, name)
     }
 
     fun FunctionCallArgumentNode.visit() {
@@ -553,6 +579,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 ?.map { it.parameter }
             primaryConstructor?.parameters?.forEach {
                 currentScope.undeclareProperty(it.parameter.name)
+                currentScope.unregisterTransformedSymbol(IdentifierClassifier.Property, it.parameter.transformedRefName!!)
             }
             primaryConstructor?.parameters
                 ?.filter { it.isProperty }
@@ -591,6 +618,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             )
 
             currentScope.declareProperty("this", TypeNode(name, null, false), false)
+            currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
             primaryConstructor?.parameters
                 ?.filter { it.isProperty }
                 ?.map { it.parameter }
@@ -666,6 +694,22 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
         popScope()
         this.accessedRefs = symbolRecorders.removeLast()
+        if (symbolRecorders.isNotEmpty()) {
+            val symbols = symbolRecorders.last()
+            symbols.properties += this.accessedRefs!!.properties
+                .filter {
+                    currentScope.findTransformedSymbol(IdentifierClassifier.Property, it)?.second?.scopeLevel?.let {
+                        isLocalAndNotCurrentScope(it)
+                    } ?: false
+                }
+            symbols.functions += this.accessedRefs!!.functions
+                .filter {
+                    currentScope.findTransformedSymbol(IdentifierClassifier.Function, it)?.second?.scopeLevel?.let {
+                        isLocalAndNotCurrentScope(it)
+                    } ?: false
+                }
+            symbols.classes += this.accessedRefs!!.classes
+        }
         type()
     }
 

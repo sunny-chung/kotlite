@@ -59,4 +59,17 @@ class CallableTypeTest {
             a(10)()
         """.trimIndent())
     }
+
+    @Test
+    fun unmatchedReturnType() {
+        assertSemanticFail("""
+            fun f(x: Int): ((Int) -> Int) -> Int {
+                return { g: (Int) -> Int ->
+                    f(2 * x)
+                }
+            }
+            val b: ((Int) -> Int) -> Int = f(10)
+            val c: Int = b({x: Int -> 2*x})
+        """.trimIndent())
+    }
 }

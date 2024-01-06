@@ -299,6 +299,289 @@ class LambdaTest {
     }
 
     @Test
+    fun returnLambdaFromLambdaWithLocalReferences() {
+        val interpreter = interpreter("""
+            var a: Int = 10
+            fun higherOrderFunction(x: Int): (Int) -> (() -> Int) {
+                var b: Int = 5
+                
+                return { i: Int ->
+                    ++a
+                    ++b
+                    val y: Int = x
+                    
+                    fun add(a: Int, b: Int): Int {
+                        return a + b
+                    }
+                    
+                    if (y > 100) {
+                        { add(x, ++b) + y }
+                    } else {
+                        { add(x, --b) + y }
+                    }
+                }
+            }
+            var b: (Int) -> (() -> Int) = higherOrderFunction(50)
+            var c: (Int) -> (() -> Int) = higherOrderFunction(20)
+            var d: Int = b(200)()
+            var e: Int = c(10)()
+            var f: Int = b(200)()
+            var g: Int = c(10)()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(105, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(105, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+    }
+
+    @Test
+    fun returnLambdaFromLambdaWithLocalClassRef1() {
+        val interpreter = interpreter("""
+            var a: Int = 10
+            fun higherOrderFunction(x: Int): (Int) -> (() -> Int) {
+                var b: Int = 5
+                
+                class LocalClass(val la: Int, val lb: Int) {
+                    fun calc(): Int {
+                        return la + lb
+                    }
+                }
+                
+                return { i: Int ->
+                    ++a
+                    ++b
+                    if (i > 100) {
+                        { LocalClass(x, ++b).calc() }
+                    } else {
+                        { LocalClass(x, --b).calc() }
+                    }
+                }
+            }
+            var b: (Int) -> (() -> Int) = higherOrderFunction(50)
+            var c: (Int) -> (() -> Int) = higherOrderFunction(20)
+            var d: Int = b(200)()
+            var e: Int = c(10)()
+            var f: Int = b(200)()
+            var g: Int = c(10)()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(57, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(59, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+    }
+
+    @Test
+    fun returnLambdaFromLambdaWithLocalClassRef2() {
+        val interpreter = interpreter("""
+            var a: Int = 10
+            fun higherOrderFunction(x: Int): (Int) -> (() -> Int) {
+                var b: Int = 5
+                
+                class LocalClass(val la: Int, val lb: Int) {
+                    fun calc(): Int {
+                        return la + lb
+                    }
+                }
+                
+                return { i: Int ->
+                    ++a
+                    ++b
+                    if (i > 100) {
+                        val o: LocalClass = LocalClass(x, ++b)
+                        {
+                            val r: LocalClass = o
+                            r.calc()
+                        }
+                    } else {
+                        val o: LocalClass = LocalClass(x, --b)
+                        {
+                            val r: LocalClass = o
+                            r.calc()
+                        }
+                    }
+                }
+            }
+            var b: (Int) -> (() -> Int) = higherOrderFunction(50)
+            var c: (Int) -> (() -> Int) = higherOrderFunction(20)
+            var d: Int = b(200)()
+            var e: Int = c(10)()
+            var f: Int = b(200)()
+            var g: Int = c(10)()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(57, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(59, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+    }
+
+    @Test
+    fun returnLambdaFromLambdaWithLocalClassRef3() {
+        val interpreter = interpreter("""
+            var a: Int = 10
+            fun higherOrderFunction(x: Int): (Int) -> (() -> Int) {
+                var b: Int = 5
+                
+                class LocalClass(val la: Int, val lb: Int) {
+                    fun calc(): Int {
+                        return la + lb
+                    }
+                }
+                
+                fun makeLocalClass(a: Int, b: Int): LocalClass {
+                    return LocalClass(a, b)
+                }
+                
+                return { i: Int ->
+                    ++a
+                    ++b
+                    if (i > 100) {
+                        {
+                            makeLocalClass(x, ++b).calc()
+                        }
+                    } else {
+                        {
+                            makeLocalClass(x, --b).calc()
+                        }
+                    }
+                }
+            }
+            var b: (Int) -> (() -> Int) = higherOrderFunction(50)
+            var c: (Int) -> (() -> Int) = higherOrderFunction(20)
+            var d: Int = b(200)()
+            var e: Int = c(10)()
+            var f: Int = b(200)()
+            var g: Int = c(10)()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(57, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(59, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+    }
+
+    @Test
+    fun returnLambdaFromLambdaWithLocalClassRef4() {
+        val interpreter = interpreter("""
+            var a: Int = 10
+            fun higherOrderFunction(x: Int): (Int) -> (() -> Int) {
+                var b: Int = 5
+                
+                class LocalClass(val la: Int, val lb: Int) {
+                    fun calc(): Int {
+                        return la + lb
+                    }
+                }
+                
+                fun makeLocalClass(a: Int, b: Int): LocalClass {
+                    return LocalClass(a, b)
+                }
+                
+                fun calc(c: LocalClass): Int = c.calc()
+                
+                return { i: Int ->
+                    ++a
+                    ++b
+                    if (i > 100) {
+                        val o: LocalClass = makeLocalClass(x, ++b)
+                        {
+                            calc(o)
+                        }
+                    } else {
+                        val o: LocalClass = makeLocalClass(x, --b)
+                        {
+                            calc(o)
+                        }
+                    }
+                }
+            }
+            var b: (Int) -> (() -> Int) = higherOrderFunction(50)
+            var c: (Int) -> (() -> Int) = higherOrderFunction(20)
+            var d: Int = b(200)()
+            var e: Int = c(10)()
+            var f: Int = b(200)()
+            var g: Int = c(10)()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(57, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(59, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+    }
+
+    @Test
+    fun returnLambdaFromLambdaWithLocalClass() {
+        val interpreter = interpreter("""
+            var a: Int = 10
+            fun higherOrderFunction(x: Int): (Int) -> (() -> Int) {
+                var b: Int = 5
+                
+                return { i: Int ->
+                    ++a
+                    ++b
+                    if (i > 100) {
+                        {
+                            class LocalClass(val la: Int, val lb: Int) {
+                                fun calc(): Int {
+                                    return la + lb
+                                }
+                            }
+                            
+                            LocalClass(x, ++b).calc()
+                        }
+                    } else {
+                        {
+                            class LocalClass(val la: Int, val lb: Int) {
+                                fun calc(): Int {
+                                    return - la - lb
+                                }
+                            }
+                            LocalClass(x, --b).calc()
+                        }
+                    }
+                }
+            }
+            var b: (Int) -> (() -> Int) = higherOrderFunction(50)
+            var c: (Int) -> (() -> Int) = higherOrderFunction(20)
+            var d: Int = b(200)()
+            var e: Int = c(10)()
+            var f: Int = b(200)()
+            var g: Int = c(10)()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(57, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(-25, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(59, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(-25, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+    }
+
+    @Test
     fun returnLambdaFromClassFunctionWithClassMemberAccess1() {
         val interpreter = interpreter("""
             var a: Int = 10
@@ -540,5 +823,141 @@ class LambdaTest {
         assertEquals(60, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals((1 + 10) * 10 / 2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals((1 + 50) * 50 / 2, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun manyReturnLevelsOfCallablesInReturn() {
+        val interpreter = interpreter("""
+            fun f(x: Int): () -> (() -> (() -> (() -> (() -> Int)))) {
+                return {
+                    val x: Int = x - 1
+                    {
+                        val x: Int = x - 1
+                        {
+                            val x: Int = x - 1
+                            {
+                                val x: Int = x - 1
+                                {
+                                    x - 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            var b: Int = f(10)()()()()()
+            var c: Int = f(50)()()()()()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun manyReturnLevelsOfCallablesInArgument() {
+        val interpreter = interpreter("""
+            fun f(x: Int): () -> (() -> (() -> (() -> (() -> Int)))) {
+                return {
+                    val x: Int = x - 1
+                    {
+                        val x: Int = x - 1
+                        {
+                            val x: Int = x - 1
+                            {
+                                val x: Int = x - 1
+                                {
+                                    x - 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            fun g(function: () -> (() -> (() -> (() -> (() -> Int))))): Int {
+                return function()()()()()
+            }
+            var b: Int = g(f(10))
+            var c: Int = g(f(50))
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun manyArgumentLevelsOfCallablesInReturn() {
+        val interpreter = interpreter("""
+            fun f(x: Int): ((Int) -> Int) -> Int {
+                return { g: (Int) -> Int ->
+                    g(2 * x)
+                }
+            }
+            val b: ((Int) -> Int) -> Int = f(10)
+            val c: Int = b({x: Int -> 2*x})
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(40, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    @Ignore
+    fun manyArgumentLevelsOfCallablesInReturn2() {
+        val interpreter = interpreter("""
+            var a: Int = 0
+            fun f(x: Int): (((((Int) -> Unit) -> Unit) -> Unit) -> Unit) -> Int {
+                return { f: ((((Int) -> Unit) -> Unit) -> Unit) -> Unit ->
+                    var b: Int = 0
+                    x
+                }
+            }
+            var b: Int = f(10)({x ->
+                a += x
+                {x ->
+                    a+=x
+                    {x ->
+                        a+=x
+                        {x ->
+                            a+=x
+                        }
+                    }
+                }
+            })
+            var c: Int = f(50)()()()()()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun nullableCallableInReturn() {
+        val interpreter = interpreter("""
+            fun f(x: Int, g: ((Int) -> Int)? = null): Int {
+                if (g == null) {
+                    return x
+                }
+                return g(x)
+            }
+            var b: Int = f(10, {x: Int -> x * 2})
+            var c: Int = f(10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
 }

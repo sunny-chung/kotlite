@@ -42,6 +42,21 @@ data class ObjectType(val clazz: ClassDefinition, override val isNullable: Boole
 }
 data class FunctionType(val arguments: List<DataType>, val returnType: DataType, override val isNullable: Boolean) : DataType {
     override val name: String = "Function"
+
+    override fun isAssignableFrom(other: DataType): Boolean {
+        if (other is NullType && isNullable) return true
+        if (!super.isAssignableFrom(other) || other !is FunctionType) return false
+        // val f: (Int) -> Any = (g as (Int) -> Int)
+        if (!returnType.isAssignableFrom(other.returnType)) return false
+        if (arguments.size != other.arguments.size) return false
+        arguments.forEachIndexed { i, _ ->
+            // val f: (Any) -> Unit = (g as (Int) -> Unit)
+            if (!arguments[i].isAssignableFrom(other.arguments[i])) {
+                return false
+            }
+        }
+        return true
+    }
 }
 
 fun TypeNode.toPrimitiveDataType() = when(this.name) {

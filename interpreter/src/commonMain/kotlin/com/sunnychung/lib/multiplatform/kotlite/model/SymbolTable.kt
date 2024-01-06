@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierException
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
+import com.sunnychung.lib.multiplatform.kotlite.log
 
 class SymbolTable(
     val scopeLevel: Int,
@@ -14,6 +15,7 @@ class SymbolTable(
     internal val propertyValues = mutableMapOf<String, RuntimeValueAccessor>()
     internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
     internal val functionOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
+    internal val transformedSymbols = mutableMapOf<Pair<IdentifierClassifier, String>, String>() // only use in SemanticAnalyzer. transformed name -> original name
 
     private val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
     private val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
@@ -202,7 +204,34 @@ class SymbolTable(
         }
     }
 
-    fun mergeRuntimeSymbolTableIntoThis(other: SymbolTable) {
+    internal fun registerTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String) {
+        val key = identifierClassifier to transformedName
+        if (transformedSymbols.containsKey(key)) {
+            throw DuplicateIdentifierException(transformedName, identifierClassifier)
+        }
+        transformedSymbols[key] = originalName
+    }
+
+    internal fun unregisterTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String): Boolean {
+        val key = identifierClassifier to transformedName
+        return if (transformedSymbols.containsKey(key)) {
+            transformedSymbols.remove(key)
+            true
+        } else if (parentScope?.unregisterTransformedSymbol(identifierClassifier, transformedName) == true) {
+            true
+        } else {
+            throw RuntimeException("$identifierClassifier $transformedName not found")
+        }
+    }
+
+    fun findTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String): Pair<String, SymbolTable>? {
+        val key = identifierClassifier to transformedName
+        return transformedSymbols[key]?.let { it to this }
+            ?: parentScope?.findTransformedSymbol(identifierClassifier, transformedName) // TODO optimize to pass key directly
+    }
+
+    fun mergeFrom(other: SymbolTable) { // this is only involved in runtime
+        log.d { "Merge from other SymbolTable" }
         other.propertyValues.forEach {
             putPropertyHolder(it.key, it.value)
         }
@@ -212,6 +241,7 @@ class SymbolTable(
         other.classDeclarations.forEach {
             declareClass(it.value)
         }
+//        this.transformedSymbols += other.transformedSymbols
     }
 
     override fun toString(): String {

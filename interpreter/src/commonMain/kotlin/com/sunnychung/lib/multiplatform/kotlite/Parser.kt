@@ -936,13 +936,49 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * parenthesizedType:
+     *     '('
+     *     {NL}
+     *     type
+     *     {NL}
+     *     ')'
+     *
+     * nullableType:
+     *     (typeReference | parenthesizedType) {NL} (quest {quest})
+     *
+     */
+    fun nullableParenthesizedType(): TypeNode {
+        eat(TokenType.Operator, "(")
+        repeatedNL()
+        val type = type(isTryParenthesizedType = false)
+        repeatedNL()
+        eat(TokenType.Operator, ")")
+        val isNullable = if (isCurrentTokenExcludingNL(TokenType.Symbol, "?")) {
+            repeatedNL()
+            eat(TokenType.Symbol, "?")
+            true
+        } else false
+        return type.copy(isNullable)
+    }
+
+    /**
      * type:
      *     [typeModifiers] (functionType | parenthesizedType | nullableType | typeReference | definitelyNonNullableType)
      *
      */
-    fun type(): TypeNode {
+    fun type(isTryParenthesizedType: Boolean = true): TypeNode {
+        val originalTokenIndex = tokenIndex
         return when {
-            isCurrentToken(TokenType.Operator, "(") -> functionType()
+            isCurrentToken(TokenType.Operator, "(") -> try {
+                functionType()
+            } catch (e: ParseException) {
+                if (isTryParenthesizedType) {
+                    resetTokenToIndex(originalTokenIndex)
+                    nullableParenthesizedType()
+                } else {
+                    throw e
+                }
+            }
             else -> typeReference()
         }
     }

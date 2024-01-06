@@ -133,8 +133,22 @@ class Interpreter(val scriptNode: ScriptNode) {
             "<=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a <= b) }
             ">" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a > b) }
             ">=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a >= b) }
-            "==" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a == b) }
-            "!=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a != b) }
+            "==" -> {
+                val r1 = node1.eval() as RuntimeValue
+                val r2 = node2.eval() as RuntimeValue
+                if (r1 is NullValue || r2 is NullValue) {
+                    return BooleanValue(r1 == r2)
+                }
+                castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a == b) }
+            }
+            "!=" -> {
+                val r1 = node1.eval() as RuntimeValue
+                val r2 = node2.eval() as RuntimeValue
+                if (r1 is NullValue || r2 is NullValue) {
+                    return BooleanValue(r1 != r2)
+                }
+                castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a != b) }
+            }
 
             "||" -> castType<BooleanValue, BooleanValue>(node1.eval()) { a -> if (a.value) BooleanValue(true) else node2.eval() as BooleanValue }
             "&&" -> castType<BooleanValue, BooleanValue>(node1.eval()) { a -> if (!a.value) BooleanValue(false) else node2.eval() as BooleanValue }
@@ -360,7 +374,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         try {
             val symbolTable = callStack.currentSymbolTable()
             extraSymbols?.let{
-                symbolTable.mergeRuntimeSymbolTableIntoThis(it)
+                symbolTable.mergeFrom(it)
             }
             extraScopeParameters.forEach {
                 symbolTable.declareProperty(it.key, TypeNode(it.value.type().name, null, false), false) // TODO change to use DataType directly
