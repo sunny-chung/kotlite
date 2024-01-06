@@ -30,7 +30,7 @@ data class StringValue(val value: String) : RuntimeValue {
     override fun convertToString() = value
 }
 
-class LambdaValue(val value: LambdaLiteralNode, private val resolvedType: FunctionType) : RuntimeValue {
+class LambdaValue(val value: LambdaLiteralNode, private val resolvedType: FunctionType, val symbolRefs: SymbolTable) : RuntimeValue {
     override fun type() = resolvedType
 
     override fun convertToString() = "Lambda()"

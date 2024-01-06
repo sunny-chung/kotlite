@@ -1,10 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 /**
- * TODO: This refactor is not necessary and can be removed to save memory significantly.
- *
- * Its main use case was to allow mutations to member properties of nested class instances.
- * The concerned test case was ExtensionFunctionTest#extensionInsideClass.
+ * Its main use cases are to allow mutations to member properties of nested class instances and in lambdas.
  */
 interface RuntimeValueAccessor {
     val type: DataType

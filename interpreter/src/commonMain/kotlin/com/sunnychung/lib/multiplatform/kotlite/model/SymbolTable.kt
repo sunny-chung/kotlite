@@ -37,7 +37,7 @@ class SymbolTable(
             )
         }
         val primitiveType = type.toPrimitiveDataType()
-        return primitiveType ?: ObjectType(clazz = findClass(type.name) ?: return null, isNullable = type.isNullable)
+        return primitiveType ?: ObjectType(clazz = findClass(type.name)?.first ?: return null, isNullable = type.isNullable)
     }
 
     fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
@@ -117,12 +117,12 @@ class SymbolTable(
         return propertyValues[name] != null
     }
 
-    fun getPropertyTypeOrNull(name: String, isThisScopeOnly: Boolean = false): PropertyType? {
-        return propertyDeclarations[name]
+    fun getPropertyTypeOrNull(name: String, isThisScopeOnly: Boolean = false): Pair<PropertyType, SymbolTable>? {
+        return propertyDeclarations[name]?.let { it to this }
             ?: Unit.takeIf { !isThisScopeOnly }.let { parentScope?.getPropertyTypeOrNull(name) }
     }
 
-    fun getPropertyType(name: String, isThisScopeOnly: Boolean = false): PropertyType {
+    fun getPropertyType(name: String, isThisScopeOnly: Boolean = false): Pair<PropertyType, SymbolTable> {
         return getPropertyTypeOrNull(name = name, isThisScopeOnly = isThisScopeOnly)
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
@@ -163,8 +163,8 @@ class SymbolTable(
         functionDeclarations[functionSignature] = node
     }
 
-    fun findFunction(name: String): FunctionDeclarationNode? {
-        return functionDeclarations[name] ?: parentScope?.findFunction(name)
+    fun findFunction(name: String): Pair<FunctionDeclarationNode, SymbolTable>? {
+        return functionDeclarations[name]?.let { it  to this } ?: parentScope?.findFunction(name)
     }
 
     fun declareExtensionFunction(name: String, node: FunctionDeclarationNode) {
@@ -194,11 +194,23 @@ class SymbolTable(
         classDeclarations[classDefinition.fullQualifiedName] = classDefinition
     }
 
-    fun findClass(fullQualifiedName: String): ClassDefinition? {
+    fun findClass(fullQualifiedName: String): Pair<ClassDefinition, SymbolTable>? {
         if (classDeclarations.containsKey(fullQualifiedName)) {
-            return classDeclarations[fullQualifiedName]
+            return classDeclarations[fullQualifiedName]!! to this
         } else {
             return parentScope?.findClass(fullQualifiedName)
+        }
+    }
+
+    fun mergeRuntimeSymbolTableIntoThis(other: SymbolTable) {
+        other.propertyValues.forEach {
+            putPropertyHolder(it.key, it.value)
+        }
+        other.functionDeclarations.forEach {
+            declareFunction(it.key, it.value)
+        }
+        other.classDeclarations.forEach {
+            declareClass(it.value)
         }
     }
 

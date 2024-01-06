@@ -42,6 +42,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolReferenceSet
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -56,6 +57,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     val symbolTable = SymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = builtinSymbolTable)
     var currentScope = symbolTable
     var functionDefIndex = 0
+    val symbolRecorders = mutableListOf<SymbolReferenceSet>()
 
     val typeRegistry = listOf(
         TypeNode("Int", null, false),
@@ -107,6 +109,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun TypeNode.toDataType(): DataType {
         return currentScope.typeNodeToPropertyType(this, false)?.type
             ?: throw SemanticException("Unknown type `$name`")
+    }
+
+    fun isLocalAndNotCurrentScope(scopeLevel: Int): Boolean {
+        val recorder = symbolRecorders.lastOrNull() ?: return false
+        return scopeLevel > 1 && scopeLevel <= recorder.scopeLevel
     }
 
     fun ASTNode.visit() {
@@ -169,7 +176,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             scope = scope.parentScope!!
         }
 
-        val propertyType = scope.getPropertyType(name)
+        val propertyType = scope.getPropertyType(name).first
         if (!propertyType.isMutable && scope.hasAssignedInThisScope(name)) {
             throw SemanticException("val `$name` cannot be reassigned")
         }
@@ -281,7 +288,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 throw SemanticException("Property `$name` with an initial value cannot have custom accessors")
             }
 
-            currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.getPropertyType(name).type))
+            currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.getPropertyType(name).first.type))
         }
         transformedRefName = "$name/${scopeLevel}"
     }
@@ -292,6 +299,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             transformedRefName = "$variableName/$l"
             currentScope.findPropertyOwner(transformedRefName!!)?.let {
                 ownerRef = it
+            }
+            if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(l)) {
+                val symbols = symbolRecorders.last()
+                symbols.properties += ownerRef ?: transformedRefName!!
+            }
+        } else if (variableName == "this") {
+            if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(l)) {
+                val symbols = symbolRecorders.last()
+                symbols.properties += variableName
             }
         }
     }
@@ -321,12 +337,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         valueParameters.forEach { it.visit() }
         if (receiver == null) {
             previousScope.declareFunction(name, this)
+            transformedRefName = name
         } else {
             previousScope.declareExtensionFunction("$receiver/$name", this)
             transformedRefName = "$receiver/$name/${++functionDefIndex}"
 
             currentScope.declareProperty(name = "this", type = TypeNode(receiver, null, false), isMutable = false)
-            val clazz = currentScope.findClass(receiver) ?: throw SemanticException("Class `$receiver` not found")
+            val clazz = currentScope.findClass(receiver)?.first ?: throw SemanticException("Class `$receiver` not found")
             clazz.memberProperties.forEach {
                 currentScope.declareProperty(name = it.key, type = it.value.type.toTypeNode(), isMutable = it.value.isMutable)
                 currentScope.declarePropertyOwner(name = "${it.key}/${currentScope.scopeLevel}", owner = "this/$receiver")
@@ -358,14 +375,37 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 functionNode?.also {
                     val owner = currentScope.findFunctionOwner(name)
                     function.ownerRef = owner
+
+                    if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(it.second.scopeLevel)) {
+                        val symbols = symbolRecorders.last()
+                        if (owner == null) {
+                            symbols.functions += it.first.transformedRefName!!
+                        } else {
+                            symbols.properties += owner
+                        }
+                    }
                 }
-                    ?: currentScope.findClass(name)
-                    ?: currentScope.getPropertyTypeOrNull(name)?.type.takeIf { it is FunctionType }?.also {
+                    ?: currentScope.findClass(name)?.also {
+                        if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(it.second.scopeLevel)) {
+                            val symbols = symbolRecorders.last()
+                            symbols.classes += it.first.fullQualifiedName
+                        }
+                    }
+                    ?: currentScope.getPropertyTypeOrNull(name)?.takeIf { it.first.type is FunctionType }?.also {
                         val l = checkPropertyReadAccess(name)
                         if (function.transformedRefName == null) {
                             function.transformedRefName = "$name/$l"
                             currentScope.findPropertyOwner(function.transformedRefName!!)?.let {
                                 function.ownerRef = it
+                            }
+
+                            if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(l)) {
+                                val symbols = symbolRecorders.last()
+                                if (function.ownerRef == null) {
+                                    symbols.functions += function.transformedRefName!!
+                                } else {
+                                    symbols.properties += function.ownerRef!!
+                                }
                             }
                         }
                     }
@@ -401,7 +441,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 log.v { "Type of call ${function.member.name} -> ${function.type()}" }
             }
 
-            else -> throw UnsupportedOperationException("Dynamic functions are not yet supported")
+            else -> {
+                val type = function.type()
+                if (type is FunctionTypeNode) {
+                    if (type.returnType !is FunctionTypeNode) {
+                        throw UnsupportedOperationException("Return type ${type.returnType.descriptiveName()} is not callable")
+                    }
+                } else {
+                    throw UnsupportedOperationException("${type.descriptiveName()} is not callable")
+                }
+            }
         }
 
         arguments.forEach { it.visit() }
@@ -452,6 +501,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             }
             s = s.parentScope!!
         }
+        // TODO block return in lambda
         // s.scopeType == ScopeType.Function
         val valueType = value?.type()?.toDataType() ?: UnitType()
         if (!s.returnType!!.isAssignableFrom(valueType)) {
@@ -511,7 +561,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 ?.forEach {
                     val p = it.parameter
                     currentScope.declareProperty(name = p.name, type = p.type, isMutable = it.isMutable)
-                    currentScope.assign(p.name, SemanticDummyRuntimeValue(currentScope.getPropertyType(p.name).type))
+                    currentScope.assign(p.name, SemanticDummyRuntimeValue(currentScope.getPropertyType(p.name).first.type))
                 }
 
             currentScope.parentScope!!.declareClass(
@@ -604,9 +654,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun LambdaLiteralNode.visit() {
 //        val type = type() as FunctionTypeNode
 
+        symbolRecorders += SymbolReferenceSet(scopeLevel = currentScope.scopeLevel)
         pushScope(
             scopeName = "<lambda>",
-            scopeType = ScopeType.Function,
+            scopeType = ScopeType.Closure,
             returnType = null //type.returnType.toDataType(),
         )
 
@@ -616,6 +667,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         body.visit()
 
         popScope()
+        this.accessedRefs = symbolRecorders.removeLast()
+        type()
     }
 
     fun analyze() = scriptNode.visit()
@@ -689,8 +742,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun VariableReferenceNode.type() = type ?: (
             currentScope.findClass(variableName)
                 ?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = TypeNode(variableName, null, false), isNullable = false) }
-                ?: currentScope.findFunction(variableName)?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false) }
-                ?: currentScope.getPropertyType(variableName).type.toTypeNode()!!
+                ?: currentScope.findFunction(variableName)?.first?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false) }
+                ?: currentScope.getPropertyType(variableName).first.type.toTypeNode()!!
             ).also { type = it }
 
     fun NavigationNode.type(): TypeNode {
@@ -699,7 +752,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is FunctionTypeNode -> type.returnType
             else -> type
         }
-        val clazz = currentScope.findClass(subjectType.name) ?: throw SemanticException("Unknown type `${subjectType.name}`")
+        val clazz = currentScope.findClass(subjectType.name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
         clazz.memberFunctions[memberName]?.let {
             return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false).also { type = it }

@@ -308,6 +308,7 @@ data class LambdaLiteralNode(
     override val valueParameters: List<FunctionValueParameterNode>,
     override val body: BlockNode,
     @ModifyByAnalyzer var type: FunctionTypeNode? = null,
+    @ModifyByAnalyzer var accessedRefs: SymbolReferenceSet? = null,
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
         get() = type!!.returnType

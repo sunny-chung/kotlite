@@ -76,12 +76,12 @@ open class CodeGenerator(protected val node: ASTNode) {
             is UnaryOpNode -> this.generate()
             is VariableReferenceNode -> this.generate()
             is WhileNode -> this.generate()
-        is PropertyAccessorsNode -> TODO()
-        is ValueNode -> TODO()
-        is StringLiteralNode -> this.generate()
-        is StringNode -> this.generate()
-        is LambdaLiteralNode -> this.generate()
-    }
+            is PropertyAccessorsNode -> TODO()
+            is ValueNode -> TODO()
+            is StringLiteralNode -> this.generate()
+            is StringNode -> this.generate()
+            is LambdaLiteralNode -> this.generate()
+        }
 
     protected fun AssignmentNode.generate()
         = "${subject.generate()} $operator ${value.generate()}"
@@ -187,7 +187,8 @@ open class CodeGenerator(protected val node: ASTNode) {
     protected fun StringFieldIdentifierNode.generate(): String = (this as VariableReferenceNode).generate()
 
     protected fun LambdaLiteralNode.generate()
-        = "{${valueParameters.joinToString(", ") {it.generate()}}${if (valueParameters.isNotEmpty()) " ->" else ""}\n" +
+        = "<p=${accessedRefs!!.properties}; f=${accessedRefs!!.functions}; c=${accessedRefs!!.classes}>" +
+            "{${valueParameters.joinToString(", ") {it.generate()}}${if (valueParameters.isNotEmpty()) " ->" else ""}\n" +
             run {
                 ++indentLevel
                 val s = body.statements.joinToString("") { "${indent()}${it.generate()}\n" }

@@ -50,6 +50,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
@@ -279,19 +280,19 @@ class Interpreter(val scriptNode: ScriptNode) {
                     return this.copy(function = NavigationNode(VariableReferenceNode(this.function.ownerRef!!), ".", ClassMemberReferenceNode(name))).eval()
                 }
 
-                val functionNode = callStack.currentSymbolTable().findFunction(name)
+                val functionNode = callStack.currentSymbolTable().findFunction(name)?.first
                 if (functionNode != null) {
                     return evalFunctionCall(functionNode)
                 }
 
-                val classDefinition = callStack.currentSymbolTable().findClass(name)
+                val classDefinition = callStack.currentSymbolTable().findClass(name)?.first
                 if (classDefinition != null) {
                     return evalCreateClassInstance(classDefinition)
                 }
 
                 val variable = callStack.currentSymbolTable().read(function.transformedRefName!!)
                 if (variable is LambdaValue) {
-                    return evalFunctionCall(variable.value)
+                    return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs)
                 }
 
                 throw RuntimeException("Function $name not found")
@@ -318,11 +319,11 @@ class Interpreter(val scriptNode: ScriptNode) {
         }
     }
 
-    fun FunctionCallNode.evalFunctionCall(functionNode: CallableNode): RuntimeValue {
-        return evalFunctionCall(this, functionNode, emptyMap()).result
+    fun FunctionCallNode.evalFunctionCall(functionNode: CallableNode, extraSymbols: SymbolTable? = null): RuntimeValue {
+        return evalFunctionCall(this, functionNode, emptyMap(), extraSymbols).result
     }
 
-    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>): FunctionCallResult {
+    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>, extraSymbols: SymbolTable? = null): FunctionCallResult {
         // TODO optimize to remove most loops
         val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
         callNode.arguments.forEach { a ->
@@ -341,11 +342,19 @@ class Interpreter(val scriptNode: ScriptNode) {
             }
         }
 
+        val scopeType = if (functionNode is FunctionDeclarationNode) ScopeType.Function else ScopeType.Closure
         val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(functionNode.returnType, false)!!.type
 
-        callStack.push(functionFullQualifiedName = functionNode.name, scopeType = ScopeType.Function, callPosition = callNode.position)
+        callStack.push(
+            functionFullQualifiedName = functionNode.name,
+            scopeType = scopeType,
+            callPosition = callNode.position,
+        )
         try {
             val symbolTable = callStack.currentSymbolTable()
+            extraSymbols?.let{
+                symbolTable.mergeRuntimeSymbolTableIntoThis(it)
+            }
             extraScopeParameters.forEach {
                 symbolTable.declareProperty(it.key, TypeNode(it.value.type().name, null, false), false) // TODO change to use DataType directly
                 symbolTable.assign(it.key, it.value)
@@ -374,7 +383,7 @@ class Interpreter(val scriptNode: ScriptNode) {
 
             return FunctionCallResult(returnValue, symbolTable)
         } finally {
-            callStack.pop(ScopeType.Function)
+            callStack.pop(scopeType)
         }
     }
 
@@ -622,7 +631,19 @@ class Interpreter(val scriptNode: ScriptNode) {
     }
 
     fun LambdaLiteralNode.eval(): RuntimeValue {
-        return LambdaValue(this, callStack.currentSymbolTable().typeNodeToDataType(type!!) as FunctionType)
+        val refs = this.accessedRefs!!
+        val currentSymbolTable = callStack.currentSymbolTable()
+        val runtimeRefs = SymbolTable(Int.MAX_VALUE, "lambda-symbol-ref", ScopeType.Closure, null)
+        refs.properties.forEach {
+            runtimeRefs.putPropertyHolder(it, currentSymbolTable.getPropertyHolder(it))
+        }
+        refs.functions.forEach {
+            runtimeRefs.declareFunction(it, currentSymbolTable.findFunction(it)!!.first)
+        }
+        refs.classes.forEach {
+            runtimeRefs.declareClass(currentSymbolTable.findClass(it)!!.first)
+        }
+        return LambdaValue(this, callStack.currentSymbolTable().typeNodeToDataType(type!!) as FunctionType, runtimeRefs)
     }
 
     fun StringNode.eval(): StringValue {
