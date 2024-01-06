@@ -960,4 +960,69 @@ class LambdaTest {
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
+
+    @Test
+    fun lastLambdaArgumentShorthandSyntax1() {
+        val interpreter = interpreter("""
+            fun f(x: Int, g: ((Int) -> Int)? = null): Int {
+                if (g == null) {
+                    return x
+                }
+                return g(x)
+            }
+            var b: Int = f(10) {x: Int -> x * 2}
+            var c: Int = f(10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun lastLambdaArgumentShorthandSyntax2() {
+        val interpreter = interpreter("""
+            fun f(x: Int, g: ((Int) -> Int)? = null): Int {
+                if (g == null) {
+                    return x
+                }
+                return g(x)
+            }
+            var b: Int = f(10) { x: Int ->
+                x * 2
+            }
+            var c: Int = f(10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun aloneLambdaArgumentShorthandSyntax() {
+        val interpreter = interpreter("""
+            val x: Int = 10
+            fun f(g: ((Int) -> Int)? = null): Int {
+                if (g == null) {
+                    return x
+                }
+                return g(x)
+            }
+            var b: Int = f { x: Int ->
+                x * 2
+            }
+            var c: Int = f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
 }

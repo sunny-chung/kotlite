@@ -391,11 +391,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun FunctionCallNode.visit() {
-        when (function) {
+        val functionArgumentDeclarations = when (function) {
             is VariableReferenceNode -> {
                 val name = function.variableName
-                val functionNode = currentScope.findFunction(name)
-                functionNode?.also {
+                val arguments = currentScope.findFunction(name)?.also {
                     val owner = currentScope.findFunctionOwner(name)
                     function.ownerRef = owner
 
@@ -407,13 +406,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                             symbols.properties += owner
                         }
                     }
-                }
+                }?.let { it.first.valueParameters }
                     ?: currentScope.findClass(name)?.also {
                         if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(it.second.scopeLevel)) {
                             val symbols = symbolRecorders.last()
                             symbols.classes += it.first.fullQualifiedName
                         }
-                    }
+                    }?.let { it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList() }
                     ?: currentScope.getPropertyTypeOrNull(name)?.takeIf { it.first.type is FunctionType }?.also {
                         val l = checkPropertyReadAccess(name)
                         if (function.transformedRefName == null) {
@@ -431,15 +430,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                                 }
                             }
                         }
-                    }
+                    }?.let { (it.first.type as FunctionType).arguments }
                     ?: throw SemanticException("Function $name not found")
 
                 log.v { "Type of call $name -> ${function.type()}" }
+                arguments
             }
 
             is NavigationNode -> {
                 function.visit()
                 val receiverType = function.subject.type().toDataType()
+                var arguments: List<FunctionValueParameterNode> = emptyList()
                 if (receiverType is ObjectType) {
                     val clazz = receiverType.clazz
                     val memberFunction = clazz.memberFunctions[function.member.name]
@@ -447,27 +448,33 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                         val extensionFunction = findExtensionFunction(receiverType, function.member.name)
                         if (extensionFunction != null) {
                             functionRefName = extensionFunction.transformedRefName
+                            arguments = extensionFunction.valueParameters
                         } else {
                             throw SemanticException("Function `${function.member.name}` not found for type ${receiverType.name}")
                         }
+                    } else {
+                        arguments = memberFunction.valueParameters
                     }
                 } else {
                     // receiverType is a built-in type
                     val extensionFunction = findExtensionFunction(receiverType, function.member.name)
                     if (extensionFunction != null) {
                         functionRefName = extensionFunction.transformedRefName
+                        arguments = extensionFunction.valueParameters
                     } else {
                         throw SemanticException("Function `${function.member.name}` not found for type ${receiverType.name}")
                     }
                 }
 
                 log.v { "Type of call ${function.member.name} -> ${function.type()}" }
+                arguments
             }
 
             else -> {
                 function.visit()
                 val type = function.type()
                 if (type is FunctionTypeNode) { // function's return type is FunctionTypeNode
+                    type.parameterTypes
                 } else {
                     throw SemanticException("${type.descriptiveName()} is not callable")
                 }
@@ -475,10 +482,55 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
 
         arguments.forEach { it.visit() }
-        // FIXME
 
+        // Validate call arguments against declared arguments
+        // Check for missing mandatory arguments, extra arguments, duplicated arguments and mismatch data types
+        if (arguments.size > functionArgumentDeclarations.size) {
+            throw SemanticException("Too much arguments. At most ${functionArgumentDeclarations.size} are accepted.")
+        }
+        arguments.forEachIndexed { i, _ ->
+            arguments.forEachIndexed { j, _ ->
+                if (i < j && arguments[i].name != null && arguments[j].name != null && arguments[i].name == arguments[j].name) {
+                    throw SemanticException("Duplicated argument ${arguments[i].name}")
+                }
+            }
+        }
+
+        class ArgumentInfo(val type: DataType, val isOptional: Boolean, val name: String?)
+        val argumentInfos = functionArgumentDeclarations.map {
+            when (it) {
+                is DataType -> ArgumentInfo(it, false, null)
+                is TypeNode -> ArgumentInfo(it.toDataType(), false, null)
+                is FunctionValueParameterNode -> ArgumentInfo(it.type.toDataType(), it.defaultValue != null, it.name)
+                else -> throw UnsupportedOperationException("Unknown internal class ${it::class.simpleName}")
+            }
+        }
+        val mandatoryArgumentIndexes = argumentInfos.indices.filter { !argumentInfos[it].isOptional }
+
+        val callArgumentMappedIndexes = arguments.mapIndexed { i, a ->
+            if (a.name == null) {
+                i
+            } else {
+                argumentInfos.indexOfFirst { it.name == a.name }.also {
+                    if (it < 0) throw SemanticException("Argument ${a.name} not found")
+                }
+            }
+        }
+        if (callArgumentMappedIndexes.distinct().size < callArgumentMappedIndexes.size) {
+            throw SemanticException("There are duplicated arguments")
+        }
+        val missingIndexes = mandatoryArgumentIndexes.filter { i -> callArgumentMappedIndexes.none { it == i } }
+        if (missingIndexes.isNotEmpty()) {
+            throw SemanticException("Missing mandatory arguments for index $missingIndexes")
+        }
+        arguments.forEachIndexed { i, argument ->
+            if (!argumentInfos[callArgumentMappedIndexes[i]].type.isAssignableFrom(argument.type().toDataType())) {
+                throw SemanticException("Argument type ${argument.type().descriptiveName()} cannot be mapped to ${argumentInfos[callArgumentMappedIndexes[i]].type.nameWithNullable}")
+            }
+        }
+
+        // record types if there is any enclosing lambda
         evaluateAndRegisterReturnType(this)
-
     }
 
     fun FunctionValueParameterNode.visit() {
@@ -730,7 +782,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             is ClassParameterNode -> TODO()
             is ClassPrimaryConstructorNode -> TODO()
             is ContinueNode -> typeRegistry["Unit"]!!
-            is FunctionCallArgumentNode -> TODO()
+            is FunctionCallArgumentNode -> this.type()
             is FunctionCallNode -> this.type()
             is FunctionDeclarationNode -> typeRegistry["Unit"]!!
             is FunctionValueParameterNode -> type
@@ -811,6 +863,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
 
         throw SemanticException("Could not find member `$memberName` for type ${clazz.name}")
+    }
+
+    fun FunctionCallArgumentNode.type(): TypeNode {
+        return this.value.type()
     }
 
     fun FunctionCallNode.type(): TypeNode {

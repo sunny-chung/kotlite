@@ -72,4 +72,124 @@ class CallableTypeTest {
             val c: Int = b({x: Int -> 2*x})
         """.trimIndent())
     }
+
+    @Test
+    fun unmatchedArgumentLambdaType1() {
+        assertSemanticFail("""
+            fun f(g: () -> Int): Int {
+                return g()
+            }
+            val a: Int = f({x: Int -> 2*x})
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedArgumentLambdaType2() {
+        assertSemanticFail("""
+            fun f(g: () -> Int): Int {
+                return g()
+            }
+            val a: Int = f({ "abc" })
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedArgumentLambdaType3() {
+        assertSemanticFail("""
+            fun f(g: () -> Int): Int {
+                return g()
+            }
+            val a: Int = f {x: Int -> 2*x}
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedArgumentLambdaType4() {
+        assertSemanticFail("""
+            fun f(g: () -> Int): Int {
+                return g()
+            }
+            val a: Int = f { "abc" }
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedArgumentCount1() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String): Int {
+                return g()
+            }
+            val a: Int = f(3, "abc", 4)
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedArgumentCount2() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String): Int {
+                return g()
+            }
+            val a: Int = f(3, b = "abc", a = 4)
+        """.trimIndent())
+    }
+
+    @Test
+    fun duplicatedArgument() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String = "abc"): Int {
+                return g()
+            }
+            val a: Int = f(3, a = 4)
+        """.trimIndent())
+    }
+
+    @Test
+    fun missingMandatoryArgument1() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String = "abc"): Int {
+                return g()
+            }
+            val a: Int = f(b = "def")
+        """.trimIndent())
+    }
+
+    @Test
+    fun missingMandatoryArgument2() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String = "abc"): Int {
+                return g()
+            }
+            val a: Int = f()
+        """.trimIndent())
+    }
+
+    @Test
+    fun extraArgument() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String = "abc"): Int {
+                return g()
+            }
+            val a: Int = f(3, c = "def")
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedArgumentType1() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String = "abc"): Int {
+                return g()
+            }
+            val a: Int = f(a = "def")
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedArgumentType2() {
+        assertSemanticFail("""
+            fun f(a: Int, b: String = "abc"): Int {
+                return g()
+            }
+            val a: Int = f(3, 4)
+        """.trimIndent())
+    }
 }

@@ -302,7 +302,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun postfixUnarySuffix(subject: ASTNode): ASTNode {
         when (currentToken.value) { // TODO complete
-            "(" -> return callSuffix(subject)
+            "(", "{" -> return callSuffix(subject)
             "++" -> { eat(TokenType.Operator, "++"); return UnaryOpNode(subject, "post++") }
             "--" -> { eat(TokenType.Operator, "--"); return UnaryOpNode(subject, "post--") }
         }
@@ -318,7 +318,17 @@ class Parser(protected val lexer: Lexer) {
      */
     fun callSuffix(subject: ASTNode): FunctionCallNode {
         val position = currentToken.position
-        val arguments = valueArguments()
+        val arguments = mutableListOf<FunctionCallArgumentNode>()
+        if (isCurrentToken(TokenType.Operator, "(")) {
+            arguments += valueArguments()
+        }
+        if (isCurrentToken(TokenType.Symbol, "{")) {
+            val lambda = lambdaLiteral()
+            arguments += FunctionCallArgumentNode(
+                index = arguments.size,
+                value = lambda
+            )
+        }
         return FunctionCallNode(
             function = subject,
             arguments = arguments,
