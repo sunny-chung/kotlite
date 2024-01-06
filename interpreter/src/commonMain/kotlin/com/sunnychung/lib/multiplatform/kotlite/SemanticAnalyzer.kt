@@ -331,7 +331,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         pushScope(
             scopeName = name,
             scopeType = ScopeType.Function,
-            returnType = type.toDataType(),
+            returnType = returnType.toDataType(),
         )
 
         valueParameters.forEach { it.visit() }
@@ -359,7 +359,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         // TODO check for return
 
         val valueType = body.type().toDataType()
-        val subjectType = type.toDataType()
+        val subjectType = returnType.toDataType()
         if (subjectType !is UnitType && !subjectType.isAssignableFrom(valueType)) {
             throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
         }
@@ -442,13 +442,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             }
 
             else -> {
+                function.visit()
                 val type = function.type()
-                if (type is FunctionTypeNode) {
-                    if (type.returnType !is FunctionTypeNode) {
-                        throw UnsupportedOperationException("Return type ${type.returnType.descriptiveName()} is not callable")
-                    }
+                if (type is FunctionTypeNode) { // function's return type is FunctionTypeNode
                 } else {
-                    throw UnsupportedOperationException("${type.descriptiveName()} is not callable")
+                    throw SemanticException("${type.descriptiveName()} is not callable")
                 }
             }
         }
@@ -742,7 +740,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     fun VariableReferenceNode.type() = type ?: (
             currentScope.findClass(variableName)
                 ?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = TypeNode(variableName, null, false), isNullable = false) }
-                ?: currentScope.findFunction(variableName)?.first?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false) }
+                ?: currentScope.findFunction(variableName)?.first?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = it.returnType, isNullable = false) }
                 ?: currentScope.getPropertyType(variableName).first.type.toTypeNode()!!
             ).also { type = it }
 
@@ -755,7 +753,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         val clazz = currentScope.findClass(subjectType.name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
         clazz.memberFunctions[memberName]?.let {
-            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false).also { type = it }
+            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.returnType, isNullable = false).also { type = it }
         }
         clazz.memberPropertyCustomAccessors[memberName]?.let {
             return it.type().also { type = it }
@@ -765,7 +763,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
 
         findExtensionFunction(subjectType.toDataType(), memberName)?.let {
-            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.type, isNullable = false).also { type = it }
+            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.returnType, isNullable = false).also { type = it }
         }
 
         throw SemanticException("Could not find member `$memberName` for type ${clazz.name}")

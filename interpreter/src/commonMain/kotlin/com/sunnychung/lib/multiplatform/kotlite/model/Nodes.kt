@@ -70,7 +70,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Type $name${if (isNullable) " ?" else ""}\"]"
-        return "$self\n" + (arguments?.forEach { "$self-->${it.toMermaid()}\n" } ?: "")
+        return "$self\n" + (arguments?.joinToString("") { "$self-->${it.toMermaid()}\n" } ?: "")
     }
 
     open fun copy(isNullable: Boolean) = TypeNode(
@@ -149,17 +149,15 @@ interface CallableNode {
 data class FunctionDeclarationNode(
     override val name: String,
     val receiver: String? = null,
-    val type: TypeNode,
+    override val returnType: TypeNode,
     override val valueParameters: List<FunctionValueParameterNode>,
     override val body: BlockNode,
     @ModifyByAnalyzer var transformedRefName: String? = null,
 ) : ASTNode, CallableNode {
-    override val returnType: TypeNode
-        get() = type
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name`\"]"
-        return "$self-- type -->${type.toMermaid()}\n" +
+        return "$self-- type -->${returnType.toMermaid()}\n" +
                 "$self-->${body.toMermaid()}\n"
     }
 }
@@ -332,5 +330,13 @@ class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: L
             returnType = returnType,
             isNullable = isNullable,
         )
+    }
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Function Type $name${if (isNullable) " ?" else ""}\"]"
+        return "$self\n" +
+                (receiverType?.let { "$self- -receiver -->${it.toMermaid()}" } ?: "") +
+                parameterTypes.joinToString("") { "$self-- parameter -->${it.toMermaid()}\n" } +
+                "$self-- return -->${returnType.toMermaid()}"
     }
 }

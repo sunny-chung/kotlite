@@ -12,7 +12,8 @@ import kotlin.test.assertEquals
 fun interpreter(code: String, isDebug: Boolean = true) = Parser(Lexer(code)).let { parser ->
     val it = parser.script()
     if (isDebug) {
-        println(parser.allTokens)
+        println("Tokens: ${parser.allTokens}")
+        println("AST:\n---\nflowchart TD\n${it.toMermaid()}\n---")
     }
     SemanticAnalyzer(it).analyze()
     if (isDebug) {

@@ -1047,7 +1047,7 @@ class Parser(protected val lexer: Lexer) {
         eat(TokenType.Operator, ")")
         repeatedNL()
         val body = functionBody()
-        return FunctionDeclarationNode(name = "get", type = type, valueParameters = emptyList(), body = body)
+        return FunctionDeclarationNode(name = "get", returnType = type, valueParameters = emptyList(), body = body)
     }
 
     /**
@@ -1081,7 +1081,7 @@ class Parser(protected val lexer: Lexer) {
         val body = functionBody()
         return FunctionDeclarationNode(
             name = "set",
-            type = returnType,
+            returnType = returnType,
             valueParameters = listOf(
                 FunctionValueParameterNode(parameterName, type, null)
             ),
@@ -1230,7 +1230,7 @@ class Parser(protected val lexer: Lexer) {
         }
         // TODO make functionBody optional for interfaces
         val body = functionBody()
-        return FunctionDeclarationNode(name = name, receiver = receiver, type = type, valueParameters = valueParameters, body = body)
+        return FunctionDeclarationNode(name = name, receiver = receiver, returnType = type, valueParameters = valueParameters, body = body)
     }
 
     /**

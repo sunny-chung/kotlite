@@ -213,6 +213,28 @@ class LambdaTest {
     }
 
     @Test
+    fun returnLambdaFromFunctionChainedCallsWithLocalVariableReadReference() {
+        val interpreter = interpreter("""
+            var a: Int = 10
+            fun higherOrderFunction(x: Int): (Int) -> Int {
+                return { i: Int ->
+                    ++a
+                    i + x + a
+                }
+            }
+            var b: Int = higherOrderFunction(29)(20)
+            var c: Int = higherOrderFunction(60)(30)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(60, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(102, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
     fun returnLambdaFromFunctionWithLocalVariableWriteReference() {
         val interpreter = interpreter("""
             var a: Int = 10
@@ -474,5 +496,49 @@ class LambdaTest {
         assertEquals(324, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
         assertEquals(146, (symbolTable.findPropertyByDeclaredName("h") as IntValue).value)
         assertEquals(146, (symbolTable.findPropertyByDeclaredName("i") as IntValue).value)
+    }
+
+    @Test
+    fun invokeLambdaDirectly() {
+        val interpreter = interpreter("""
+            var a: Int = 0
+            val b: Int = { x: Int ->
+                var i: Int = x
+                while (i > 1) {
+                    a += 2
+                    --i
+                }
+                i
+            }(10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(18, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun recursiveLambdas() {
+        val interpreter = interpreter("""
+            var a: Int = 0
+            fun f(x: Int): () -> Int {
+                if (x < 1) return { 0 }
+                return {
+                    ++a
+                    x + f(x-1)()
+                }
+            }
+            var b: Int = f(10)()
+            var c: Int = f(50)()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(60, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals((1 + 10) * 10 / 2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals((1 + 50) * 50 / 2, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
 }

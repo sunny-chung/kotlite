@@ -315,7 +315,14 @@ class Interpreter(val scriptNode: ScriptNode) {
                 return evalClassMemberFunctionCall(subject as ClassInstance, function.member)
             }
 
-            else -> throw UnsupportedOperationException("Dynamic functions are not yet supported")
+            else -> {
+                val variable = function.eval() as? RuntimeValue
+                if (variable is LambdaValue) {
+                    return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs)
+                } else {
+                    throw RuntimeException("${variable?.type()} is not callable")
+                }
+            }
         }
     }
 
@@ -468,7 +475,7 @@ class Interpreter(val scriptNode: ScriptNode) {
                         is ClassInstanceInitializerNode -> {
                             val init = FunctionDeclarationNode(
                                 name = "init",
-                                type = TypeNode("Unit", null, false),
+                                returnType = TypeNode("Unit", null, false),
                                 valueParameters = emptyList(),
                                 body = it.block
                             )
