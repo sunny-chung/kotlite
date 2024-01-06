@@ -43,6 +43,11 @@ data class ObjectType(val clazz: ClassDefinition, override val isNullable: Boole
 data class FunctionType(val arguments: List<DataType>, val returnType: DataType, override val isNullable: Boolean) : DataType {
     override val name: String = "Function"
 
+    override val nameWithNullable: String
+        get() = "Function<${(arguments + returnType).joinToString(", ") { it.nameWithNullable }}>".let {
+            if (isNullable) "($it)?" else it
+        }
+
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NullType && isNullable) return true
         if (!super.isAssignableFrom(other) || other !is FunctionType) return false
@@ -65,7 +70,7 @@ fun TypeNode.toPrimitiveDataType() = when(this.name) {
     "Boolean" -> BooleanType(isNullable = isNullable)
     "String" -> StringType(isNullable = isNullable)
     "Unit" -> UnitType(isNullable = isNullable)
-    "Null" -> NullType
+    "Nothing" -> NullType
     else -> null //ObjectType(clazz = clazz!!, isNullable = isNullable)
 }
 

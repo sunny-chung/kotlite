@@ -71,12 +71,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             listOf(it.name to it, "${it.name}?" to it.copy(isNullable = true))
         }
         .let { it + listOf(
-            "Null" to TypeNode("Null", null, true),
+            "Null" to TypeNode("Nothing", null, true),
         ) }
         .toMap()
 
     init {
-        listOf("Int", "Double", "Boolean", "String", "Unit").forEach {
+        listOf("Int", "Double", "Boolean", "String", "Unit", "Nothing").forEach {
             builtinSymbolTable.declareClass(ClassDefinition(
                 currentScope = builtinSymbolTable,
                 name = it,
@@ -95,17 +95,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         typeRegistry["$name?"]!!
     }
 
-    fun DataType.toTypeNode(): TypeNode = if (this !is ObjectType && this !is FunctionType) {
-        typeRegistry["$name${if (isNullable) "?" else ""}"]!!
-    } else if (this is FunctionType) {
-        FunctionTypeNode(
-            parameterTypes = arguments.map { it.toTypeNode() },
-            returnType = returnType.toTypeNode(),
-            isNullable = isNullable,
-        )
-    } else {
-        TypeNode(name, null, isNullable)
-    }
+    fun DataType.toTypeNode(): TypeNode =
+        if (this is NullType) {
+            typeRegistry["Null"]!!
+        } else if (this !is ObjectType && this !is FunctionType) {
+            typeRegistry["$name${if (isNullable) "?" else ""}"]!!
+        } else if (this is FunctionType) {
+            FunctionTypeNode(
+                parameterTypes = arguments.map { it.toTypeNode() },
+                returnType = returnType.toTypeNode(),
+                isNullable = isNullable,
+            )
+        } else {
+            TypeNode(name, null, isNullable)
+        }
 
     fun TypeNode.toDataType(): DataType {
         return currentScope.typeNodeToPropertyType(this, false)?.type
@@ -291,10 +294,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
         if (initialValue != null) {
             val valueType = initialValue.type().toDataType()
+            if (declaredType == null) {
+                inferredType = initialValue.type()
+            }
             val subjectType = type.toDataType()
             if (!subjectType.isAssignableFrom(valueType)) {
                 throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
             }
+        } else if (declaredType == null) {
+            throw SemanticException("Type cannot be inferred for property `$name`")
         }
         currentScope.declareProperty(name = name, type = type, isMutable = isMutable)
         if (initialValue != null) {
@@ -654,7 +662,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                             val p = it.parameter
                             PropertyDeclarationNode(
                                 name = p.name,
-                                type = p.type,
+                                declaredType = p.type,
                                 isMutable = it.isMutable,
                                 initialValue = p.defaultValue,
                                 transformedRefName = p.transformedRefName,
@@ -909,10 +917,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             if (type1.name == type2.name && (type1.isNullable || type2.isNullable)) {
                 return type1.toNullable()
             }
-            if (type1.name == "Null" && type2.name != type1.name) {
+            if (type1.name == "Nothing" && type2.name != type1.name) {
                 return type2.toNullable()
             }
-            if (type2.name == "Null" && type2.name != type1.name) {
+            if (type2.name == "Nothing" && type2.name != type1.name) {
                 return type1.toNullable()
             }
             // TODO return "Any"

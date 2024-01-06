@@ -100,15 +100,21 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
 data class PropertyDeclarationNode(
     val name: String,
-    val type: TypeNode,
+    val declaredType: TypeNode?,
     val isMutable: Boolean,
     val initialValue: ASTNode?,
     val accessors: PropertyAccessorsNode? = null,
-    @ModifyByAnalyzer var transformedRefName: String? = null
+    @ModifyByAnalyzer var transformedRefName: String? = null,
+    @ModifyByAnalyzer var inferredType: TypeNode? = null,
 ) : ASTNode {
+    val type: TypeNode
+        get() = declaredType ?: inferredType!!
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
-        return "$self-->${type.toMermaid()}\n$self-->${initialValue?.toMermaid()}\n"
+        return "$self\n" +
+                (declaredType?.let { "$self-- declared type -->${it.toMermaid()}\n" } ?: "") +
+                (inferredType?.let { "$self-- inferred type -->${it.toMermaid()}\n" } ?: "") +
+                (initialValue?.let { "$self-- initial value -->${it.toMermaid()}\n" } ?: "")
     }
 }
 

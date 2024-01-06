@@ -581,7 +581,7 @@ class Parser(protected val lexer: Lexer) {
                     throw ExpectTokenMismatchException(",", currentToken.position)
                 }
                 val (name, type) = variableDeclaration()
-                parameters += FunctionValueParameterNode(name = name, type = type, defaultValue = null)
+                parameters += FunctionValueParameterNode(name = name, type = type ?: throw ParseException("Missing type"), defaultValue = null)
                 if (isCurrentTokenExcludingNL(TokenType.Symbol, ",")) {
                     repeatedNL()
                     eat(TokenType.Symbol, ",")
@@ -998,12 +998,14 @@ class Parser(protected val lexer: Lexer) {
      *     {annotation} {NL} simpleIdentifier [{NL} ':' {NL} type]
      *
      */
-    fun variableDeclaration(): Pair<String, TypeNode> {
+    fun variableDeclaration(): Pair<String, TypeNode?> {
         val name = userDefinedIdentifier()
-        repeatedNL()
-        eat(TokenType.Symbol, ":")
-        repeatedNL()
-        val type = type()
+        val type = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
+            repeatedNL()
+            eat(TokenType.Symbol, ":")
+            repeatedNL()
+            type()
+        } else null
         return name to type
     }
 
@@ -1055,6 +1057,9 @@ class Parser(protected val lexer: Lexer) {
         val accessors = when (nextToken.value.takeIf { nextToken.type == TokenType.Identifier }) {
             "get" -> {
                 repeatedNL()
+                if (type == null) { // TODO make type infer possible
+                    throw RuntimeException("Type is needed if there is custom accessor")
+                }
                 val getter = getter(type)
                 val next = nextNonNLSemiToken()
                 val setter = if (next.type == TokenType.Identifier && next.value == "set") {
@@ -1066,6 +1071,9 @@ class Parser(protected val lexer: Lexer) {
             }
             "set" -> {
                 repeatedNL()
+                if (type == null) { // TODO make type infer possible
+                    throw RuntimeException("Type is needed if there is custom accessor")
+                }
                 val setter = setter(type)
                 val next = nextNonNLSemiToken()
                 val getter = if (next.type == TokenType.Identifier && next.value == "get") {
@@ -1077,7 +1085,7 @@ class Parser(protected val lexer: Lexer) {
             }
             else -> null
         }
-        return PropertyDeclarationNode(name = name, type = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
+        return PropertyDeclarationNode(name = name, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
     }
 
     /**

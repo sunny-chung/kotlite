@@ -61,7 +61,7 @@ class CallableTypeTest {
     }
 
     @Test
-    fun unmatchedReturnType() {
+    fun unmatchedReturnType1() {
         assertSemanticFail("""
             fun f(x: Int): ((Int) -> Int) -> Int {
                 return { g: (Int) -> Int ->
@@ -70,6 +70,16 @@ class CallableTypeTest {
             }
             val b: ((Int) -> Int) -> Int = f(10)
             val c: Int = b({x: Int -> 2*x})
+        """.trimIndent())
+    }
+
+    @Test
+    fun unmatchedReturnType2() {
+        assertSemanticFail("""
+            fun f(): () -> (() -> (() -> Unit)) {
+                return {{{29}}}
+            }
+            val a = f()()()()
         """.trimIndent())
     }
 

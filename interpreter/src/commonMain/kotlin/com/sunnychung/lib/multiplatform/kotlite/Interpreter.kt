@@ -613,7 +613,7 @@ class Interpreter(val scriptNode: ScriptNode) {
                     val p = it.parameter
                     PropertyDeclarationNode(
                         name = p.name,
-                        type = p.type,
+                        declaredType = p.type,
                         isMutable = it.isMutable,
                         initialValue = p.defaultValue,
                         transformedRefName = p.transformedRefName,
