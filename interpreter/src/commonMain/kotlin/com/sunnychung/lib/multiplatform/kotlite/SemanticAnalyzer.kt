@@ -218,8 +218,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         if (subject !is VariableReferenceNode && subject !is NavigationNode) {
             throw SemanticException("$subject cannot be assigned")
         }
-        value.visit()
-        val valueType = value.type().toDataType()
         when (subject) {
             is VariableReferenceNode -> {
                 subject.visit()
@@ -229,17 +227,26 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                     transformedRefName = "$variableName/$l"
                 }
 
-                log.v { "Assign $variableName type ${subject.type()} <- type ${value.type()}" }
+//                log.v { "Assign $variableName type ${subject.type()} <- type ${value.type()}" }
             }
             is NavigationNode -> {
                 subject.visit()
                 // TODO handle NavigationNode
 
-                log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
+//                log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
             }
-            else -> SemanticException("$subject cannot be assigned")
+            else -> throw SemanticException("$subject cannot be assigned")
         }
-        val subjectType = subject.type().toDataType()
+        val subjectRawType = subject.type()
+        val subjectType = subjectRawType.toDataType()
+
+        if (operator == "=" && subjectRawType is FunctionTypeNode && value is LambdaLiteralNode) {
+            value.parameterTypesUpperBound = subjectRawType.parameterTypes
+            value.returnTypeUpperBound = subjectRawType.returnType
+        }
+
+        value.visit()
+        val valueType = value.type().toDataType()
 
         if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
             if (operator == "+=" && subjectType is StringType) {
@@ -606,7 +613,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
     }
 
     fun ReturnNode.visit() {
-        value?.visit()
         var s = currentScope
         while (s.scopeType != ScopeType.Function) {
             if (s.scopeType == ScopeType.Script || s.parentScope == null) {
@@ -616,8 +622,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         }
         // TODO block return in lambda
         // s.scopeType == ScopeType.Function
+        val declaredReturnType = s.returnType!!
+        if (declaredReturnType is FunctionType && value is LambdaLiteralNode) {
+            value.parameterTypesUpperBound = declaredReturnType.arguments.map { it.toTypeNode() }
+            value.returnTypeUpperBound = declaredReturnType.returnType.toTypeNode()
+        }
+
+        value?.visit()
         val valueType = value?.type()?.toDataType() ?: UnitType()
-        if (!s.returnType!!.isAssignableFrom(valueType)) {
+        if (!declaredReturnType.isAssignableFrom(valueType)) {
             throw TypeMismatchException(s.returnType!!.nameWithNullable, valueType.nameWithNullable)
         }
     }

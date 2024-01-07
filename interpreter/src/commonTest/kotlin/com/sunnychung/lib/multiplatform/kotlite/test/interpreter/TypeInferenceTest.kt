@@ -300,4 +300,42 @@ class TypeInferenceTest {
         assertEquals("3a1", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
         assertEquals("4b2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
     }
+
+    @Test
+    fun assignNullableLambdaParameters() {
+        val interpreter = interpreter("""
+            var f: ((Int, String) -> String)? = null
+            f = null
+            f = { i, s ->
+                s + i
+            }
+            val a = f(1, "a")
+            val b = f(2, "b")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals("a1", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("b2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
+
+    @Test
+    fun returnLambda() {
+        val interpreter = interpreter("""
+            fun f(): (Int, String) -> String {
+                return { i, s ->
+                    s + i
+                }
+            }
+            val a = f()(1, "a")
+            val b = f()(2, "b")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals("a1", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("b2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
 }
