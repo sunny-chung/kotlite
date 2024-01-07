@@ -274,6 +274,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
 
     fun PropertyDeclarationNode.visit(isVisitInitialValue: Boolean = true, isClassProperty: Boolean = false, scopeLevel: Int = currentScope.scopeLevel) {
         if (isVisitInitialValue) {
+            if (declaredType is FunctionTypeNode && initialValue is LambdaLiteralNode) {
+                initialValue.parameterTypesUpperBound = declaredType.parameterTypes
+                initialValue.returnTypeUpperBound = declaredType.returnType
+            }
             initialValue?.visit()
         }
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {

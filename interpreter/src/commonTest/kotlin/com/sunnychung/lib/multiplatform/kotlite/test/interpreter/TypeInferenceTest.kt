@@ -249,4 +249,55 @@ class TypeInferenceTest {
         assertEquals(29, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(576, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun propertyLambdaParameters() {
+        val interpreter = interpreter("""
+            val f: (Int, String) -> String = { i, s ->
+                s + i
+            }
+            val a = f(1, "a")
+            val b = f(2, "b")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals("a1", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("b2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
+
+    @Test
+    fun propertyNullableLambdaParameters() {
+        val interpreter = interpreter("""
+            val f: ((Int, String) -> String)? = { i, s ->
+                s + i
+            }
+            val a = f(1, "a")
+            val b = f(2, "b")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals("a1", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("b2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
+
+    @Test
+    fun propertyNestedLambdaParameters() {
+        val interpreter = interpreter("""
+            val f: (Int, String) -> ((Int) -> String) = { i, s ->
+                { x -> x + s + i }
+            }
+            val a = f(1, "a")(3)
+            val b = f(2, "b")(4)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals("3a1", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("4b2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
 }

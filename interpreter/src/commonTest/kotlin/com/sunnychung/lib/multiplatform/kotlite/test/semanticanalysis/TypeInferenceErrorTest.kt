@@ -65,4 +65,33 @@ class TypeInferenceErrorTest {
             val b = f(20, 29) { a, b -> {c -> {_ -> "a * b - c"}} }
         """.trimIndent())
     }
+
+    @Test
+    fun missingLambdaArgumentType() {
+        assertSemanticFail("""
+            val f = { x, y -> x + y }
+        """.trimIndent())
+    }
+
+    @Test
+    fun propertyLambdaParameterMismatch() {
+        assertSemanticFail("""
+            val f: ((Int, String) -> String)? = { i, s: Int ->
+                s + i
+            }
+            val a = f(1, "a")
+            val b = f(2, "b")
+        """.trimIndent())
+    }
+
+    @Test
+    fun propertyLambdaNestedParameterMismatch() {
+        assertSemanticFail("""
+            val f: (Int, String) -> ((Int) -> String) = { i, s ->
+                { x: String -> x + s + i }
+            }
+            val a = f(1, "a")(3)
+            val b = f(2, "b")(4)
+        """.trimIndent())
+    }
 }
