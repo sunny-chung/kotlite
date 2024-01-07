@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.annotation.ModifyByAnalyzer
 import kotlin.random.Random
 
@@ -155,17 +156,18 @@ data class BlockNode(
 
 interface CallableNode {
     val valueParameters: List<FunctionValueParameterNode>
-    val body: BlockNode
     val returnType: TypeNode
     val name: String?
+
+    fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue?>): RuntimeValue
 }
 
-data class FunctionDeclarationNode(
+open class FunctionDeclarationNode(
     override val name: String,
     val receiver: String? = null,
     override val returnType: TypeNode,
     override val valueParameters: List<FunctionValueParameterNode>,
-    override val body: BlockNode,
+    val body: BlockNode,
     @ModifyByAnalyzer var transformedRefName: String? = null,
 ) : ASTNode, CallableNode {
 
@@ -173,6 +175,12 @@ data class FunctionDeclarationNode(
         val self = "${generateId()}[\"Function Node `$name`\"]"
         return "$self-- type -->${returnType.toMermaid()}\n" +
                 "$self-->${body.toMermaid()}\n"
+    }
+
+    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue?>): RuntimeValue {
+        with (interpreter) {
+            return body.eval()
+        }
     }
 }
 
@@ -294,8 +302,8 @@ class PropertyAccessorsNode(
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Navigation Node\"]"
-        return "$self\n${getter?.let {"$self-- getter -->${it.toMermaid()}\n"}}\n" +
-                "${setter?.let {"$self-- setter -->${it.toMermaid()}\n"}}"
+        return "$self\n${getter?.let {"$self-- getter -->${it.toMermaid()}\n"} ?: ""}\n" +
+                (setter?.let {"$self-- setter -->${it.toMermaid()}\n"} ?: "")
     }
 }
 
@@ -312,13 +320,13 @@ class StringNode(
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"String Node\"]"
-        return "$self\n${nodes.forEach {"$self-->${it.toMermaid()}\n"}}"
+        return "$self\n${nodes.joinToString("") {"$self-->${it.toMermaid()}\n"}}"
     }
 }
 
 data class LambdaLiteralNode(
     override val valueParameters: List<FunctionValueParameterNode>,
-    override val body: BlockNode,
+    val body: BlockNode,
     @ModifyByAnalyzer var type: FunctionTypeNode? = null,
     @ModifyByAnalyzer var accessedRefs: SymbolReferenceSet? = null,
     @ModifyByAnalyzer var parameterTypesUpperBound: List<TypeNode>? = null,
@@ -334,6 +342,12 @@ data class LambdaLiteralNode(
         val self = "${generateId()}[\"Lambda Node\"]"
         return valueParameters.joinToString("") { "$self-- parameter -->${it.toMermaid() }\n" } +
                 "$self-->${body.toMermaid()}\n"
+    }
+
+    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue?>): RuntimeValue {
+        with (interpreter) {
+            return body.eval()
+        }
     }
 }
 

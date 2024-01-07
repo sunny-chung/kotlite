@@ -21,6 +21,14 @@ class CallStack {
         )
     }
 
+    internal fun provideBuiltinFunction(function: CustomFunctionDeclarationNode) {
+        if (function.receiver == null) {
+            activationRecords[0].symbolTable.declareFunction(function.transformedRefName!!, function)
+        } else {
+            activationRecords[0].symbolTable.declareExtensionFunction(function.transformedRefName!!, function)
+        }
+    }
+
     fun getStacktrace(): List<String> {
         return if (activationRecords.size < 3) {
             emptyList()

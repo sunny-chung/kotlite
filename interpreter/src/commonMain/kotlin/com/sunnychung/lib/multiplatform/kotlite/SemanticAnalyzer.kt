@@ -19,6 +19,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
+import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -53,7 +54,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 
-class SemanticAnalyzer(val scriptNode: ScriptNode) {
+class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
     val builtinSymbolTable = SymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
     val symbolTable = SymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = builtinSymbolTable)
     var currentScope = symbolTable
@@ -86,6 +87,19 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 memberFunctions = emptyMap(),
                 primaryConstructor = null,
             ))
+        }
+
+        val libFunctions = executionEnvironment.getBuiltinFunctions(builtinSymbolTable)
+        libFunctions.forEach {
+                if (it.receiver == null) {
+                    builtinSymbolTable.declareFunction(it.name, it)
+                } else {
+                    builtinSymbolTable.declareExtensionFunction("${it.receiver}/${it.name}", it)
+                }
+            }
+
+        libFunctions.forEach {
+            it.visit()
         }
     }
 

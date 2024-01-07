@@ -5,13 +5,14 @@ import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
+import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
-fun semanticAnalyzer(code: String) = SemanticAnalyzer(Parser(Lexer(code)).script())
-fun assertSemanticFail(code: String) {
-    val a = semanticAnalyzer(code)
+fun semanticAnalyzer(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) = SemanticAnalyzer(Parser(Lexer(code)).script(), environment)
+fun assertSemanticFail(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) {
+    val a = semanticAnalyzer(code, environment)
     assertFailsWith<SemanticException> { a.analyze() }
 }
 fun assertTypeCheckFail(code: String) {
@@ -21,7 +22,7 @@ fun assertTypeCheckFail(code: String) {
 
 class SemanticAnalyzerTest {
     fun build(code: String) = SemanticAnalyzer(
-        Parser(Lexer(code)).script()
+        Parser(Lexer(code)).script(), ExecutionEnvironment()
     )
 
     @Test

@@ -25,6 +25,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallResult
@@ -59,10 +60,16 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
-class Interpreter(val scriptNode: ScriptNode) {
+class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
 
     internal val callStack = CallStack()
     val globalScope = callStack.currentSymbolTable()
+
+    init {
+        executionEnvironment.getBuiltinFunctions(globalScope).forEach {
+            callStack.provideBuiltinFunction(it)
+        }
+    }
 
     fun DataType.toTypeNode() = TypeNode(name, null, isNullable)
 
@@ -344,7 +351,7 @@ class Interpreter(val scriptNode: ScriptNode) {
         return evalFunctionCall(this, functionNode, emptyMap(), extraSymbols).result
     }
 
-    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>, extraSymbols: SymbolTable? = null): FunctionCallResult {
+    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>, extraSymbols: SymbolTable? = null, subject: RuntimeValue? = null): FunctionCallResult {
         // TODO optimize to remove most loops
         val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
         callNode.arguments.forEach { a ->
@@ -392,7 +399,7 @@ class Interpreter(val scriptNode: ScriptNode) {
 
             // execute function
             val returnValue = try {
-                val result = functionNode.body.eval()
+                val result = functionNode.execute(this, subject, callArguments.toList())
                 if (returnType is UnitType) {
                     UnitValue
                 } else {
@@ -547,6 +554,7 @@ class Interpreter(val scriptNode: ScriptNode) {
                 callNode = this.copy(function = function),
                 functionNode = function,
                 extraScopeParameters = emptyMap(),
+                subject = subject,
             )
 
             return result.result

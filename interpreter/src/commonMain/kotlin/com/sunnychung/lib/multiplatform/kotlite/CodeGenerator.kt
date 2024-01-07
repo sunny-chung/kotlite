@@ -130,7 +130,7 @@ open class CodeGenerator(protected val node: ASTNode) {
         = (name?.let { "$name = " } ?: "") + value.generate()
 
     protected fun FunctionCallNode.generate()
-        = "${functionRefName ?: function.generate()}(${arguments.joinToString(", ") { it.generate() }})"
+        = "${function.generate()}<f:$functionRefName>(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
         = "fun ${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
