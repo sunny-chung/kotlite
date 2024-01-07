@@ -1025,4 +1025,24 @@ class LambdaTest {
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
+
+    @Test
+    fun underscoreArgumentsInLambda() {
+        val interpreter = interpreter("""
+            fun f(g: ((Int, Int, Int, Int) -> Int)? = null): Int {
+                if (g == null) {
+                    return 1
+                }
+                return g(2, 5, 11, 19)
+            }
+            val x = f { x, _, _, y ->
+                x + y
+            }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }

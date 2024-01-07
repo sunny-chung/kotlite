@@ -460,4 +460,19 @@ class SemanticAnalyzerTest {
             val x: Int = 30
         """.trimIndent())
     }
+
+    @Test
+    fun underscoreArgumentCannotBeAccessed() {
+        assertSemanticFail("""
+            fun f(g: ((Int, Int, Int) -> Int)? = null): Int {
+                if (g == null) {
+                    return 1
+                }
+                return g(2, 5, 11, 19)
+            }
+            val x = f { x, _, y ->
+                x + _ + y
+            }
+        """.trimIndent())
+    }
 }

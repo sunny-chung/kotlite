@@ -800,7 +800,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             }
         }
 
-        valueParameters.forEach { it.visit() }
+        valueParameters.forEach {
+            if (it.name != "_") {
+                it.visit()
+            }
+        }
         // TODO provide receiver to scope if exists
 
         body.returnTypeUpperBound = returnTypeUpperBound

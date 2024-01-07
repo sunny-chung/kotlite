@@ -381,8 +381,13 @@ class Interpreter(val scriptNode: ScriptNode) {
                 symbolTable.assign(it.key, it.value)
             }
             functionNode.valueParameters.forEachIndexed { index, it ->
-                symbolTable.declareProperty(it.transformedRefName!!, it.type, false)
-                symbolTable.assign(it.transformedRefName!!, callArguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue))
+                if (functionNode is LambdaLiteralNode && it.name == "_") else {
+                    symbolTable.declareProperty(it.transformedRefName!!, it.type, false)
+                    symbolTable.assign(
+                        it.transformedRefName!!,
+                        callArguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue)
+                    )
+                }
             }
 
             // execute function
