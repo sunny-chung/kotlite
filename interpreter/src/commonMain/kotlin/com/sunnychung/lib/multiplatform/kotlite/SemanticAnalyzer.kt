@@ -489,8 +489,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             }
         }
 
-        arguments.forEach { it.visit() }
-
         // Validate call arguments against declared arguments
         // Check for missing mandatory arguments, extra arguments, duplicated arguments and mismatch data types
         if (arguments.size > functionArgumentDeclarations.size) {
@@ -531,9 +529,26 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         if (missingIndexes.isNotEmpty()) {
             throw SemanticException("Missing mandatory arguments for index $missingIndexes")
         }
-        arguments.forEachIndexed { i, argument ->
-            if (!argumentInfos[callArgumentMappedIndexes[i]].type.isAssignableFrom(argument.type().toDataType())) {
-                throw SemanticException("Argument type ${argument.type().descriptiveName()} cannot be mapped to ${argumentInfos[callArgumentMappedIndexes[i]].type.nameWithNullable}")
+        arguments.forEachIndexed { i, callArgument ->
+            val functionArgumentType = argumentInfos[callArgumentMappedIndexes[i]].type
+            if (callArgument.value is LambdaLiteralNode && functionArgumentType is FunctionType) {
+                if (callArgument.value.valueParameters.size != functionArgumentType.arguments.size) {
+                    throw SemanticException("Lambda argument count is different from function parameter declaration.")
+                }
+                callArgument.value.parameterTypesUpperBound = functionArgumentType.arguments.map {
+                    it.toTypeNode()
+                }
+                callArgument.value.returnTypeUpperBound = functionArgumentType.returnType.toTypeNode()
+            }
+        }
+
+        // visit argument must before evaluating type
+        arguments.forEach { it.visit() }
+
+        arguments.forEachIndexed { i, callArgument ->
+            val functionArgumentType = argumentInfos[callArgumentMappedIndexes[i]].type
+            if (!functionArgumentType.isAssignableFrom(callArgument.type().toDataType())) {
+                throw SemanticException("Argument type ${callArgument.type().descriptiveName()} cannot be mapped to ${argumentInfos[callArgumentMappedIndexes[i]].type.nameWithNullable}")
             }
         }
 
@@ -553,6 +568,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
                 throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
             }
         }
+        if (declaredType == null && inferredType == null) {
+            throw SemanticException("Cannot infer lambda parameter type")
+        }
         currentScope.declareProperty(name = name, type = type, isMutable = false)
         currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type))
         transformedRefName = "$name/${currentScope.scopeLevel}"
@@ -569,7 +587,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
             scopeType = if (type == ScopeType.Function) ScopeType.FunctionBlock else type,
         )
 
-        statements.forEach { it.visit() }
+        statements.forEachIndexed { i, it ->
+            if (returnTypeUpperBound is FunctionTypeNode && i == statements.lastIndex && it is LambdaLiteralNode) {
+                val returnTypeUpperBound = returnTypeUpperBound as FunctionTypeNode
+                it.parameterTypesUpperBound = returnTypeUpperBound.parameterTypes
+                it.returnTypeUpperBound = returnTypeUpperBound.returnType
+            }
+            it.visit()
+        }
 
         returnType = type()
 
@@ -744,13 +769,29 @@ class SemanticAnalyzer(val scriptNode: ScriptNode) {
         pushScope(
             scopeName = "<lambda>",
             scopeType = ScopeType.Closure,
-            returnType = null //type.returnType.toDataType(),
+            returnType = returnTypeUpperBound?.toDataType() //type.returnType.toDataType(),
         )
+
+        if (parameterTypesUpperBound != null) {
+            if (valueParameters.size != parameterTypesUpperBound!!.size) {
+                throw SemanticException("Lambda argument count is different from function parameter declaration.")
+            }
+            valueParameters.forEachIndexed { i, lambdaParameterNode ->
+                if (lambdaParameterNode.declaredType == null) {
+                    lambdaParameterNode.inferredType = parameterTypesUpperBound!![i]
+                }
+            }
+        }
 
         valueParameters.forEach { it.visit() }
         // TODO provide receiver to scope if exists
 
+        body.returnTypeUpperBound = returnTypeUpperBound
         body.visit()
+
+        if (returnTypeUpperBound?.toDataType()?.isAssignableFrom(body.type().toDataType()) == false) {
+            throw SemanticException("Lambda return type ${body.type().descriptiveName()} cannot be converted to ${returnTypeUpperBound!!.descriptiveName()}")
+        }
 
         popScope()
         this.accessedRefs = symbolRecorders.removeLast()

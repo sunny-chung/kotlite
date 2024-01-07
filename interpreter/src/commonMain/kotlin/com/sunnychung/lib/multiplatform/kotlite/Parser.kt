@@ -581,7 +581,7 @@ class Parser(protected val lexer: Lexer) {
                     throw ExpectTokenMismatchException(",", currentToken.position)
                 }
                 val (name, type) = variableDeclaration()
-                parameters += FunctionValueParameterNode(name = name, type = type ?: throw ParseException("Missing type"), defaultValue = null)
+                parameters += FunctionValueParameterNode(name = name, declaredType = type, defaultValue = null)
                 if (isCurrentTokenExcludingNL(TokenType.Symbol, ",")) {
                     repeatedNL()
                     eat(TokenType.Symbol, ",")
@@ -1208,7 +1208,7 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             expression()
         } else null
-        return FunctionValueParameterNode(name = name, type = type, defaultValue = defaultValue)
+        return FunctionValueParameterNode(name = name, declaredType = type, defaultValue = defaultValue)
     }
 
     /**
@@ -1318,7 +1318,7 @@ class Parser(protected val lexer: Lexer) {
             isMutable = isMutable == true,
             parameter = FunctionValueParameterNode(
                 name = name,
-                type = type,
+                declaredType = type,
                 defaultValue = defaultValue
             )
         )

@@ -181,4 +181,72 @@ class TypeInferenceTest {
         assertEquals(29, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(54, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun lambdaArguments() {
+        val interpreter = interpreter("""
+            fun f(a: Int, b: Int, g: (Int, Int) -> Int): Int {
+                return g(a, b)
+            }
+            val a = f(10, 15) { a, b -> a + b }
+            val b = f(20, 29) { a, b -> a * b }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(580, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun nestedLambdaArguments() {
+        val interpreter = interpreter("""
+            fun f(a: Int, b: Int, g: (Int, Int, ((Int) -> Int)) -> Int): Int {
+                return g(a, b) { x -> -x }
+            }
+            val a = f(10, 15) { a, b, g -> g(a + b) }
+            val b = f(20, 29) { a, b, g -> g(a * b) }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(-25, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(-580, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun nestedLambdaReturnType1() {
+        val interpreter = interpreter("""
+            fun f(a: Int, b: Int, g: (Int, Int) -> ((Int) -> Int)): Int {
+                return g(a, b)(4)
+            }
+            val a = f(10, 15) { a, b -> {c -> a + b + c} }
+            val b = f(20, 29) { a, b -> {c -> a * b - c} }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(576, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun nestedLambdaReturnType2() {
+        val interpreter = interpreter("""
+            fun f(a: Int, b: Int, g: (Int, Int) -> ((Int) -> ((Int) -> Int))): Int {
+                return g(a, b)(4)(1)
+            }
+            val a = f(10, 15) { a, b -> {c -> {_ -> a + b + c}} }
+            val b = f(20, 29) { a, b -> {c -> {_ -> a * b - c}} }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(576, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

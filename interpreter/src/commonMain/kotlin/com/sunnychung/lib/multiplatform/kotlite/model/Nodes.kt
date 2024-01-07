@@ -130,15 +130,23 @@ open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 
-data class FunctionValueParameterNode(val name: String, val type: TypeNode, val defaultValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+    @ModifyByAnalyzer var inferredType: TypeNode? = null
+    val type: TypeNode get() = declaredType ?: inferredType!!
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Value Parameter Node `$name`\"]"
-        return "$self-->${type.toMermaid()}\n" +
+        return "$self\n" + (if (declaredType != null) "$self-- declared type -->${declaredType.toMermaid()}\n" else "") +
                 if (defaultValue != null) "$self-->${defaultValue.toMermaid()}\n" else ""
     }
 }
 
-data class BlockNode(val statements: List<ASTNode>, val position: SourcePosition, val type: ScopeType, @ModifyByAnalyzer var returnType: TypeNode? = null,) : ASTNode {
+data class BlockNode(
+    val statements: List<ASTNode>,
+    val position: SourcePosition,
+    val type: ScopeType,
+    @ModifyByAnalyzer var returnType: TypeNode? = null,
+    @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
+) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Block Node\"]"
         return statements.joinToString("") { "$self-->${it.toMermaid()}\n" }
@@ -313,6 +321,8 @@ data class LambdaLiteralNode(
     override val body: BlockNode,
     @ModifyByAnalyzer var type: FunctionTypeNode? = null,
     @ModifyByAnalyzer var accessedRefs: SymbolReferenceSet? = null,
+    @ModifyByAnalyzer var parameterTypesUpperBound: List<TypeNode>? = null,
+    @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
         get() = type!!.returnType
