@@ -139,38 +139,43 @@ class Lexer(val code: String) {
         }
     }
 
+    fun readChar(isDecodeSurrogatePair: Boolean): String {
+        val read = if (currentChar() == '\\') {
+            advanceChar()
+            when (currentChar()) {
+                't' -> '\t'
+                'b' -> '\b'
+                'r' -> '\r'
+                'n' -> '\n'
+                '\'' -> '\''
+                '"' -> '"'
+                '\\' -> '\\'
+                '$' -> '$'
+                'u' -> {
+                    val hex = (1..4).map { advanceChar() }.joinToString("")
+                    var code = hex.toInt(16)
+                    if (isDecodeSurrogatePair && code in (0xD800 .. 0xDFFF)) { // surrogates
+                        if (advanceChar() != '\\' || advanceChar() != 'u') throw RuntimeException("Expect another \\u for a surrogate pair")
+                        val lowSurrogateHex = (1..4).map { advanceChar() }.joinToString("")
+                        val lowSurrogateCode = lowSurrogateHex.toInt(16)
+                        // decode according to https://en.wikipedia.org/wiki/UTF-16#Examples
+                        code = ((code - 0xD800) * 0x400) + (lowSurrogateCode - 0xDC00) + 0x10000
+                    }
+                    hexToUtf8String(code)
+                }
+                else -> throw RuntimeException("Unsupported escape \\${currentChar()}")
+            }
+        } else {
+            currentChar()
+        }
+        return read.toString()
+    }
+
     internal fun readStringContent(): Token {
         val sb = StringBuilder()
         val position = makeSourcePosition()
         while (currentChar() !in setOf('"', '$', null)) {
-            if (currentChar() == '\\') {
-                advanceChar()
-                sb.append(when (currentChar()) {
-                    't' -> '\t'
-                    'b' -> '\b'
-                    'r' -> '\r'
-                    'n' -> '\n'
-                    '\'' -> '\''
-                    '"' -> '"'
-                    '\\' -> '\\'
-                    '$' -> '$'
-                    'u' -> {
-                        val hex = (1..4).map { advanceChar() }.joinToString("")
-                        var code = hex.toInt(16)
-                        if (code in (0xD800 .. 0xDFFF)) { // surrogates
-                            if (advanceChar() != '\\' || advanceChar() != 'u') throw RuntimeException("Expect another \\u for a surrogate pair")
-                            val lowSurrogateHex = (1..4).map { advanceChar() }.joinToString("")
-                            val lowSurrogateCode = lowSurrogateHex.toInt(16)
-                            // decode according to https://en.wikipedia.org/wiki/UTF-16#Examples
-                            code = ((code - 0xD800) * 0x400) + (lowSurrogateCode - 0xDC00) + 0x10000
-                        }
-                        hexToUtf8String(code)
-                    }
-                    else -> throw RuntimeException("Unsupported escape \\${currentChar()}")
-                })
-            } else {
-                sb.append(currentChar())
-            }
+            sb.append(readChar(isDecodeSurrogatePair = true))
             advanceChar()
         }
         backward()
@@ -269,6 +274,16 @@ class Lexer(val code: String) {
                             } else {
                                 return Token(TokenType.Operator, token, position)
                             }
+                        }
+
+                        c == '\'' -> {
+                            val position = makeSourcePosition()
+                            advanceChar()
+                            val char = readChar(isDecodeSurrogatePair = false).first()
+                            if (advanceChar() != '\'') {
+                                throw RuntimeException("Invalid char literal")
+                            }
+                            return Token(TokenType.Char, char, position)
                         }
 
                         c == '"' -> {

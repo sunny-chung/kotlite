@@ -32,6 +32,7 @@ data class IntType(override val isNullable: Boolean = false) : DataType { overri
 data class DoubleType(override val isNullable: Boolean = false) : DataType { override val name: String = "Double" }
 data class BooleanType(override val isNullable: Boolean = false) : DataType { override val name: String = "Boolean" }
 data class StringType(override val isNullable: Boolean = false) : DataType { override val name: String = "String" }
+data class CharType(override val isNullable: Boolean = false) : DataType { override val name: String = "Char" }
 data class UnitType(override val isNullable: Boolean = false) : DataType { override val name: String = "Unit" }
 data object NullType : DataType {
     override val name: String = "Null"
@@ -69,6 +70,7 @@ fun TypeNode.toPrimitiveDataType() = when(this.name) {
     "Double" -> DoubleType(isNullable = isNullable)
     "Boolean" -> BooleanType(isNullable = isNullable)
     "String" -> StringType(isNullable = isNullable)
+    "Char" -> CharType(isNullable = isNullable)
     "Unit" -> UnitType(isNullable = isNullable)
     "Nothing" -> NullType
     else -> null //ObjectType(clazz = clazz!!, isNullable = isNullable)

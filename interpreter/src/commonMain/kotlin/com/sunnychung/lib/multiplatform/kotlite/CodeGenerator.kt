@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
@@ -52,6 +53,7 @@ open class CodeGenerator(protected val node: ASTNode) {
             is BinaryOpNode -> this.generate()
             is BlockNode -> this.generate()
             is BooleanNode -> this.generate()
+            is CharNode -> this.generate()
             is BreakNode -> this.generate()
             is ClassDeclarationNode -> this.generate()
             is ClassInstanceInitializerNode -> this.generate()
@@ -98,6 +100,8 @@ open class CodeGenerator(protected val node: ASTNode) {
         }
 
     protected fun BooleanNode.generate() = "$value"
+
+    protected fun CharNode.generate() = "'${if (value in setOf('\\', '\'')) "\\$value" else "$value" }'"
 
     protected fun BreakNode.generate() = "break"
 

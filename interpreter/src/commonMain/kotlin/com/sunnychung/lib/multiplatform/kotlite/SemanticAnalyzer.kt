@@ -9,6 +9,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
@@ -66,6 +68,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         TypeNode("Double", null, false),
         TypeNode("Boolean", null, false),
         TypeNode("String", null, false),
+        TypeNode("Char", null, false),
         TypeNode("Unit", null, false),
     )
         .flatMap {
@@ -77,7 +80,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         .toMap()
 
     init {
-        listOf("Int", "Double", "Boolean", "String", "Unit", "Nothing").forEach {
+        listOf("Int", "Double", "Boolean", "String", "Char", "Unit", "Nothing").forEach {
             builtinSymbolTable.declareClass(ClassDefinition(
                 currentScope = builtinSymbolTable,
                 name = it,
@@ -167,6 +170,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is StringLiteralNode -> {}
             is StringNode -> this.visit()
             is LambdaLiteralNode -> this.visit()
+            is CharNode -> {}
         }
     }
 
@@ -888,6 +892,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         is StringLiteralNode -> TODO()
         is StringNode -> typeRegistry["String"]!!
         is LambdaLiteralNode -> this.type()
+            is CharNode -> typeRegistry["Char"]!!
     }
 
     fun BinaryOpNode.type(): TypeNode = type ?: when (operator) {
@@ -901,6 +906,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             ) {
                 typeRegistry["Double"]!!
             } else if (t1 == IntType(isNullable = false) && t2 == IntType(isNullable = false)) {
+                typeRegistry["Int"]!!
+            } else if (operator == "+" && t1 is CharType && t2 is IntType) {
+                typeRegistry["Char"]!!
+            } else if (operator == "-" && t1 is CharType && t2 is CharType) {
                 typeRegistry["Int"]!!
             } else {
                 throw SemanticException("Types ${t1.nameWithNullable} and ${t2.nameWithNullable} cannot be applied with operator `$operator`")

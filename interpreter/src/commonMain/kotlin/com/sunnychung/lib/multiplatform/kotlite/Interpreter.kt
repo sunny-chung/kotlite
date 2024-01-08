@@ -14,6 +14,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallStack
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
@@ -107,6 +109,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is StringLiteralNode -> this.eval()
             is StringNode -> this.eval()
             is LambdaLiteralNode -> this.eval()
+            is CharNode -> this.eval()
         }
     }
 
@@ -127,11 +130,21 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 val r2 = node2.eval() as RuntimeValue
                 if (r1 is StringValue || r1 is NullValue || r2 is StringValue || r2 is NullValue) {
                     StringValue(r1.convertToString() + r2.convertToString())
+                } else if (r1 is CharValue && r2 is IntValue) {
+                    CharValue(r1.value + r2.value)
                 } else {
                     castType<NumberValue<*>, NumberValue<*>>(r1, r2) { a, b -> a + b }
                 }
             }
-            "-" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a - b }
+            "-" -> {
+                val r1 = node1.eval() as RuntimeValue
+                val r2 = node2.eval() as RuntimeValue
+                if (r1 is CharValue && r2 is CharValue) {
+                    IntValue(r1.value - r2.value)
+                } else {
+                    castType<NumberValue<*>, NumberValue<*>>(r1, r2) { a, b -> a - b }
+                }
+            }
             "*" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a * b }
             "/" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a / b }
             "%" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a % b }
@@ -143,18 +156,24 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             "==" -> {
                 val r1 = node1.eval() as RuntimeValue
                 val r2 = node2.eval() as RuntimeValue
-                if (r1 is NullValue || r2 is NullValue) {
-                    return BooleanValue(r1 == r2)
+//                if (r1 is NullValue || r2 is NullValue) {
+//                    return BooleanValue(r1 == r2)
+//                }
+                if (r1 is NumberValue<*> && r2 is NumberValue<*>) {
+                    return castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a == b) }
                 }
-                castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a == b) }
+                return BooleanValue(r1 == r2)
             }
             "!=" -> {
                 val r1 = node1.eval() as RuntimeValue
                 val r2 = node2.eval() as RuntimeValue
-                if (r1 is NullValue || r2 is NullValue) {
-                    return BooleanValue(r1 != r2)
+//                if (r1 is NullValue || r2 is NullValue) {
+//                    return BooleanValue(r1 != r2)
+//                }
+                if (r1 is NumberValue<*> && r2 is NumberValue<*>) {
+                    castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a != b) }
                 }
-                castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a != b) }
+                return BooleanValue(r1 != r2)
             }
 
             "||" -> castType<BooleanValue, BooleanValue>(node1.eval()) { a -> if (a.value) BooleanValue(true) else node2.eval() as BooleanValue }
@@ -689,6 +708,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     fun IntegerNode.eval() = IntValue(value)
     fun DoubleNode.eval() = DoubleValue(value)
     fun BooleanNode.eval() = BooleanValue(value)
+    fun CharNode.eval() = CharValue(value)
     fun NullNode.eval() = NullValue
     fun ValueNode.eval() = value
 

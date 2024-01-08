@@ -12,6 +12,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
@@ -645,6 +646,10 @@ class Parser(protected val lexer: Lexer) {
             TokenType.Double -> {
                 eat(TokenType.Double)
                 return DoubleNode(currentToken.value as Double)
+            }
+            TokenType.Char -> {
+                eat(TokenType.Char)
+                return CharNode(currentToken.value as Char)
             }
             TokenType.Identifier -> {
                 when (currentToken.value) {
