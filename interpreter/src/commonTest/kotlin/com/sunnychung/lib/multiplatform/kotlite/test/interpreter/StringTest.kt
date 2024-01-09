@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
+import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -309,5 +310,55 @@ class StringTest {
         println(symbolTable.propertyValues)
         assertEquals(2, symbolTable.propertyValues.size)
         assertEquals("abcgreat--30<60>--erdef", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
+    }
+
+    @Test
+    fun compareStrings() {
+        val interpreter = interpreter("""
+            val a1 = "abcde" < "aaaaa"
+            val b1 = "abcde" > "aaaaa"
+            val c1 = "abcde" <= "aaaaa"
+            val d1 = "abcde" >= "aaaaa"
+            val a2 = "abcde" < "abcde"
+            val b2 = "abcde" > "abcde"
+            val c2 = "abcde" <= "abcde"
+            val d2 = "abcde" >= "abcde"
+            val a3 = "abcde" < "aaaaaaaaaaaaa"
+            val b3 = "abcde" > "aaaaaaaaaaaaa"
+            val c3 = "abcde" <= "aaaaaaaaaaaaa"
+            val d3 = "abcde" >= "aaaaaaaaaaaaa"
+            val a4 = "abcde" < "ba"
+            val b4 = "abcde" > "ba"
+            val c4 = "abcde" <= "ba"
+            val d4 = "abcde" >= "ba"
+            val e1 = "abcde" == "abcde"
+            val f1 = "abcde" != "abcde"
+            val e2 = "abcde" == "abcd"
+            val f2 = "abcde" != "abcd"
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(20, symbolTable.propertyValues.size)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a1") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b1") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("c1") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d1") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a2") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("b2") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c2") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d2") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a3") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b3") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("c3") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d3") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("a4") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("b4") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c4") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("d4") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("e1") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("f1") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("e2") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("f2") as BooleanValue).value)
     }
 }

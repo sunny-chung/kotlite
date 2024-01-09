@@ -23,6 +23,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNo
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ComparableRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
@@ -149,10 +150,19 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             "/" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a / b }
             "%" -> castType<NumberValue<*>, NumberValue<*>>(node1.eval(), node2.eval()) { a, b -> a % b }
 
-            "<" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a < b) }
-            "<=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a <= b) }
-            ">" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a > b) }
-            ">=" -> castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a >= b) }
+            "<" -> {
+//                val r1 = node1.eval() as RuntimeValue
+//                val r2 = node2.eval() as RuntimeValue
+//                val r1 = node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>
+//                val r2 = node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>
+//                BooleanValue(r1 < r2)
+                BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> < node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
+//                if (r1 is )
+//                castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a < b) }
+            }
+            "<=" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> <= node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
+            ">" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> > node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
+            ">=" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> >= node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
             "==" -> {
                 val r1 = node1.eval() as RuntimeValue
                 val r2 = node2.eval() as RuntimeValue

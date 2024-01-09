@@ -1,7 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-sealed interface NumberValue<T : Number> : RuntimeValue, Comparable<NumberValue<*>> {
-    val value: T
+sealed interface NumberValue<T> : ComparableRuntimeValue<T>, RuntimeValue/*, Comparable<NumberValue<*>>*/ where T : Number, T : Comparable<T> {
+//    val value: T
 
     operator fun plus(other: NumberValue<*>): NumberValue<*> {
         if (type() is IntType && other.type() is IntType) {
@@ -49,14 +49,14 @@ sealed interface NumberValue<T : Number> : RuntimeValue, Comparable<NumberValue<
         return DoubleValue(result)
     }
 
-    override fun compareTo(other: NumberValue<*>): Int {
-        if (type() is IntType && other.type() is IntType) {
-            this as IntValue
-            other as IntValue
-            return value.compareTo(other.value)
-        }
-        return (value.toDouble()).compareTo(other.value.toDouble())
-    }
+//    override fun compareTo(other: NumberValue<*>): Int {
+//        if (type() is IntType && other.type() is IntType) {
+//            this as IntValue
+//            other as IntValue
+//            return value.compareTo(other.value)
+//        }
+//        return (value.toDouble()).compareTo(other.value.toDouble())
+//    }
 
-    override fun convertToString() = value.toString()
+    override fun convertToString() = (value as Number).toString()
 }

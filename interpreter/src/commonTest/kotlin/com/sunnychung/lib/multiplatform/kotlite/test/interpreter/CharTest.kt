@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 class CharTest {
 
     @Test
-    fun compareChar() {
+    fun compareCharEquality() {
         val interpreter = interpreter("""
             val x: Char = 'k'
             val y = 'k'
@@ -29,6 +29,30 @@ class CharTest {
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
+    }
+
+    @Test
+    fun compareChar() {
+        val interpreter = interpreter("""
+            val x = 'k'
+            val y = 'w'
+            val a = x < y
+            val b = x > y
+            val c = x <= 'k'
+            val d = x >= 'k'
+            val e = x <= 'K'
+            val f = x >= 'K'
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(8, symbolTable.propertyValues.size)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
     }

@@ -24,13 +24,13 @@ data class BooleanValue(val value: Boolean) : RuntimeValue {
     override fun convertToString() = value.toString()
 }
 
-data class StringValue(val value: String) : RuntimeValue {
+data class StringValue(override val value: String) : ComparableRuntimeValue<String> {
     override fun type() = StringType()
 
     override fun convertToString() = value
 }
 
-data class CharValue(val value: Char) : RuntimeValue {
+data class CharValue(override val value: Char) : ComparableRuntimeValue<Char> {
     override fun type() = CharType()
 
     override fun convertToString() = value.toString()
