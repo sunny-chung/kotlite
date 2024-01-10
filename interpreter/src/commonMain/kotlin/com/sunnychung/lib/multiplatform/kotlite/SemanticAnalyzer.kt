@@ -390,15 +390,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             returnType = returnType.toDataType(),
         )
 
-        valueParameters.forEach { it.visit() }
         if (receiver == null) {
+            valueParameters.forEach { it.visit() }
+
             previousScope.declareFunction(name, this)
             transformedRefName = name
             previousScope.registerTransformedSymbol(IdentifierClassifier.Function, transformedRefName!!, name)
         } else {
-            previousScope.declareExtensionFunction("$receiver/$name", this)
-            transformedRefName = "$receiver/$name/${++functionDefIndex}"
-
             currentScope.declareProperty(name = "this", type = TypeNode(receiver, null, false), isMutable = false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
             val clazz = currentScope.findClass(receiver)?.first ?: throw SemanticException("Class `$receiver` not found")
@@ -410,6 +408,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope.declareFunction(name = it.key, node = it.value)
                 currentScope.declareFunctionOwner(name = it.key, owner = "this/$receiver")
             }
+
+            valueParameters.forEach { it.visit() }
+
+            previousScope.declareExtensionFunction("$receiver/$name", this)
+            transformedRefName = "$receiver/$name/${++functionDefIndex}"
         }
 
         body.visit()
@@ -889,11 +892,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is DoubleNode -> typeRegistry["Double"]!!
             is BooleanNode -> typeRegistry["Boolean"]!!
             NullNode -> typeRegistry["Null"]!!
-        is StringLiteralNode -> TODO()
-        is StringNode -> typeRegistry["String"]!!
-        is LambdaLiteralNode -> this.type()
+            is StringLiteralNode -> TODO()
+            is StringNode -> typeRegistry["String"]!!
+            is LambdaLiteralNode -> this.type()
             is CharNode -> typeRegistry["Char"]!!
-    }
+        }
 
     fun BinaryOpNode.type(): TypeNode = type ?: when (operator) {
         "+", "-", "*", "/", "%" -> {
