@@ -159,7 +159,7 @@ interface CallableNode {
     val returnType: TypeNode
     val name: String?
 
-    fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue?>): RuntimeValue
+    fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>): RuntimeValue
 }
 
 open class FunctionDeclarationNode(
@@ -177,7 +177,7 @@ open class FunctionDeclarationNode(
                 "$self-->${body.toMermaid()}\n"
     }
 
-    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue?>): RuntimeValue {
+    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>): RuntimeValue {
         with (interpreter) {
             return body.eval()
         }
@@ -344,7 +344,7 @@ data class LambdaLiteralNode(
                 "$self-->${body.toMermaid()}\n"
     }
 
-    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue?>): RuntimeValue {
+    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>): RuntimeValue {
         with (interpreter) {
             return body.eval()
         }

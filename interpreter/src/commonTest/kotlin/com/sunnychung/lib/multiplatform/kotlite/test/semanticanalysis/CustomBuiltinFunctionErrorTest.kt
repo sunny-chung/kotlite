@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis
 
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
@@ -13,9 +14,9 @@ class CustomBuiltinFunctionErrorTest {
             functionName = "myGlobalFunc",
             returnType = "String",
             parameterTypes = listOf(
-                "a" to "String",
-                "b" to "Int",
-                "c" to "String",
+                CustomFunctionParameter("a", "String"),
+                CustomFunctionParameter("b", "Int"),
+                CustomFunctionParameter("c", "String"),
             ),
             executable = { _, args ->
                 val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
@@ -27,7 +28,7 @@ class CustomBuiltinFunctionErrorTest {
             receiverType = "String",
             functionName = "size",
             returnType = "Int",
-            parameterTypes = listOf("factor" to "Int"),
+            parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
             executable = { receiver, args ->
                 IntValue((receiver as StringValue).value.length)
             }

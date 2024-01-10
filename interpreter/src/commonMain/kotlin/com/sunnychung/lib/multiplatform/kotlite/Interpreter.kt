@@ -50,6 +50,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
@@ -392,7 +393,23 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             if (index < 0) throw RuntimeException("Named argument `${a.name}` could not be found.")
             callArguments[index] = a.value.eval() as RuntimeValue
         }
-        callArguments.forEachIndexed { index, it ->
+
+        return evalFunctionCall(callArguments, callNode.position, functionNode, extraScopeParameters, extraSymbols, subject)
+    }
+
+    fun evalFunctionCall(
+        arguments: Array<RuntimeValue?>,
+        callPosition: SourcePosition,
+        functionNode: CallableNode,
+        extraScopeParameters: Map<String, RuntimeValue>,
+        extraSymbols: SymbolTable? = null,
+        subject: RuntimeValue? = null
+    ): FunctionCallResult {
+        if (arguments.size != functionNode.valueParameters.size) {
+            throw RuntimeException("Arguments size not match. Optional arguments should be specified as null.")
+        }
+
+        arguments.forEachIndexed { index, it ->
             val parameterNode = functionNode.valueParameters[index]
             if (it == null && parameterNode.defaultValue == null) {
                 throw RuntimeException("Missing parameter `${parameterNode.name} in function call ${functionNode.name}`")
@@ -405,7 +422,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         callStack.push(
             functionFullQualifiedName = functionNode.name,
             scopeType = scopeType,
-            callPosition = callNode.position,
+            callPosition = callPosition,
         )
         try {
             val symbolTable = callStack.currentSymbolTable()
@@ -421,14 +438,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     symbolTable.declareProperty(it.transformedRefName!!, it.type, false)
                     symbolTable.assign(
                         it.transformedRefName!!,
-                        callArguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue)
+                        arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue).also { arguments[index] = it }
                     )
                 }
             }
 
             // execute function
             val returnValue = try {
-                val result = functionNode.execute(this, subject, callArguments.toList())
+                val result = functionNode.execute(this, subject, arguments.toList() as List<RuntimeValue>)
                 if (returnType is UnitType) {
                     UnitValue
                 } else {
@@ -706,7 +723,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         refs.classes.forEach {
             runtimeRefs.declareClass(currentSymbolTable.findClass(it)!!.first)
         }
-        return LambdaValue(this, callStack.currentSymbolTable().typeNodeToDataType(type!!) as FunctionType, runtimeRefs)
+        return LambdaValue(this, callStack.currentSymbolTable().typeNodeToDataType(type!!) as FunctionType, runtimeRefs, this@Interpreter)
     }
 
     fun StringNode.eval(): StringValue {

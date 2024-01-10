@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+
 sealed interface RuntimeValue {
     fun type(): DataType
 
@@ -36,8 +38,12 @@ data class CharValue(override val value: Char) : ComparableRuntimeValue<Char> {
     override fun convertToString() = value.toString()
 }
 
-class LambdaValue(val value: LambdaLiteralNode, private val resolvedType: FunctionType, val symbolRefs: SymbolTable) : RuntimeValue {
+class LambdaValue(val value: LambdaLiteralNode, private val resolvedType: FunctionType, val symbolRefs: SymbolTable, private val interpreter: Interpreter) : RuntimeValue {
     override fun type() = resolvedType
 
     override fun convertToString() = "Lambda()"
+
+    fun execute(arguments: Array<RuntimeValue?>): RuntimeValue {
+        return interpreter.evalFunctionCall(arguments, SourcePosition(1, 1), value, emptyMap()).result
+    }
 }
