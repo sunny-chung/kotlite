@@ -394,7 +394,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             valueParameters.forEach { it.visit() }
 
             previousScope.declareFunction(name, this)
-            transformedRefName = name
+            if (transformedRefName == null) { // class declaration can assign transformedRefName
+                transformedRefName = "$name/${++functionDefIndex}"
+            }
             previousScope.registerTransformedSymbol(IdentifierClassifier.Function, transformedRefName!!, name)
         } else {
             currentScope.declareProperty(name = "this", type = TypeNode(receiver, null, false), isMutable = false)
@@ -437,6 +439,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 val arguments = currentScope.findFunction(name)?.also {
                     val owner = currentScope.findFunctionOwner(name)
                     function.ownerRef = owner
+                    functionRefName = it.first.transformedRefName
 
                     if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(it.second.scopeLevel)) {
                         val symbols = symbolRecorders.last()
@@ -494,6 +497,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         }
                     } else {
                         arguments = memberFunction.valueParameters
+                        functionRefName = memberFunction.transformedRefName
                     }
                 } else {
                     // receiverType is a built-in type
@@ -766,8 +770,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
-                    it.visit()
+                    it.transformedRefName = "${it.name}/${++functionDefIndex}"
                     currentScope.declareFunctionOwner(it.name, "this/$fullQualifiedClassName")
+                }
+
+            declarations.filterIsInstance<FunctionDeclarationNode>()
+                .forEach {
+                    it.visit()
                 }
         }
         popScope()

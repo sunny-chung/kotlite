@@ -245,4 +245,25 @@ class FunctionTest {
         assertEquals(5 + 4 + 3 + 2 + 1, (symbolTable.findPropertyByDeclaredName("r") as IntValue).value)
         assertEquals(55, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun functionsAreNotOverriddenByRedefiningLaterThanCalls() {
+        val interpreter = interpreter("""
+            fun g(): Int = 3
+            var a: Int = 0
+            fun f() {
+                fun f2() {
+                    a = g()
+                }
+                fun g(): Int = 4
+                f2()
+            }
+            f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(1, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
 }

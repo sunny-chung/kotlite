@@ -315,7 +315,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun FunctionDeclarationNode.eval() {
         if (receiver == null) {
-            callStack.currentSymbolTable().declareFunction(name, this)
+            callStack.currentSymbolTable().declareFunction(transformedRefName!!, this)
         } else {
             globalScope.declareExtensionFunction(transformedRefName!!, this)
         }
@@ -325,20 +325,30 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         // TODO move to semantic analyzer
         when (function) {
             is VariableReferenceNode -> {
-                val name = function.variableName
+                val directName = function.variableName
 
                 if (this.function.ownerRef != null) {
-                    return this.copy(function = NavigationNode(VariableReferenceNode(this.function.ownerRef!!), ".", ClassMemberReferenceNode(name))).eval()
+                    return this.copy(
+                        function = NavigationNode(
+                            VariableReferenceNode(this.function.ownerRef!!),
+                            ".",
+                            ClassMemberReferenceNode(directName)
+                        )
+                    ).eval()
                 }
 
-                val functionNode = callStack.currentSymbolTable().findFunction(name)?.first
-                if (functionNode != null) {
-                    return evalFunctionCall(functionNode)
+                functionRefName?.let { name ->
+                    val functionNode = callStack.currentSymbolTable().findFunction(name)?.first
+                    if (functionNode != null) {
+                        return evalFunctionCall(functionNode)
+                    }
                 }
 
-                val classDefinition = callStack.currentSymbolTable().findClass(name)?.first
-                if (classDefinition != null) {
-                    return evalCreateClassInstance(classDefinition)
+                directName.let { name ->
+                    val classDefinition = callStack.currentSymbolTable().findClass(name)?.first
+                    if (classDefinition != null) {
+                        return evalCreateClassInstance(classDefinition)
+                    }
                 }
 
                 val variable = callStack.currentSymbolTable().read(function.transformedRefName!!)
@@ -346,7 +356,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs)
                 }
 
-                throw RuntimeException("Function $name not found")
+                throw RuntimeException("Function $directName not found")
             }
 
             is NavigationNode -> {
@@ -358,12 +368,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         throw EvaluateNullPointerException()
                     }
                 }
-                if (functionRefName != null) { // an extension function
-                    val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
-                        ?: throw RuntimeException("Analysed function $functionRefName not found")
-                    return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
+                (subject as? ClassInstance)?.clazz?.memberFunctions?.get(functionRefName)?.let { function ->
+                    return evalClassMemberAnyFunctionCall(subject, function)
                 }
-                return evalClassMemberFunctionCall(subject as ClassInstance, function.member)
+
+                // extension function
+                val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
+                    ?: throw RuntimeException("Analysed function $functionRefName not found")
+                return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
             }
 
             else -> {
@@ -575,10 +587,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         return instance
     }
 
-    fun FunctionCallNode.evalClassMemberFunctionCall(subject: ClassInstance, member: ClassMemberReferenceNode): RuntimeValue {
-        val function = subject.clazz.memberFunctions[member.name] ?: throw EvaluateRuntimeException("Member function `${member.name}` not found")
-        return evalClassMemberAnyFunctionCall(subject, function)
-    }
+//    fun FunctionCallNode.evalClassMemberFunctionCall(subject: ClassInstance, member: ClassMemberReferenceNode): RuntimeValue {
+//        val function = subject.clazz.memberFunctions[member.name] ?: throw EvaluateRuntimeException("Member function `${member.name}` not found")
+//        return evalClassMemberAnyFunctionCall(subject, function)
+//    }
 
     fun FunctionCallNode.evalClassMemberAnyFunctionCall(subject: RuntimeValue, function: FunctionDeclarationNode): RuntimeValue {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
@@ -682,7 +694,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             memberFunctions = declarations
                 .filterIsInstance<FunctionDeclarationNode>()
                 .filter { it.receiver == null }
-                .associateBy { it.name },
+                .associateBy { it.transformedRefName!! },
             orderedInitializersAndPropertyDeclarations = declarations
                 .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
         ))
