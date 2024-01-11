@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.annotation.ModifyByAnalyzer
+import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import kotlin.random.Random
 
 fun generateId() = Random.nextInt()
@@ -109,7 +110,7 @@ data class PropertyDeclarationNode(
     @ModifyByAnalyzer var inferredType: TypeNode? = null,
 ) : ASTNode {
     val type: TypeNode
-        get() = declaredType ?: inferredType!!
+        get() = declaredType ?: inferredType ?: throw SemanticException("Could not infer type")
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self\n" +
@@ -197,6 +198,7 @@ data class FunctionCallNode(
     val position: SourcePosition,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
+    @ModifyByAnalyzer var callableType: CallableType? = null,
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"

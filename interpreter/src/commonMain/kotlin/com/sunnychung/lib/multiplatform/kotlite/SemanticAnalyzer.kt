@@ -9,6 +9,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CallableType
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
@@ -435,83 +436,45 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     fun FunctionCallNode.visit() {
         val functionArgumentDeclarations = when (function) {
             is VariableReferenceNode -> {
-                val name = function.variableName
-                val arguments = currentScope.findFunction(name)?.also {
-                    val owner = currentScope.findFunctionOwner(name)
-                    function.ownerRef = owner
-                    functionRefName = it.first.transformedRefName
+                val resolution = currentScope.findMatchingCallables(function.variableName, null, arguments)
+                    .firstOrNull() ?: throw SemanticException("No matching function found")
+                function.ownerRef = resolution.owner
+                functionRefName = resolution.transformedName
+                callableType = resolution.type
 
-                    if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(it.second.scopeLevel)) {
-                        val symbols = symbolRecorders.last()
-                        if (owner == null) {
-                            symbols.functions += it.first.transformedRefName!!
-                        } else {
-                            symbols.properties += owner
+                if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(resolution.scope.scopeLevel)) {
+                    val symbols = symbolRecorders.last()
+                    when (resolution.type) {
+                        CallableType.Function, CallableType.Property -> {
+                            if (resolution.owner == null) {
+                                symbols.functions += resolution.transformedName
+                            } else {
+                                symbols.properties += resolution.owner
+                            }
                         }
+
+                        CallableType.Constructor -> {
+                            symbols.classes += (resolution.definition as ClassDefinition).fullQualifiedName
+                        }
+
+                        CallableType.ExtensionFunction -> {}
+                        CallableType.ClassMemberFunction -> {}
                     }
-                }?.let { it.first.valueParameters }
-                    ?: currentScope.findClass(name)?.also {
-                        if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(it.second.scopeLevel)) {
-                            val symbols = symbolRecorders.last()
-                            symbols.classes += it.first.fullQualifiedName
-                        }
-                    }?.let { it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList() }
-                    ?: currentScope.getPropertyTypeOrNull(name)?.takeIf { it.first.type is FunctionType }?.also {
-                        val l = checkPropertyReadAccess(name)
-                        if (function.transformedRefName == null) {
-                            function.transformedRefName = "$name/$l"
-                            currentScope.findPropertyOwner(function.transformedRefName!!)?.let {
-                                function.ownerRef = it
-                            }
+                }
 
-                            if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(l)) {
-                                val symbols = symbolRecorders.last()
-                                if (function.ownerRef == null) {
-                                    symbols.functions += function.transformedRefName!!
-                                } else {
-                                    symbols.properties += function.ownerRef!!
-                                }
-                            }
-                        }
-                    }?.let { (it.first.type as FunctionType).arguments }
-                    ?: throw SemanticException("Function $name not found")
-
-                log.v { "Type of call $name -> ${function.type()}" }
-                arguments
+                resolution.arguments
             }
 
             is NavigationNode -> {
                 function.visit()
                 val receiverType = function.subject.type().toDataType()
-                var arguments: List<FunctionValueParameterNode> = emptyList()
-                if (receiverType is ObjectType) {
-                    val clazz = receiverType.clazz
-                    val memberFunction = clazz.memberFunctions[function.member.name]
-                    if (memberFunction == null) {
-                        val extensionFunction = findExtensionFunction(receiverType, function.member.name)
-                        if (extensionFunction != null) {
-                            functionRefName = extensionFunction.transformedRefName
-                            arguments = extensionFunction.valueParameters
-                        } else {
-                            throw SemanticException("Function `${function.member.name}` not found for type ${receiverType.name}")
-                        }
-                    } else {
-                        arguments = memberFunction.valueParameters
-                        functionRefName = memberFunction.transformedRefName
-                    }
-                } else {
-                    // receiverType is a built-in type
-                    val extensionFunction = findExtensionFunction(receiverType, function.member.name)
-                    if (extensionFunction != null) {
-                        functionRefName = extensionFunction.transformedRefName
-                        arguments = extensionFunction.valueParameters
-                    } else {
-                        throw SemanticException("Function `${function.member.name}` not found for type ${receiverType.name}")
-                    }
-                }
 
-                log.v { "Type of call ${function.member.name} -> ${function.type()}" }
-                arguments
+                val resolution = currentScope.findMatchingCallables(function.member.name, receiverType, arguments)
+                    .firstOrNull() ?: throw SemanticException("No matching function found for type ${receiverType.nameWithNullable}")
+                functionRefName = resolution.transformedName
+                callableType = resolution.type
+
+                resolution.arguments
             }
 
             else -> {

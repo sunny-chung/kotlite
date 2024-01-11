@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierException
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
+import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.log
 
 class SymbolTable(
@@ -121,7 +122,7 @@ class SymbolTable(
 
     fun getPropertyTypeOrNull(name: String, isThisScopeOnly: Boolean = false): Pair<PropertyType, SymbolTable>? {
         return propertyDeclarations[name]?.let { it to this }
-            ?: Unit.takeIf { !isThisScopeOnly }.let { parentScope?.getPropertyTypeOrNull(name) }
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.getPropertyTypeOrNull(name) }
     }
 
     fun getPropertyType(name: String, isThisScopeOnly: Boolean = false): Pair<PropertyType, SymbolTable> {
@@ -131,7 +132,7 @@ class SymbolTable(
 
     fun read(name: String, isThisScopeOnly: Boolean = false): RuntimeValue {
         return propertyValues[name]?.read()
-            ?: Unit.takeIf { !isThisScopeOnly }.let { parentScope?.read(name) }
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.read(name) }
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
@@ -145,7 +146,7 @@ class SymbolTable(
 
     fun getPropertyHolder(name: String, isThisScopeOnly: Boolean = false): RuntimeValueAccessor {
         return propertyValues[name]
-            ?: Unit.takeIf { !isThisScopeOnly }.let { parentScope?.getPropertyHolder(name) }
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.getPropertyHolder(name) }
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
@@ -162,11 +163,13 @@ class SymbolTable(
         if (functionDeclarations.containsKey(functionSignature)) {
             throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Function)
         }
+        log.v(Exception()) { "Register $functionSignature at $scopeLevel" }
         functionDeclarations[functionSignature] = node
     }
 
-    fun findFunction(name: String): Pair<FunctionDeclarationNode, SymbolTable>? {
-        return functionDeclarations[name]?.let { it  to this } ?: parentScope?.findFunction(name)
+    fun findFunction(name: String, isThisScopeOnly: Boolean = false): Pair<FunctionDeclarationNode, SymbolTable>? {
+        return functionDeclarations[name]?.let { it  to this }
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findFunction(name) }
     }
 
     fun declareExtensionFunction(name: String, node: FunctionDeclarationNode) {
@@ -177,8 +180,9 @@ class SymbolTable(
         extensionFunctionDeclarations[functionSignature] = node
     }
 
-    fun findExtensionFunction(name: String): FunctionDeclarationNode? {
-        return extensionFunctionDeclarations[name] ?: parentScope?.findExtensionFunction(name)
+    fun findExtensionFunction(name: String, isThisScopeOnly: Boolean = false): FunctionDeclarationNode? {
+        return extensionFunctionDeclarations[name]
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunction(name) }
     }
 
     fun findTransformedNameByDeclaredName(declaredName: String): String
@@ -196,12 +200,91 @@ class SymbolTable(
         classDeclarations[classDefinition.fullQualifiedName] = classDefinition
     }
 
-    fun findClass(fullQualifiedName: String): Pair<ClassDefinition, SymbolTable>? {
-        if (classDeclarations.containsKey(fullQualifiedName)) {
-            return classDeclarations[fullQualifiedName]!! to this
+    fun findClass(fullQualifiedName: String, isThisScopeOnly: Boolean = false): Pair<ClassDefinition, SymbolTable>? {
+        return if (classDeclarations.containsKey(fullQualifiedName)) {
+            classDeclarations[fullQualifiedName]!! to this
+        } else if (!isThisScopeOnly) {
+            parentScope?.findClass(fullQualifiedName)
         } else {
-            return parentScope?.findClass(fullQualifiedName)
+            null
         }
+    }
+
+    // only use in semantic analyzer
+    private fun findAllMatchingCallables(originalName: String, receiverClass: ClassDefinition?, arguments: List<FunctionCallArgumentNode>): List<FindCallableResult> {
+        val thisScopeCandidates = mutableListOf<FindCallableResult>()
+        if (receiverClass == null) {
+            findFunction(originalName, isThisScopeOnly = true)?.let {
+                val owner = findFunctionOwner(originalName)
+                thisScopeCandidates += FindCallableResult(
+                    transformedName = it.first.transformedRefName!!,
+                    owner = owner,
+                    type = if (owner == null) CallableType.Function else CallableType.ClassMemberFunction,
+                    arguments = it.first.valueParameters,
+                    definition = it.first,
+                    scope = this
+                )
+            }
+            findClass(originalName, isThisScopeOnly = true)?.let {
+                thisScopeCandidates += FindCallableResult(
+                    transformedName = it.first.fullQualifiedName,
+                    owner = null,
+                    type = CallableType.Constructor,
+                    arguments = it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList(),
+                    definition = it.first,
+                    scope = this
+                )
+            }
+            getPropertyTypeOrNull(originalName, isThisScopeOnly = true)?.let {
+                if (it.first.type !is FunctionType) {
+                    return@let
+                }
+                val transformedName = "$originalName/${this.scopeLevel}"
+                thisScopeCandidates += FindCallableResult(
+                    transformedName = transformedName,
+                    owner = findPropertyOwner(transformedName),
+                    type = CallableType.Property,
+                    arguments = (it.first.type as FunctionType).arguments,
+                    definition = it.first,
+                    scope = this
+                )
+            }
+        } else {
+            receiverClass.memberFunctions[originalName]?.let {
+                thisScopeCandidates += FindCallableResult(
+                    transformedName = it.transformedRefName!!,
+                    owner = null,
+                    type = CallableType.ClassMemberFunction,
+                    arguments = it.valueParameters,
+                    definition = it,
+                    scope = this
+                )
+            }
+            findExtensionFunction("${receiverClass.fullQualifiedName}/${originalName}", isThisScopeOnly = true)?.let {
+                thisScopeCandidates += FindCallableResult(
+                    transformedName = it.transformedRefName!!,
+                    owner = null,
+                    type = CallableType.ExtensionFunction,
+                    arguments = it.valueParameters,
+                    definition = it,
+                    scope = this
+                )
+            }
+        }
+        return thisScopeCandidates + (parentScope?.findAllMatchingCallables(originalName, receiverClass, arguments) ?: emptyList())
+    }
+
+    // only use in semantic analyzer
+    fun findMatchingCallables(originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentNode>): List<FindCallableResult> {
+        val receiverClass = when (receiverType) {
+            is ObjectType -> receiverType.clazz
+            null -> null
+            else -> findClass(receiverType.name)!!.first
+        }
+        return findAllMatchingCallables(originalName, receiverClass, arguments)
+            .also { log.v { "Matching functions:\n${it.joinToString("\n")}" } }
+            .firstOrNull()?.let { listOf(it) }
+            ?: emptyList()
     }
 
     internal fun registerTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String) {
@@ -245,7 +328,8 @@ class SymbolTable(
     }
 
     override fun toString(): String {
-        return "functionDeclarations = $functionDeclarations\n" +
+        return "scopeLevel = $scopeLevel\n" +
+                "functionDeclarations = $functionDeclarations\n" +
                 "propertyDeclarations = $propertyDeclarations\n" +
                 "propertyValues = $propertyValues"
     }

@@ -14,6 +14,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallStack
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CallableType
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
@@ -337,26 +338,28 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     ).eval()
                 }
 
-                functionRefName?.let { name ->
-                    val functionNode = callStack.currentSymbolTable().findFunction(name)?.first
-                    if (functionNode != null) {
-                        return evalFunctionCall(functionNode)
+                when (callableType) {
+                    CallableType.Function -> {
+                        val functionNode = callStack.currentSymbolTable().findFunction(functionRefName!!)?.first
+                        if (functionNode != null) {
+                            return evalFunctionCall(functionNode)
+                        }
                     }
-                }
-
-                directName.let { name ->
-                    val classDefinition = callStack.currentSymbolTable().findClass(name)?.first
-                    if (classDefinition != null) {
-                        return evalCreateClassInstance(classDefinition)
+                    CallableType.Constructor -> {
+                        val classDefinition = callStack.currentSymbolTable().findClass(functionRefName!!)?.first
+                        if (classDefinition != null) {
+                            return evalCreateClassInstance(classDefinition)
+                        }
                     }
+                    CallableType.Property -> {
+                        val variable = callStack.currentSymbolTable().read(functionRefName!!)
+                        if (variable is LambdaValue) {
+                            return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs)
+                        }
+                    }
+                    else -> {}
                 }
-
-                val variable = callStack.currentSymbolTable().read(function.transformedRefName!!)
-                if (variable is LambdaValue) {
-                    return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs)
-                }
-
-                throw RuntimeException("Function $directName not found")
+                throw RuntimeException("Function `$directName` not found")
             }
 
             is NavigationNode -> {
@@ -368,14 +371,20 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         throw EvaluateNullPointerException()
                     }
                 }
-                (subject as? ClassInstance)?.clazz?.memberFunctions?.get(functionRefName)?.let { function ->
-                    return evalClassMemberAnyFunctionCall(subject, function)
+                when (callableType) {
+                    CallableType.ClassMemberFunction -> {
+                        (subject as? ClassInstance)?.clazz?.memberFunctions?.get(functionRefName)?.let { function ->
+                            return evalClassMemberAnyFunctionCall(subject, function)
+                        }
+                    }
+                    CallableType.ExtensionFunction -> {
+                        val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
+                            ?: throw RuntimeException("Analysed function $functionRefName not found")
+                        return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
+                    }
+                    else -> {}
                 }
-
-                // extension function
-                val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
-                    ?: throw RuntimeException("Analysed function $functionRefName not found")
-                return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
+                throw RuntimeException("Class Function `${function.member.name}` not found")
             }
 
             else -> {
