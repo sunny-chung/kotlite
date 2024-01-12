@@ -97,4 +97,70 @@ class CustomBuiltinFunctionErrorTest {
             val a = "string".size(1, factor = 2)
         """.trimIndent(), env())
     }
+
+    @Test
+    fun duplicatedCustomGlobalFunctions() {
+        val env = ExecutionEnvironment().apply {
+            registerFunction(CustomFunctionDefinition(
+                receiverType = null,
+                functionName = "myGlobalFunc",
+                returnType = "String",
+                parameterTypes = listOf(
+                    CustomFunctionParameter("a", "String"),
+                    CustomFunctionParameter("b", "Int"),
+                    CustomFunctionParameter("c", "String"),
+                ),
+                executable = { _, args ->
+                    val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
+                    println(s.value)
+                    s
+                }
+            ))
+            registerFunction(CustomFunctionDefinition(
+                receiverType = null,
+                functionName = "myGlobalFunc",
+                returnType = "String",
+                parameterTypes = listOf(
+                    CustomFunctionParameter("a", "String"),
+                    CustomFunctionParameter("b", "Int"),
+                    CustomFunctionParameter("c", "String"),
+                ),
+                executable = { _, args ->
+                    val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
+                    println(s.value)
+                    s
+                }
+            ))
+        }
+        assertSemanticFail("""
+            val a = myGlobalFunc("aaaaa", 123, "b")
+        """.trimIndent(), env)
+    }
+
+    @Test
+    fun duplicatedCustomExtensionFunctions() {
+        val env = ExecutionEnvironment().apply {
+            registerFunction(CustomFunctionDefinition(
+                receiverType = "String",
+                functionName = "size",
+                returnType = "Int",
+                parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
+                executable = { receiver, args ->
+                    IntValue((receiver as StringValue).value.length)
+                }
+            ))
+            registerFunction(CustomFunctionDefinition(
+                receiverType = "String",
+                functionName = "size",
+                returnType = "Int",
+                parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
+                executable = { receiver, args ->
+                    IntValue((receiver as StringValue).value.length)
+                }
+            ))
+        }
+        assertSemanticFail("""
+            val a = "string".size(1)
+        """.trimIndent(), env)
+    }
 }

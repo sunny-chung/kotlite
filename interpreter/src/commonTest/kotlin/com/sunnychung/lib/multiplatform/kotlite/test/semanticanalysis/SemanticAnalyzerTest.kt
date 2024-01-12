@@ -12,8 +12,10 @@ import kotlin.test.assertFailsWith
 
 fun semanticAnalyzer(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) = SemanticAnalyzer(Parser(Lexer(code)).script(), environment)
 fun assertSemanticFail(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) {
-    val a = semanticAnalyzer(code, environment)
-    assertFailsWith<SemanticException> { a.analyze() }
+    assertFailsWith<SemanticException> {
+        val a = semanticAnalyzer(code, environment)
+        a.analyze()
+    }
 }
 fun assertTypeCheckFail(code: String) {
     val a = semanticAnalyzer(code)
