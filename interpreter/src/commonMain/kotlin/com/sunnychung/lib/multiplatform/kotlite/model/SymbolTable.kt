@@ -5,7 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.log
 
-class SymbolTable(
+open class SymbolTable(
     val scopeLevel: Int,
     val scopeName: String,
     val scopeType: ScopeType,
@@ -18,8 +18,8 @@ class SymbolTable(
     internal val functionOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
     internal val transformedSymbols = mutableMapOf<Pair<IdentifierClassifier, String>, String>() // only use in SemanticAnalyzer. transformed name -> original name
 
-    private val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
-    private val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
+    protected val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
+    protected val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
 
     private val classDeclarations = mutableMapOf<String, ClassDefinition>()
 
@@ -34,8 +34,8 @@ class SymbolTable(
     fun typeNodeToDataType(type: TypeNode): DataType? {
         if (type is FunctionTypeNode) {
             return FunctionType(
-                arguments = type.parameterTypes.map { typeNodeToDataType(it)!! },
-                returnType = typeNodeToDataType(type.returnType)!!,
+                arguments = type.parameterTypes?.map { typeNodeToDataType(it)!! } ?: listOf(UnresolvedType),
+                returnType = type.returnType?.let { typeNodeToDataType(it)!! } ?: UnresolvedType,
                 isNullable = type.isNullable,
             )
         }
@@ -70,8 +70,8 @@ class SymbolTable(
     /**
      * Only use in SemanticAnalyzer
      */
-    fun declareFunctionOwner(name: String, owner: String) {
-        functionOwners[name] = owner
+    fun declareFunctionOwner(name: String, function: FunctionDeclarationNode, owner: String) {
+        functionOwners[functionNameTransform(name, function)] = owner
     }
 
     /**
@@ -158,13 +158,14 @@ class SymbolTable(
         return thisScopeResult || (parentScope?.hasProperty(name) ?: false)
     }
 
-    fun declareFunction(name: String, node: FunctionDeclarationNode) {
-        val functionSignature = "$name"
+    fun declareFunction(name: String, node: FunctionDeclarationNode): String {
+        val functionSignature = functionNameTransform(name = name, function = node)
         if (functionDeclarations.containsKey(functionSignature)) {
             throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Function)
         }
-        log.v(Exception()) { "Register $functionSignature at $scopeLevel" }
+//        log.v(Exception()) { "Register $functionSignature at $scopeLevel" }
         functionDeclarations[functionSignature] = node
+        return functionSignature
     }
 
     fun findFunction(name: String, isThisScopeOnly: Boolean = false): Pair<FunctionDeclarationNode, SymbolTable>? {
@@ -172,12 +173,13 @@ class SymbolTable(
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findFunction(name) }
     }
 
-    fun declareExtensionFunction(name: String, node: FunctionDeclarationNode) {
-        val functionSignature = "$name"
+    fun declareExtensionFunction(name: String, node: FunctionDeclarationNode): String {
+        val functionSignature = functionNameTransform(name = name, function = node)
         if (extensionFunctionDeclarations.containsKey(functionSignature)) {
             throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Function)
         }
         extensionFunctionDeclarations[functionSignature] = node
+        return functionSignature
     }
 
     fun findExtensionFunction(name: String, isThisScopeOnly: Boolean = false): FunctionDeclarationNode? {
@@ -210,81 +212,8 @@ class SymbolTable(
         }
     }
 
-    // only use in semantic analyzer
-    private fun findAllMatchingCallables(originalName: String, receiverClass: ClassDefinition?, arguments: List<FunctionCallArgumentNode>): List<FindCallableResult> {
-        val thisScopeCandidates = mutableListOf<FindCallableResult>()
-        if (receiverClass == null) {
-            findFunction(originalName, isThisScopeOnly = true)?.let {
-                val owner = findFunctionOwner(originalName)
-                thisScopeCandidates += FindCallableResult(
-                    transformedName = it.first.transformedRefName!!,
-                    owner = owner,
-                    type = if (owner == null) CallableType.Function else CallableType.ClassMemberFunction,
-                    arguments = it.first.valueParameters,
-                    definition = it.first,
-                    scope = this
-                )
-            }
-            findClass(originalName, isThisScopeOnly = true)?.let {
-                thisScopeCandidates += FindCallableResult(
-                    transformedName = it.first.fullQualifiedName,
-                    owner = null,
-                    type = CallableType.Constructor,
-                    arguments = it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList(),
-                    definition = it.first,
-                    scope = this
-                )
-            }
-            getPropertyTypeOrNull(originalName, isThisScopeOnly = true)?.let {
-                if (it.first.type !is FunctionType) {
-                    return@let
-                }
-                val transformedName = "$originalName/${this.scopeLevel}"
-                thisScopeCandidates += FindCallableResult(
-                    transformedName = transformedName,
-                    owner = findPropertyOwner(transformedName),
-                    type = CallableType.Property,
-                    arguments = (it.first.type as FunctionType).arguments,
-                    definition = it.first,
-                    scope = this
-                )
-            }
-        } else {
-            receiverClass.memberFunctions[originalName]?.let {
-                thisScopeCandidates += FindCallableResult(
-                    transformedName = it.transformedRefName!!,
-                    owner = null,
-                    type = CallableType.ClassMemberFunction,
-                    arguments = it.valueParameters,
-                    definition = it,
-                    scope = this
-                )
-            }
-            findExtensionFunction("${receiverClass.fullQualifiedName}/${originalName}", isThisScopeOnly = true)?.let {
-                thisScopeCandidates += FindCallableResult(
-                    transformedName = it.transformedRefName!!,
-                    owner = null,
-                    type = CallableType.ExtensionFunction,
-                    arguments = it.valueParameters,
-                    definition = it,
-                    scope = this
-                )
-            }
-        }
-        return thisScopeCandidates + (parentScope?.findAllMatchingCallables(originalName, receiverClass, arguments) ?: emptyList())
-    }
-
-    // only use in semantic analyzer
-    fun findMatchingCallables(originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentNode>): List<FindCallableResult> {
-        val receiverClass = when (receiverType) {
-            is ObjectType -> receiverType.clazz
-            null -> null
-            else -> findClass(receiverType.name)!!.first
-        }
-        return findAllMatchingCallables(originalName, receiverClass, arguments)
-            .also { log.v { "Matching functions:\n${it.joinToString("\n")}" } }
-            .firstOrNull()?.let { listOf(it) }
-            ?: emptyList()
+    open fun functionNameTransform(name: String, function: FunctionDeclarationNode): String {
+        return name
     }
 
     internal fun registerTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String) {

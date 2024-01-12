@@ -414,6 +414,21 @@ class SemanticAnalyzerTest {
     }
 
     @Test
+    fun duplicateFunctionDeclarationWithArguments() {
+        val analyzer = build("""
+            fun myFunction(x: Int, y: Int) {
+                val a: Int = x + y
+            }
+            fun myFunction(x: Int, y: Int) {
+                val d: Int = x * y
+            }
+        """.trimIndent())
+        assertFailsWith<SemanticException> {
+            analyzer.analyze()
+        }
+    }
+
+    @Test
     fun primaryConstructorParametersOrPropertiesCannotBeReassigned() {
         assertSemanticFail("""
             class Cls(var a: Int = 10, var e: Int = 60, var f: Int = e++) {
@@ -473,6 +488,33 @@ class SemanticAnalyzerTest {
             }
             val x = f { x, _, y ->
                 x + _ + y
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun duplicateClassMemberFunctionDeclarations() {
+        assertSemanticFail("""
+            class A {
+                fun myFunction(x: Int, y: Int) {
+                    val a: Int = x + y
+                }
+                fun myFunction(x: Int, y: Int) {
+                    val d: Int = x * y
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun duplicateExtensionFunctionDeclarations() {
+        assertSemanticFail("""
+            class A
+            fun A.myFunction(x: Int, y: Int) {
+                val a: Int = x + y
+            }
+            fun A.myFunction(x: Int, y: Int) {
+                val d: Int = x * y
             }
         """.trimIndent())
     }

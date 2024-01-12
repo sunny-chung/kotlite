@@ -335,7 +335,7 @@ data class LambdaLiteralNode(
     @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
-        get() = type!!.returnType
+        get() = type!!.returnType!!
 
     override val name: String?
         get() = null
@@ -353,8 +353,8 @@ data class LambdaLiteralNode(
     }
 }
 
-class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: List<TypeNode>, val returnType: TypeNode, isNullable: Boolean)
-    : TypeNode("Function", parameterTypes + returnType, isNullable) {
+class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: List<TypeNode>?, val returnType: TypeNode?, isNullable: Boolean)
+    : TypeNode("Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
     override fun copy(isNullable: Boolean): FunctionTypeNode {
         return FunctionTypeNode(
             receiverType = receiverType,
@@ -368,8 +368,8 @@ class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: L
         val self = "${generateId()}[\"Function Type $name${if (isNullable) " ?" else ""}\"]"
         return "$self\n" +
                 (receiverType?.let { "$self- -receiver -->${it.toMermaid()}" } ?: "") +
-                parameterTypes.joinToString("") { "$self-- parameter -->${it.toMermaid()}\n" } +
-                "$self-- return -->${returnType.toMermaid()}"
+                parameterTypes!!.joinToString("") { "$self-- parameter -->${it.toMermaid()}\n" } +
+                "$self-- return -->${returnType!!.toMermaid()}"
     }
 }
 

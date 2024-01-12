@@ -41,6 +41,15 @@ data object NullType : DataType {
 data class ObjectType(val clazz: ClassDefinition, override val isNullable: Boolean = false) : DataType {
     override val name: String = clazz.name
 }
+
+/**
+ * Only use in semantic analyzer
+ */
+data object UnresolvedType : DataType {
+    override val name: String = "Unresolved"
+    override val isNullable: Boolean = false
+}
+
 data class FunctionType(val arguments: List<DataType>, val returnType: DataType, override val isNullable: Boolean) : DataType {
     override val name: String = "Function"
 
@@ -52,6 +61,9 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NullType && isNullable) return true
         if (!super.isAssignableFrom(other) || other !is FunctionType) return false
+
+        if (returnType is UnresolvedType || other.returnType is UnresolvedType) return true
+
         // val f: (Int) -> Any = (g as (Int) -> Int)
         if (!returnType.isAssignableFrom(other.returnType)) return false
         if (arguments.size != other.arguments.size) return false

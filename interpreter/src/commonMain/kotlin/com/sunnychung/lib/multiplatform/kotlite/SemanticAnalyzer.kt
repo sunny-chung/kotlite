@@ -23,6 +23,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentInfo
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -43,6 +44,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.SemanticAnalyzerSymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
@@ -58,13 +60,14 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 
 class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
-    val builtinSymbolTable = SymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
-    val symbolTable = SymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = builtinSymbolTable)
+    val builtinSymbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
+    val symbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = builtinSymbolTable)
     var currentScope = symbolTable
     var functionDefIndex = 0
     val symbolRecorders = mutableListOf<SymbolReferenceSet>()
 
     val typeRegistry = listOf(
+        TypeNode("Any", null, false),
         TypeNode("Int", null, false),
         TypeNode("Double", null, false),
         TypeNode("Boolean", null, false),
@@ -73,7 +76,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         TypeNode("Unit", null, false),
     )
         .flatMap {
-            listOf(it.name to it, "${it.name}?" to it.copy(isNullable = true))
+            listOf(
+                it.name to it,
+                "${it.name}?" to it.copy(isNullable = true),
+            )
         }
         .let { it + listOf(
             "Null" to TypeNode("Nothing", null, true),
@@ -81,7 +87,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         .toMap()
 
     init {
-        listOf("Int", "Double", "Boolean", "String", "Char", "Unit", "Nothing").forEach {
+        listOf("Int", "Double", "Boolean", "String", "Char", "Unit", "Nothing", "Function").forEach {
             builtinSymbolTable.declareClass(ClassDefinition(
                 currentScope = builtinSymbolTable,
                 name = it,
@@ -137,40 +143,47 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         return scopeLevel > 1 && scopeLevel <= (symbolRecorders.lastOrNull()?.scopeLevel ?: currentScope.scopeLevel)
     }
 
-    fun ASTNode.visit() {
+    data class Modifier(
+        /**
+         * This would skip visiting lambdas.
+         */
+        val isSkipGenerics: Boolean = false,
+    )
+
+    fun ASTNode.visit(modifier: Modifier = Modifier()) {
         when (this) {
-            is AssignmentNode -> this.visit()
-            is BinaryOpNode -> this.visit()
-            is FunctionDeclarationNode -> this.visit()
-            is FunctionValueParameterNode -> this.visit()
+            is AssignmentNode -> this.visit(modifier = modifier)
+            is BinaryOpNode -> this.visit(modifier = modifier)
+            is FunctionDeclarationNode -> this.visit(modifier = modifier)
+            is FunctionValueParameterNode -> this.visit(modifier = modifier)
             is IntegerNode -> {}
             is DoubleNode -> {}
             is BooleanNode -> {}
             is NullNode -> {}
-            is PropertyDeclarationNode -> this.visit()
-            is ScriptNode -> this.visit()
+            is PropertyDeclarationNode -> this.visit(modifier = modifier)
+            is ScriptNode -> this.visit(modifier = modifier)
             is TypeNode -> {}
-            is UnaryOpNode -> this.visit()
-            is VariableReferenceNode -> this.visit()
-            is FunctionCallArgumentNode -> this.visit()
-            is FunctionCallNode -> this.visit()
-            is BlockNode -> this.visit()
-            is ReturnNode -> this.visit()
-            is BreakNode -> this.visit()
-            is ContinueNode -> this.visit()
-            is IfNode -> this.visit()
-            is WhileNode -> this.visit()
-            is ClassDeclarationNode -> this.visit()
-            is ClassInstanceInitializerNode -> this.visit()
+            is UnaryOpNode -> this.visit(modifier = modifier)
+            is VariableReferenceNode -> this.visit(modifier = modifier)
+            is FunctionCallArgumentNode -> this.visit(modifier = modifier)
+            is FunctionCallNode -> this.visit(modifier = modifier)
+            is BlockNode -> this.visit(modifier = modifier)
+            is ReturnNode -> this.visit(modifier = modifier)
+            is BreakNode -> this.visit(modifier = modifier)
+            is ContinueNode -> this.visit(modifier = modifier)
+            is IfNode -> this.visit(modifier = modifier)
+            is WhileNode -> this.visit(modifier = modifier)
+            is ClassDeclarationNode -> this.visit(modifier = modifier)
+            is ClassInstanceInitializerNode -> this.visit(modifier = modifier)
             is ClassMemberReferenceNode -> { /* TODO */ }
-            is ClassParameterNode -> this.visit()
-            is ClassPrimaryConstructorNode -> this.visit()
-            is NavigationNode -> this.visit()
+            is ClassParameterNode -> this.visit(modifier = modifier)
+            is ClassPrimaryConstructorNode -> this.visit(modifier = modifier)
+            is NavigationNode -> this.visit(modifier = modifier)
             is PropertyAccessorsNode -> TODO()
             is ValueNode -> {}
             is StringLiteralNode -> {}
-            is StringNode -> this.visit()
-            is LambdaLiteralNode -> this.visit()
+            is StringNode -> this.visit(modifier = modifier)
+            is LambdaLiteralNode -> this.visit(modifier = modifier)
             is CharNode -> {}
         }
     }
@@ -179,7 +192,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         if (!currentScope.hasProperty(name)) {
             throw SemanticException("Property `$name` is not declared")
         }
-        var scope = currentScope
+        var scope: SymbolTable = currentScope
         while (!scope.hasProperty(name, isThisScopeOnly = true)) {
             scope = scope.parentScope!!
         }
@@ -193,7 +206,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         if (!currentScope.hasProperty(name)) {
             throw SemanticException("Property `$name` is not declared")
         }
-        var scope = currentScope
+        var scope: SymbolTable = currentScope
         while (!scope.hasProperty(name, isThisScopeOnly = true)) {
             scope = scope.parentScope!!
         }
@@ -216,30 +229,30 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
     }
 
-    fun ScriptNode.visit() {
-        nodes.forEach { it.visit() }
+    fun ScriptNode.visit(modifier: Modifier = Modifier()) {
+        nodes.forEach { it.visit(modifier = modifier) }
     }
 
-    fun UnaryOpNode.visit() {
-        node!!.visit()
+    fun UnaryOpNode.visit(modifier: Modifier = Modifier()) {
+        node!!.visit(modifier = modifier)
         if (operator in setOf("pre++", "pre--", "post++", "post--") && node is VariableReferenceNode) {
             checkPropertyWriteAccess((node as VariableReferenceNode).variableName)
         }
     }
 
-    fun BinaryOpNode.visit() {
-        node1.visit()
-        node2.visit()
+    fun BinaryOpNode.visit(modifier: Modifier = Modifier()) {
+        node1.visit(modifier = modifier)
+        node2.visit(modifier = modifier)
         type()
     }
 
-    fun AssignmentNode.visit() {
+    fun AssignmentNode.visit(modifier: Modifier = Modifier()) {
         if (subject !is VariableReferenceNode && subject !is NavigationNode) {
             throw SemanticException("$subject cannot be assigned")
         }
         when (subject) {
             is VariableReferenceNode -> {
-                subject.visit()
+                subject.visit(modifier = modifier)
                 val variableName = subject.variableName
                 val l = checkPropertyWriteAccess(variableName)
                 if (transformedRefName == null) {
@@ -249,7 +262,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //                log.v { "Assign $variableName type ${subject.type()} <- type ${value.type()}" }
             }
             is NavigationNode -> {
-                subject.visit()
+                subject.visit(modifier = modifier)
                 // TODO handle NavigationNode
 
 //                log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
@@ -264,7 +277,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             value.returnTypeUpperBound = subjectRawType.returnType
         }
 
-        value.visit()
+        value.visit(modifier = modifier)
         val valueType = value.type().toDataType()
 
         if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
@@ -298,13 +311,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
     }
 
-    fun PropertyDeclarationNode.visit(isVisitInitialValue: Boolean = true, isClassProperty: Boolean = false, scopeLevel: Int = currentScope.scopeLevel) {
+    fun PropertyDeclarationNode.visit(modifier: Modifier = Modifier(), isVisitInitialValue: Boolean = true, isClassProperty: Boolean = false, scopeLevel: Int = currentScope.scopeLevel) {
         if (isVisitInitialValue) {
             if (declaredType is FunctionTypeNode && initialValue is LambdaLiteralNode) {
                 initialValue.parameterTypesUpperBound = declaredType.parameterTypes
                 initialValue.returnTypeUpperBound = declaredType.returnType
             }
-            initialValue?.visit()
+            initialValue?.visit(modifier = modifier)
         }
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {
             throw SemanticException("Property `$name` has already been declared")
@@ -319,8 +332,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //            throw SemanticException("Custom setter is currently not supported")
 //        }
         if (isVisitInitialValue && accessors != null) {
-            accessors.getter?.visit()
-            accessors.setter?.visit()
+            accessors.getter?.visit(modifier = modifier)
+            accessors.setter?.visit(modifier = modifier)
         }
         if (initialValue != null) {
             val valueType = initialValue.type().toDataType()
@@ -348,7 +361,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         evaluateAndRegisterReturnType(this)
     }
 
-    fun VariableReferenceNode.visit() {
+    fun VariableReferenceNode.visit(modifier: Modifier = Modifier()) {
         val l = checkPropertyReadAccess(variableName)
         if (variableName != "this" && transformedRefName == null) {
             transformedRefName = "$variableName/$l"
@@ -370,7 +383,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun pushScope(scopeName: String, scopeType: ScopeType, returnType: DataType? = null, overrideScopeLevel: Int = currentScope.scopeLevel + 1) {
-        currentScope = SymbolTable(
+        currentScope = SemanticAnalyzerSymbolTable(
             scopeLevel = overrideScopeLevel,
             scopeName = scopeName,
             scopeType = scopeType,
@@ -380,10 +393,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun popScope() {
-        currentScope = currentScope.parentScope!!
+        currentScope = currentScope.parentScope!! as SemanticAnalyzerSymbolTable
     }
 
-    fun FunctionDeclarationNode.visit() {
+    fun FunctionDeclarationNode.visit(modifier: Modifier = Modifier()) {
         val previousScope = currentScope
         pushScope(
             scopeName = name,
@@ -392,7 +405,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         )
 
         if (receiver == null) {
-            valueParameters.forEach { it.visit() }
+            valueParameters.forEach { it.visit(modifier = modifier) }
 
             previousScope.declareFunction(name, this)
             if (transformedRefName == null) { // class declaration can assign transformedRefName
@@ -409,16 +422,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
             clazz.memberFunctions.forEach {
                 currentScope.declareFunction(name = it.key, node = it.value)
-                currentScope.declareFunctionOwner(name = it.key, owner = "this/$receiver")
+                currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/$receiver")
             }
 
-            valueParameters.forEach { it.visit() }
+            valueParameters.forEach { it.visit(modifier = modifier) }
 
             previousScope.declareExtensionFunction("$receiver/$name", this)
             transformedRefName = "$receiver/$name/${++functionDefIndex}"
         }
 
-        body.visit()
+        body.visit(modifier = modifier)
 
         // TODO check for return
 
@@ -433,11 +446,30 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         evaluateAndRegisterReturnType(this)
     }
 
-    fun FunctionCallNode.visit() {
-        val functionArgumentDeclarations = when (function) {
+    fun FunctionCallNode.visit(modifier: Modifier = Modifier()) {
+        arguments.forEachIndexed { i, _ ->
+            arguments.forEachIndexed { j, _ ->
+                if (i < j && arguments[i].name != null && arguments[j].name != null && arguments[i].name == arguments[j].name) {
+                    throw SemanticException("Duplicated argument ${arguments[i].name}")
+                }
+            }
+        }
+
+        // visit argument must before evaluating type
+        arguments.forEach {
+            it.visit(modifier = modifier.copy(isSkipGenerics = true))
+        }
+
+        val functionArgumentAndReturnTypeDeclarations = when (function) {
             is VariableReferenceNode -> {
-                val resolution = currentScope.findMatchingCallables(function.variableName, null, arguments)
-                    .firstOrNull() ?: throw SemanticException("No matching function found")
+                val resolution = currentScope.findMatchingCallables(
+                    currentSymbolTable = currentScope,
+                    originalName = function.variableName,
+                    receiverType = null,
+                    arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) }
+                )
+                    .firstOrNull()
+                    ?: throw SemanticException("No matching function found")
                 function.ownerRef = resolution.owner
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
@@ -462,26 +494,26 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     }
                 }
 
-                resolution.arguments
+                resolution.arguments to resolution.returnType
             }
 
             is NavigationNode -> {
-                function.visit()
+                function.visit(modifier = modifier)
                 val receiverType = function.subject.type().toDataType()
 
-                val resolution = currentScope.findMatchingCallables(function.member.name, receiverType, arguments)
+                val resolution = currentScope.findMatchingCallables(currentScope, function.member.name, receiverType, arguments.map { FunctionCallArgumentInfo(it.name, it.type().toDataType()) })
                     .firstOrNull() ?: throw SemanticException("No matching function found for type ${receiverType.nameWithNullable}")
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
 
-                resolution.arguments
+                resolution.arguments to resolution.returnType
             }
 
             else -> {
-                function.visit()
+                function.visit(modifier = modifier)
                 val type = function.type()
                 if (type is FunctionTypeNode) { // function's return type is FunctionTypeNode
-                    type.parameterTypes
+                    type.parameterTypes!! to type.returnType
                 } else {
                     throw SemanticException("${type.descriptiveName()} is not callable")
                 }
@@ -490,19 +522,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         // Validate call arguments against declared arguments
         // Check for missing mandatory arguments, extra arguments, duplicated arguments and mismatch data types
-        if (arguments.size > functionArgumentDeclarations.size) {
-            throw SemanticException("Too much arguments. At most ${functionArgumentDeclarations.size} are accepted.")
-        }
-        arguments.forEachIndexed { i, _ ->
-            arguments.forEachIndexed { j, _ ->
-                if (i < j && arguments[i].name != null && arguments[j].name != null && arguments[i].name == arguments[j].name) {
-                    throw SemanticException("Duplicated argument ${arguments[i].name}")
-                }
-            }
-        }
+//        if (arguments.size > functionArgumentDeclarations.size) {
+//            throw SemanticException("Too much arguments. At most ${functionArgumentDeclarations.size} are accepted.")
+//        }
 
         class ArgumentInfo(val type: DataType, val isOptional: Boolean, val name: String?)
-        val argumentInfos = functionArgumentDeclarations.map {
+        val argumentInfos = functionArgumentAndReturnTypeDeclarations.first.map {
             when (it) {
                 is DataType -> ArgumentInfo(it, false, null)
                 is TypeNode -> ArgumentInfo(it.toDataType(), false, null)
@@ -510,8 +535,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 else -> throw UnsupportedOperationException("Unknown internal class ${it::class.simpleName}")
             }
         }
-        val mandatoryArgumentIndexes = argumentInfos.indices.filter { !argumentInfos[it].isOptional }
-
+//        val mandatoryArgumentIndexes = argumentInfos.indices.filter { !argumentInfos[it].isOptional }
+//
         val callArgumentMappedIndexes = arguments.mapIndexed { i, a ->
             if (a.name == null) {
                 i
@@ -521,13 +546,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 }
             }
         }
-        if (callArgumentMappedIndexes.distinct().size < callArgumentMappedIndexes.size) {
-            throw SemanticException("There are duplicated arguments")
-        }
-        val missingIndexes = mandatoryArgumentIndexes.filter { i -> callArgumentMappedIndexes.none { it == i } }
-        if (missingIndexes.isNotEmpty()) {
-            throw SemanticException("Missing mandatory arguments for index $missingIndexes")
-        }
+//        if (callArgumentMappedIndexes.distinct().size < callArgumentMappedIndexes.size) {
+//            throw SemanticException("There are duplicated arguments")
+//        }
+//        val missingIndexes = mandatoryArgumentIndexes.filter { i -> callArgumentMappedIndexes.none { it == i } }
+//        if (missingIndexes.isNotEmpty()) {
+//            throw SemanticException("Missing mandatory arguments for index $missingIndexes")
+//        }
         arguments.forEachIndexed { i, callArgument ->
             val functionArgumentType = argumentInfos[callArgumentMappedIndexes[i]].type
             if (callArgument.value is LambdaLiteralNode && functionArgumentType is FunctionType) {
@@ -541,9 +566,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
         }
 
+        // revisit to resolve generic type parameters
         // visit argument must before evaluating type
-        arguments.forEach { it.visit() }
+        arguments.forEach { it.visit(modifier = modifier) }
 
+        // check for mismatch generic parameters
         arguments.forEachIndexed { i, callArgument ->
             val functionArgumentType = argumentInfos[callArgumentMappedIndexes[i]].type
             if (!functionArgumentType.isAssignableFrom(callArgument.type().toDataType())) {
@@ -551,12 +578,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
         }
 
+        returnType = functionArgumentAndReturnTypeDeclarations.second!!
+
         // record types if there is any enclosing lambda
         evaluateAndRegisterReturnType(this)
     }
 
-    fun FunctionValueParameterNode.visit() {
-        defaultValue?.visit()
+    fun FunctionValueParameterNode.visit(modifier: Modifier = Modifier()) {
+        defaultValue?.visit(modifier = modifier)
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {
             throw SemanticException("Property `$name` has already been declared")
         }
@@ -576,11 +605,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         currentScope.registerTransformedSymbol(IdentifierClassifier.Property, transformedRefName!!, name)
     }
 
-    fun FunctionCallArgumentNode.visit() {
-        value.visit()
+    fun FunctionCallArgumentNode.visit(modifier: Modifier = Modifier()) {
+        value.visit(modifier = modifier)
     }
 
-    fun BlockNode.visit() {
+    fun BlockNode.visit(modifier: Modifier = Modifier()) {
         pushScope(
             scopeName = "<block>",
             scopeType = if (type == ScopeType.Function) ScopeType.FunctionBlock else type,
@@ -592,7 +621,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 it.parameterTypesUpperBound = returnTypeUpperBound.parameterTypes
                 it.returnTypeUpperBound = returnTypeUpperBound.returnType
             }
-            it.visit()
+            it.visit(modifier = modifier)
         }
 
         returnType = type()
@@ -600,8 +629,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         popScope()
     }
 
-    fun ReturnNode.visit() {
-        var s = currentScope
+    fun ReturnNode.visit(modifier: Modifier = Modifier()) {
+        var s: SymbolTable = currentScope
         while (s.scopeType != ScopeType.Function) {
             if (s.scopeType == ScopeType.Script || s.parentScope == null) {
                 throw SemanticException("`return` statement should be within a function")
@@ -616,7 +645,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             value.returnTypeUpperBound = declaredReturnType.returnType.toTypeNode()
         }
 
-        value?.visit()
+        value?.visit(modifier = modifier)
         val valueType = value?.type()?.toDataType() ?: UnitType()
         if (!declaredReturnType.isAssignableFrom(valueType)) {
             throw TypeMismatchException(s.returnType!!.nameWithNullable, valueType.nameWithNullable)
@@ -624,7 +653,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun checkBreakOrContinueScope() {
-        var s = currentScope
+        var s: SymbolTable = currentScope
         while (!s.scopeType.isLoop()) {
             if (s.scopeType in setOf(ScopeType.Script, ScopeType.Function) || s.parentScope == null) {
                 throw SemanticException("`break` statement should be within a loop")
@@ -633,37 +662,37 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
     }
 
-    fun BreakNode.visit() {
+    fun BreakNode.visit(modifier: Modifier = Modifier()) {
         checkBreakOrContinueScope()
     }
 
-    fun ContinueNode.visit() {
+    fun ContinueNode.visit(modifier: Modifier = Modifier()) {
         checkBreakOrContinueScope()
     }
 
-    fun IfNode.visit() {
-        condition.visit()
-        trueBlock?.visit()
-        falseBlock?.visit()
+    fun IfNode.visit(modifier: Modifier = Modifier()) {
+        condition.visit(modifier = modifier)
+        trueBlock?.visit(modifier = modifier)
+        falseBlock?.visit(modifier = modifier)
     }
 
-    fun WhileNode.visit() {
-        condition.visit()
-        body?.visit()
+    fun WhileNode.visit(modifier: Modifier = Modifier()) {
+        condition.visit(modifier = modifier)
+        body?.visit(modifier = modifier)
     }
 
-    fun NavigationNode.visit() {
-        subject.visit()
+    fun NavigationNode.visit(modifier: Modifier = Modifier()) {
+        subject.visit(modifier = modifier)
 
         // at this moment subject must not be a primitive
-        member.visit()
+        member.visit(modifier = modifier)
     }
 
-    fun ClassDeclarationNode.visit() {
+    fun ClassDeclarationNode.visit(modifier: Modifier = Modifier()) {
         val fullQualifiedClassName = name
         pushScope(name, ScopeType.Class)
         run {
-            primaryConstructor?.visit()
+            primaryConstructor?.visit(modifier = modifier)
             val nonPropertyArguments = primaryConstructor?.parameters
                 ?.filter { !it.isProperty }
                 ?.map { it.parameter }
@@ -716,17 +745,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             declarations.filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode }
                 .forEach {
                     pushScope("init-property", ScopeType.ClassInitializer)
-                    nonPropertyArguments?.forEach { it.copy().visit() }
+                    nonPropertyArguments?.forEach { it.copy().visit(modifier = modifier) }
                     pushScope("init-property-inner", ScopeType.ClassInitializer)
                     if (it is PropertyDeclarationNode) {
-                        it.visit(isClassProperty = true)
+                        it.visit(modifier = modifier, isClassProperty = true)
                     } else {
-                        it.visit()
+                        it.visit(modifier = modifier)
                     }
                     popScope()
                     popScope()
                     if (it is PropertyDeclarationNode) {
-                        it.visit(isVisitInitialValue = false, isClassProperty = true)
+                        it.visit(modifier = modifier, isVisitInitialValue = false, isClassProperty = true)
                         currentScope.declarePropertyOwner(it.transformedRefName!!, "this/$fullQualifiedClassName")
                     }
                 }
@@ -734,30 +763,30 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
                     it.transformedRefName = "${it.name}/${++functionDefIndex}"
-                    currentScope.declareFunctionOwner(it.name, "this/$fullQualifiedClassName")
+                    currentScope.declareFunctionOwner(it.name, it, "this/$fullQualifiedClassName")
                 }
 
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
-                    it.visit()
+                    it.visit(modifier = modifier)
                 }
         }
         popScope()
     }
 
-    fun ClassPrimaryConstructorNode.visit() {
-        parameters.forEach { it.visit() }
+    fun ClassPrimaryConstructorNode.visit(modifier: Modifier = Modifier()) {
+        parameters.forEach { it.visit(modifier = modifier) }
     }
 
-    fun ClassParameterNode.visit() {
-        parameter.visit()
+    fun ClassParameterNode.visit(modifier: Modifier = Modifier()) {
+        parameter.visit(modifier = modifier)
     }
 
-    fun ClassInstanceInitializerNode.visit() {
-        block.visit()
+    fun ClassInstanceInitializerNode.visit(modifier: Modifier = Modifier()) {
+        block.visit(modifier = modifier)
     }
 
-    fun ClassMemberReferenceNode.visit() {
+    fun ClassMemberReferenceNode.visit(modifier: Modifier = Modifier()) {
         // TODO check for write access
         // check for existence and return error
         try {
@@ -768,12 +797,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         } catch (_: SemanticException) {}
     }
 
-    fun StringNode.visit() {
-        nodes.forEach { it.visit() }
+    fun StringNode.visit(modifier: Modifier = Modifier()) {
+        nodes.forEach { it.visit(modifier = modifier) }
     }
 
-    fun LambdaLiteralNode.visit() {
+    fun LambdaLiteralNode.visit(modifier: Modifier = Modifier()) {
 //        val type = type() as FunctionTypeNode
+
+        if (modifier.isSkipGenerics) return
 
         symbolRecorders += SymbolReferenceSet(scopeLevel = currentScope.scopeLevel)
         pushScope(
@@ -795,13 +826,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         valueParameters.forEach {
             if (it.name != "_") {
-                it.visit()
+                it.visit(modifier = modifier)
             }
         }
         // TODO provide receiver to scope if exists
 
         body.returnTypeUpperBound = returnTypeUpperBound
-        body.visit()
+        body.visit(modifier = modifier)
 
         if (returnTypeUpperBound?.toDataType()?.isAssignableFrom(body.type().toDataType()) == false) {
             throw SemanticException("Lambda return type ${body.type().descriptiveName()} cannot be converted to ${returnTypeUpperBound!!.descriptiveName()}")
@@ -832,12 +863,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     ////////////////////////////////////
 
-    fun ASTNode.type()
+    data class ResolveTypeModifier(val isSkipGenerics: Boolean = false)
+
+    fun ASTNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier())
         = when (this) {
             is AssignmentNode -> typeRegistry["Unit"]!!
-            is BinaryOpNode -> this.type()
-            is UnaryOpNode -> this.type()
-            is BlockNode -> this.type()
+            is BinaryOpNode -> this.type(modifier = modifier)
+            is UnaryOpNode -> this.type(modifier = modifier)
+            is BlockNode -> this.type(modifier = modifier)
             is BreakNode -> typeRegistry["Unit"]!!
             is ClassDeclarationNode -> typeRegistry["Unit"]!!
             is ClassInstanceInitializerNode -> TODO()
@@ -845,19 +878,19 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is ClassParameterNode -> TODO()
             is ClassPrimaryConstructorNode -> TODO()
             is ContinueNode -> typeRegistry["Unit"]!!
-            is FunctionCallArgumentNode -> this.type()
-            is FunctionCallNode -> this.type()
+            is FunctionCallArgumentNode -> this.type(modifier = modifier)
+            is FunctionCallNode -> this.type(modifier = modifier)
             is FunctionDeclarationNode -> typeRegistry["Unit"]!!
             is FunctionValueParameterNode -> type
-            is IfNode -> this.type()
-            is NavigationNode -> this.type()
+            is IfNode -> this.type(modifier = modifier)
+            is NavigationNode -> this.type(modifier = modifier)
             is PropertyAccessorsNode -> this.type
             is PropertyDeclarationNode -> typeRegistry["Unit"]!!
-            is ReturnNode -> this.type()
+            is ReturnNode -> this.type(modifier = modifier)
             is ScriptNode -> TODO()
             is TypeNode -> this
             is ValueNode -> TODO()
-            is VariableReferenceNode -> this.type()
+            is VariableReferenceNode -> this.type(modifier = modifier)
             is WhileNode -> typeRegistry["Unit"]!!
 
             is IntegerNode -> typeRegistry["Int"]!!
@@ -866,14 +899,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             NullNode -> typeRegistry["Null"]!!
             is StringLiteralNode -> TODO()
             is StringNode -> typeRegistry["String"]!!
-            is LambdaLiteralNode -> this.type()
+            is LambdaLiteralNode -> this.type(modifier = modifier)
             is CharNode -> typeRegistry["Char"]!!
         }
 
-    fun BinaryOpNode.type(): TypeNode = type ?: when (operator) {
+    fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {
         "+", "-", "*", "/", "%" -> {
-            val t1 = node1.type().toDataType()
-            val t2 = node2.type().toDataType()
+            val t1 = node1.type(modifier = modifier).toDataType()
+            val t2 = node2.type(modifier = modifier).toDataType()
             if (t1 is StringType || t1 is NullType || t2 is StringType || t2 is NullType) {
                 typeRegistry["String"]!!
             } else if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
@@ -898,29 +931,29 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         type = it
     }
 
-    fun UnaryOpNode.type(): TypeNode = type ?: node!!.type().also { type = it }
+    fun UnaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: node!!.type(modifier = modifier).also { type = it }
 
     // e.g. `name()`, where name is a VariableReferenceNode
-    fun VariableReferenceNode.type() = type ?: (
+    fun VariableReferenceNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()) = type ?: (
             currentScope.findClass(variableName)
                 ?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = TypeNode(variableName, null, false), isNullable = false) }
-                ?: currentScope.findFunction(variableName)?.first?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = it.returnType, isNullable = false) }
+                ?: currentScope.findFunctionsByOriginalName(variableName).firstOrNull()?.let { FunctionTypeNode(parameterTypes = null, returnType = null, isNullable = false) }
                 ?: currentScope.getPropertyType(variableName).first.type.toTypeNode()!!
             ).also { type = it }
 
-    fun NavigationNode.type(): TypeNode {
+    fun NavigationNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }
-        val subjectType = when(val type = subject.type()) {
+        val subjectType = when(val type = subject.type(modifier = modifier)) {
             is FunctionTypeNode -> type.returnType
             else -> type
-        }
+        } ?: return typeRegistry["Any"]!!
         val clazz = currentScope.findClass(subjectType.name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
         clazz.memberFunctions[memberName]?.let {
             return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.returnType, isNullable = false).also { type = it }
         }
         clazz.memberPropertyCustomAccessors[memberName]?.let {
-            return it.type().also { type = it }
+            return it.type(modifier = modifier).also { type = it }
         }
         clazz.memberProperties[memberName]?.let {
             return it.type.toTypeNode().also { type = it }
@@ -933,38 +966,39 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         throw SemanticException("Could not find member `$memberName` for type ${clazz.name}")
     }
 
-    fun FunctionCallArgumentNode.type(): TypeNode {
-        return this.value.type()
+    fun FunctionCallArgumentNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        return this.value.type(modifier = modifier)
     }
 
-    fun FunctionCallNode.type(): TypeNode {
+    fun FunctionCallNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         returnType?.let { return it }
-        val functionType = function.type()
+        val functionType = function.type(modifier = modifier)
         if (functionType !is FunctionTypeNode) {
             throw SemanticException("Cannot invoke non-function expression")
         }
-        return functionType.returnType
+        return functionType.returnType!!
     }
 
-    fun ReturnNode.type(): TypeNode {
-        return value?.type() ?: typeRegistry["Unit"]!!
+    fun ReturnNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        return value?.type(modifier = modifier) ?: typeRegistry["Unit"]!!
     }
 
-    fun IfNode.type(): TypeNode {
+    fun IfNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }
-        return superTypeOf(trueBlock?.type(), falseBlock?.type())
+        return superTypeOf(trueBlock?.type(modifier = modifier), falseBlock?.type(modifier = modifier))
             .also { type = it }
     }
 
-    fun BlockNode.type(): TypeNode {
+    fun BlockNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         returnType?.let { return it }
-        return (statements.lastOrNull()?.type() ?: typeRegistry["Unit"]!!)
+        return (statements.lastOrNull()?.type(modifier = modifier) ?: typeRegistry["Unit"]!!)
             .also { returnType = it }
     }
 
-    fun LambdaLiteralNode.type(): TypeNode {
+    fun LambdaLiteralNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        if (modifier.isSkipGenerics) return FunctionTypeNode(parameterTypes = null, returnType = null, isNullable = false)
         type?.let { return it }
-        return FunctionTypeNode(parameterTypes = valueParameters.map { it.type() }, returnType = body.type(), isNullable = false)
+        return FunctionTypeNode(parameterTypes = valueParameters.map { it.type(modifier = modifier) }, returnType = body.type(), isNullable = false)
             .also { type = it }
     }
 
