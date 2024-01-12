@@ -58,6 +58,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
+import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
 
 class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
     val builtinSymbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
@@ -469,7 +470,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) }
                 )
                     .firstOrNull()
-                    ?: throw SemanticException("No matching function found")
+                    ?: throw SemanticException("No matching function `${function.variableName}` found")
                 function.ownerRef = resolution.owner
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
@@ -502,7 +503,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 val receiverType = function.subject.type().toDataType()
 
                 val resolution = currentScope.findMatchingCallables(currentScope, function.member.name, receiverType, arguments.map { FunctionCallArgumentInfo(it.name, it.type().toDataType()) })
-                    .firstOrNull() ?: throw SemanticException("No matching function found for type ${receiverType.nameWithNullable}")
+                    .firstOrNull() ?: throw SemanticException("No matching function `${function.member.name}` found for type ${receiverType.nameWithNullable}")
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
 
@@ -730,7 +731,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                             declarations.filterIsInstance<PropertyDeclarationNode>()),
                     memberFunctions = declarations
                         .filterIsInstance<FunctionDeclarationNode>()
-                        .associateBy { it.name },
+                        .associateBy { it.toSignature(currentScope.parentScope as SemanticAnalyzerSymbolTable) },
                     orderedInitializersAndPropertyDeclarations = declarations
                         .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
                 )

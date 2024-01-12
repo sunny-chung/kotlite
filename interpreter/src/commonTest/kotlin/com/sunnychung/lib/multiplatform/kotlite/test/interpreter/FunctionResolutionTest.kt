@@ -176,4 +176,80 @@ class FunctionResolutionTest {
         assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun classMemberFunctionOverload1() {
+        val interpreter = interpreter("""
+            class A {
+                fun f(x: Int, y: String): Int = 2
+                fun f(x: String, y: Int): Int = 3
+            }
+            val a = A().f("a", 1)
+            val b = A().f(1, "a")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun classMemberFunctionOverload2() {
+        val interpreter = interpreter("""
+            class A {
+                fun f(x: Int, y: String): Int = 2
+                fun f(x: Int): Int = 3
+            }
+            val a = A().f(1)
+            val b = A().f(1, "a")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun classMemberFunctionOverload3() {
+        val interpreter = interpreter("""
+            class A {
+                fun f(x: Int, y: String): Int = 2
+                fun f(x: String, y: Int): Int = 3
+                fun g(): Int = this.f("a", 1)
+                fun h(): Int = this.f(1, "a")
+            }
+            val a = A().g()
+            val b = A().h()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun classMemberFunctionOverload4() {
+        val interpreter = interpreter("""
+            class A {
+                fun f(x: Int, y: String): Int = 2
+                fun f(x: Int): Int = 3
+                fun g(): Int = this.f(1)
+                fun h(): Int = this.f(1, "a")
+            }
+            val a = A().g()
+            val b = A().h()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

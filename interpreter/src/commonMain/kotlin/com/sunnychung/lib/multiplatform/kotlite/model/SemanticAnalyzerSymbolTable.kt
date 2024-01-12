@@ -21,11 +21,7 @@ class SemanticAnalyzerSymbolTable(
             .first
     }
 
-    override fun functionNameTransform(name: String, function: FunctionDeclarationNode): String {
-        return function.name + "//" + function.valueParameters.joinToString("/") {
-            it.type.toClass().fullQualifiedName
-        }
-    }
+    override fun functionNameTransform(name: String, function: FunctionDeclarationNode) = function.toSignature(this)
 
     fun findFunctionsByOriginalName(originalName: String, isThisScopeOnly: Boolean = false): List<Pair<FunctionDeclarationNode, SymbolTable>> {
         return functionDeclarations.filter { it.value.name == originalName }
@@ -86,8 +82,11 @@ class SemanticAnalyzerSymbolTable(
                 )
             }
         } else {
-            receiverClass.memberFunctions[originalName]?.let {
-                thisScopeCandidates += FindCallableResult(
+            receiverClass.memberFunctions.filter {
+                it.value.name == originalName
+            }.map {
+                val it = it.value
+                FindCallableResult(
                     transformedName = it.transformedRefName!!,
                     owner = null,
                     type = CallableType.ClassMemberFunction,
@@ -96,7 +95,7 @@ class SemanticAnalyzerSymbolTable(
                     definition = it,
                     scope = this
                 )
-            }
+            }.let { thisScopeCandidates += it }
             findExtensionFunctionsByOriginalName(receiverClass.fullQualifiedName, originalName, isThisScopeOnly = true).map {
                 FindCallableResult(
                     transformedName = it.first.transformedRefName!!,
@@ -174,4 +173,12 @@ class SemanticAnalyzerSymbolTable(
         } else {
             TypeNode(name, null, isNullable)
         }
+}
+
+fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable): String {
+    with (symbolTable) {
+        return name + "//" + valueParameters.joinToString("/") {
+            it.type.toClass().fullQualifiedName
+        }
+    }
 }
