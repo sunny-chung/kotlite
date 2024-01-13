@@ -230,4 +230,136 @@ class ExtensionFunctionTest {
         assertEquals(49, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
         assertEquals(11, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
     }
+
+    @Test
+    fun extensionAndFunctionWithSameSignatureCanCoexist() {
+        val interpreter = interpreter("""
+            fun happyNumber(): Int = 6
+            fun Int?.happyNumber(): Int = 5
+            val a: Int? = 3
+            val x: Int = a.happyNumber()
+            val y: Int = happyNumber()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun nullableExtension1() {
+        val interpreter = interpreter("""
+            fun Int?.happyNumber(): Int = 5
+            val a: Int? = 3
+            val x: Int = a.happyNumber()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun nullableExtension2() {
+        val interpreter = interpreter("""
+            fun f(a: Int): Int? {
+                if (a < 10) return null
+                return a
+            }
+            fun Int?.happyNumber(): Int = 5
+            val x: Int = f(0).happyNumber()
+            val y: Int = f(20).happyNumber()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun nullableExtensionCanBeUsedOnNonNullType() {
+        val interpreter = interpreter("""
+            fun f(a: Int): Int {
+                return a
+            }
+            fun Int?.happyNumber(): Int = 5
+            val x: Int = f(0).happyNumber()
+            val y: Int = 20.happyNumber()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun nullableClassExtension() {
+        val interpreter = interpreter("""
+            class A
+            fun f(): A {
+                return A()
+            }
+            fun A?.happyNumber(): Int = 5
+            val a: A? = A()
+            val x: Int = f().happyNumber()
+            val y: Int = A().happyNumber()
+            val z: Int = a.happyNumber()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("z") as IntValue).value)
+    }
+
+    @Test
+    fun nullableExtensionCanBeUsedOnAnyNullValue() {
+        val interpreter = interpreter("""
+            fun Int?.happyNumber(): Int = 5
+            val a: String? = null
+            val x: Int = null.happyNumber()
+            // val y: Int = a.happyNumber()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+//        assertEquals(5, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun nullableExtensionCannotBeUsedOnOtherTypeNullValue() {
+        assertSemanticFail("""
+            fun Int?.happyNumber(): Int = 5
+            val a: String? = null
+            val x: Int = null.happyNumber()
+            val y: Int = a.happyNumber()
+        """.trimIndent())
+    }
+
+    @Test
+    @Ignore
+    fun nullableExtensionReferenceToThis() {
+        val interpreter = interpreter("""
+            fun Int?.happyNumber(): Int = (this ?: 100) + 5
+            val x: Int = null.happyNumber()
+            val y: Int = 2.happyNumber()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(105, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(7, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
 }

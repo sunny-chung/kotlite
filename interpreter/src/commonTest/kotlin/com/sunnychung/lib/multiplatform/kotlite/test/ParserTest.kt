@@ -1,6 +1,8 @@
 package com.sunnychung.lib.multiplatform.kotlite.test
 
 import com.sunnychung.lib.multiplatform.kotlite.Parser
+import com.sunnychung.lib.multiplatform.kotlite.error.ExpectTokenMismatchException
+import com.sunnychung.lib.multiplatform.kotlite.error.UnexpectedTokenException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -9,6 +11,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ParserTest {
@@ -130,5 +133,25 @@ class ParserTest {
         parser.currentTokenExcludingNL().assertToken(TokenType.Identifier, "c")
 
         parser.readToken().assertToken(TokenType.EOF, '\u0000')
+    }
+
+    @Test
+    fun invalidQuestionMarkInExtensionFunctionDeclaration1() {
+        assertFailsWith<ExpectTokenMismatchException> {
+            parser("""
+                fun Int.func?(): Int = 2
+            """.trimIndent()
+            ).script()
+        }
+    }
+
+    @Test
+    fun invalidQuestionMarkInExtensionFunctionDeclaration2() {
+        assertFailsWith<ExpectTokenMismatchException> {
+            parser("""
+                fun kotlin?.Int.func(): Int = 2
+            """.trimIndent()
+            ).script()
+        }
     }
 }

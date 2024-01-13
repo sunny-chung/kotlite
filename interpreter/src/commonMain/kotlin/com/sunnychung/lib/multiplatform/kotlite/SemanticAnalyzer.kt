@@ -98,6 +98,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 memberFunctions = emptyMap(),
                 primaryConstructor = null,
             ))
+            builtinSymbolTable.declareClass(ClassDefinition(
+                currentScope = builtinSymbolTable,
+                name = "$it?",
+                isInstanceCreationAllowed = false,
+                orderedInitializersAndPropertyDeclarations = emptyList(),
+                rawMemberProperties = emptyList(),
+                memberFunctions = emptyMap(),
+                primaryConstructor = null,
+            ))
         }
 
         val libFunctions = executionEnvironment.getBuiltinFunctions(builtinSymbolTable)
@@ -414,22 +423,40 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
             previousScope.registerTransformedSymbol(IdentifierClassifier.Function, transformedRefName!!, name)
         } else {
-            currentScope.declareProperty(name = "this", type = TypeNode(receiver, null, false), isMutable = false)
+            val typeNode = TypeNode(receiver.trimEnd('?'), null, receiver.endsWith("?"))
+            currentScope.declareProperty(name = "this", type = typeNode, isMutable = false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
-            val clazz = currentScope.findClass(receiver)?.first ?: throw SemanticException("Class `$receiver` not found")
-            clazz.memberProperties.forEach {
-                currentScope.declareProperty(name = it.key, type = it.value.type.toTypeNode(), isMutable = it.value.isMutable)
-                currentScope.declarePropertyOwner(name = "${it.key}/${currentScope.scopeLevel}", owner = "this/$receiver")
-            }
-            clazz.memberFunctions.forEach {
-                currentScope.declareFunction(name = it.key, node = it.value)
-                currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/$receiver")
+            val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException("Class `$receiver` not found")
+            if (!typeNode.isNullable) {
+                clazz.memberProperties.forEach {
+                    currentScope.declareProperty(
+                        name = it.key,
+                        type = it.value.type.toTypeNode(),
+                        isMutable = it.value.isMutable
+                    )
+                    currentScope.declarePropertyOwner(
+                        name = "${it.key}/${currentScope.scopeLevel}",
+                        owner = "this/$receiver"
+                    )
+                }
+                clazz.memberFunctions.forEach {
+                    currentScope.declareFunction(name = it.key, node = it.value)
+                    currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/$receiver")
+                }
             }
 
             valueParameters.forEach { it.visit(modifier = modifier) }
 
-            previousScope.declareExtensionFunction("$receiver/$name", this)
-            transformedRefName = "$receiver/$name/${++functionDefIndex}"
+            previousScope.declareExtensionFunction("${typeNode.name}?/$name", this)
+            transformedRefName = "${typeNode.name}?/$name/${++functionDefIndex}"
+
+            if (typeNode.isNullable) {
+                previousScope.declareExtensionFunction("${typeNode.name}/$name", this.copy(receiver = receiver.trimEnd('?')))
+//                transformedRefName = "${typeNode.name}/$name/${++functionDefIndex}"
+
+                previousScope.declareExtensionFunction("Nothing/$name", this.copy(receiver = "Nothing"))
+//                transformedRefName = "Nothing/$name/${++functionDefIndex}"
+            }
         }
 
         body.visit(modifier = modifier)
@@ -501,13 +528,47 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is NavigationNode -> {
                 function.visit(modifier = modifier)
                 val receiverType = function.subject.type().toDataType()
+                val lookupReceiverTypes = if (!receiverType.isNullable || function.operator == ".") {
+                    listOf(receiverType)
+                } else { // ?.
+                    listOf(
+                        function.subject.type().copy(isNullable = false).toDataType(),
+                        function.subject.type().copy(isNullable = true).toDataType(),
+                    )
+                }
 
-                val resolution = currentScope.findMatchingCallables(currentScope, function.member.name, receiverType, arguments.map { FunctionCallArgumentInfo(it.name, it.type().toDataType()) })
-                    .firstOrNull() ?: throw SemanticException("No matching function `${function.member.name}` found for type ${receiverType.nameWithNullable}")
+                val resolutions = lookupReceiverTypes.flatMap {
+                    currentScope.findMatchingCallables(
+                        currentScope,
+                        function.member.name,
+                        it,
+                        arguments.map { FunctionCallArgumentInfo(it.name, it.type().toDataType()) }
+                    )
+                }
+                    .distinct()
+                if (resolutions.size > 1) {
+                    throw SemanticException("Ambiguous function call for `${function.member.name}`. ${resolutions.size} candidates match.")
+                }
+                val resolution = resolutions.firstOrNull() ?: throw SemanticException("No matching function `${function.member.name}` found for type ${receiverType.nameWithNullable}")
+
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
 
-                resolution.arguments to resolution.returnType
+                /**
+                 * Return type must be nullable if:
+                 * - Callable returns nullable type
+                 * - receiver is nullable and operator is "?."
+                 */
+
+                val returnType = resolution.returnType.let {
+                    if (receiverType.isNullable && function.operator == "?.") {
+                        it.copy(isNullable = true)
+                    } else {
+                        it
+                    }
+                }
+
+                resolution.arguments to returnType
             }
 
             else -> {
@@ -691,6 +752,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     fun ClassDeclarationNode.visit(modifier: Modifier = Modifier()) {
         val fullQualifiedClassName = name
+
+        // Declare nullable class type
+        currentScope.parentScope!!.declareClass(
+            ClassDefinition(
+                currentScope = currentScope,
+                name = "$name?",
+                fullQualifiedName = "$fullQualifiedClassName?",
+                isInstanceCreationAllowed = false,
+                orderedInitializersAndPropertyDeclarations = emptyList(),
+                rawMemberProperties = emptyList(),
+                memberFunctions = emptyMap(),
+                primaryConstructor = null,
+            )
+        )
+
         pushScope(name, ScopeType.Class)
         run {
             primaryConstructor?.visit(modifier = modifier)

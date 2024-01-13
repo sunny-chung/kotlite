@@ -1266,14 +1266,30 @@ class Parser(protected val lexer: Lexer) {
         }
         repeatedNL()
         val identifiers = mutableListOf<String>()
+        var hasEatenQuestionMark = false
+        var numOfDotsAfterQuestionMark = 0
         do {
-            if (identifiers.isNotEmpty()) {
-                eat(TokenType.Operator, ".")
+            if (hasEatenQuestionMark) {
+                ++numOfDotsAfterQuestionMark
+                if (numOfDotsAfterQuestionMark > 1) {
+                    throw ExpectTokenMismatchException("(", currentToken.position)
+                }
             }
-            identifiers += userDefinedIdentifier()
-            // TODO handle nullable type
+            if (identifiers.isNotEmpty()) {
+                if (isCurrentToken(TokenType.Operator, "?.")) {
+                    eat(TokenType.Operator, "?.")
+                } else {
+                    eat(TokenType.Operator, ".")
+                }
+            }
+            var identifier = userDefinedIdentifier()
             repeatedNL()
-        } while (isCurrentToken(TokenType.Operator, "."))
+            if (isCurrentToken(TokenType.Operator, "?.")) {
+                identifier += "?"
+                hasEatenQuestionMark = true
+            }
+            identifiers += identifier
+        } while (isCurrentToken(TokenType.Operator, ".") || isCurrentToken(TokenType.Operator, "?."))
         val name = identifiers.removeLast()
         val receiver = identifiers.takeIf { it.isNotEmpty() }?.joinToString(".")
         val valueParameters = functionValueParameters()

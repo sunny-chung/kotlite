@@ -368,11 +368,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     if (function.operator == "?.") {
                         return NullValue // TODO not always true for extension functions
                     } else {
-                        throw EvaluateNullPointerException()
+                        // extension methods of nullable types are allowed to be called
                     }
                 }
                 when (callableType) {
                     CallableType.ClassMemberFunction -> {
+                        if (subject == NullValue) {
+                            throw EvaluateNullPointerException()
+                        }
                         (subject as? ClassInstance)?.clazz?.memberFunctions?.get(functionRefName)?.let { function ->
                             return evalClassMemberAnyFunctionCall(subject, function)
                         }
@@ -380,6 +383,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     CallableType.ExtensionFunction -> {
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
                             ?: throw RuntimeException("Analysed function $functionRefName not found")
+                        if (subject == NullValue && !function.receiver!!.endsWith("?")) {
+                            throw EvaluateNullPointerException()
+                        }
                         return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
                     }
                     else -> {}
@@ -715,7 +721,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun NavigationNode.eval(): RuntimeValue {
-        val obj = subject.eval() as ClassInstance
+        val obj = subject.eval() as? ClassInstance ?: throw EvaluateNullPointerException()
 //        return obj.memberPropertyValues[member.transformedRefName!!]!!
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)) {

@@ -495,6 +495,42 @@ class SemanticAnalyzerTest {
     }
 
     @Test
+    fun classMemberFunctionsCannotBeAccessedByNullableType() {
+        assertSemanticFail("""
+            class MyCls {
+                var a: Int = 1
+                var other: MyCls? = null
+                
+                fun funcA(): Int {
+                    return ++a + other.funcB()
+                }
+                
+                fun funcB(): Int {
+                    return a
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun classMemberPropertiesCannotBeAccessedByNullableType() {
+        assertSemanticFail("""
+            class MyCls {
+                var a: Int = 1
+                var other: MyCls? = null
+                
+                fun funcA(): Int {
+                    return ++a + other?.funcB()
+                }
+                
+                fun funcB(): Int {
+                    return other.a++
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
     fun duplicateClassMemberFunctionDeclarations() {
         assertSemanticFail("""
             class A {
@@ -518,6 +554,31 @@ class SemanticAnalyzerTest {
             fun A.myFunction(x: Int, y: Int) {
                 val d: Int = x * y
             }
+        """.trimIndent())
+    }
+
+    @Test
+    fun nullableTypeCannotDeclareExtensionWithSameSignature() {
+        assertSemanticFail("""
+            fun Int?.a(): Int = 3
+            fun Double?.a(): Int = 4
+            val a: Int? = null.a()
+        """.trimIndent())
+    }
+
+    @Test
+    fun nullableTypeReferenceToThisWithIncorrectTypeOperation() {
+        assertSemanticFail("""
+            fun Int?.happyNumber(): Int = this + 5
+        """.trimIndent())
+    }
+
+    @Test
+    fun nonNullExtensionMethodsCannotBeAccessedByNullableTypes() {
+        assertSemanticFail("""
+            fun Int.happyNumber(): Int = this + 5
+            val a: Int? = 10
+            a.happyNumber()
         """.trimIndent())
     }
 }

@@ -148,11 +148,7 @@ class SemanticAnalyzerSymbolTable(
 
     // only use in semantic analyzer
     fun findMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>): List<FindCallableResult> {
-        val receiverClass = when (receiverType) {
-            is ObjectType -> receiverType.clazz
-            null -> null
-            else -> findClass(receiverType.name)!!.first
-        }
+        val receiverClass = receiverType?.let { (findClass(it.nameWithNullable) ?: throw RuntimeException("Class ${it.nameWithNullable} not found")).first }
         return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, arguments)
             .also { log.v { "Matching functions:\n${it.joinToString("\n")}" } }
             .firstOrNull()?.let { listOf(it) }
@@ -177,7 +173,7 @@ class SemanticAnalyzerSymbolTable(
 
 fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable): String {
     with (symbolTable) {
-        return name + "//" + valueParameters.joinToString("/") {
+        return (receiver?.let { "$it/" } ?: "") + name + "//" + valueParameters.joinToString("/") {
             it.type.toClass().fullQualifiedName
         }
     }

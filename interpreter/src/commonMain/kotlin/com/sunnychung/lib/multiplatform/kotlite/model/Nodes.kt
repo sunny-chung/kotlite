@@ -183,6 +183,29 @@ open class FunctionDeclarationNode(
             return body.eval()
         }
     }
+
+    fun copy(
+        name: String = this.name,
+        receiver: String? = this.receiver,
+        returnType: TypeNode = this.returnType,
+        valueParameters: List<FunctionValueParameterNode> = this.valueParameters,
+        body: BlockNode = this.body,
+        transformedRefName: String? = this.transformedRefName
+    ): FunctionDeclarationNode {
+        if (this::class != FunctionDeclarationNode::class) {
+            throw UnsupportedOperationException("Copying subclasses is not supported")
+        }
+        return FunctionDeclarationNode(
+            name = name,
+            receiver = receiver,
+            returnType = returnType,
+            valueParameters = valueParameters,
+            body = body,
+            transformedRefName = transformedRefName
+        )
+    }
+
+
 }
 
 data class FunctionCallArgumentNode(val index: Int, val name: String? = null, val value: ASTNode) : ASTNode {

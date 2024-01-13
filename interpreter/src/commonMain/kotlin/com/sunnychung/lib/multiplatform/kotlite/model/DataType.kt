@@ -35,11 +35,12 @@ data class StringType(override val isNullable: Boolean = false) : DataType { ove
 data class CharType(override val isNullable: Boolean = false) : DataType { override val name: String = "Char" }
 data class UnitType(override val isNullable: Boolean = false) : DataType { override val name: String = "Unit" }
 data object NullType : DataType {
-    override val name: String = "Null"
+    override val name: String = "Nothing"
+    override val nameWithNullable: String = "Nothing"
     override val isNullable: Boolean = true
 }
 data class ObjectType(val clazz: ClassDefinition, override val isNullable: Boolean = false) : DataType {
-    override val name: String = clazz.name
+    override val name: String = clazz.fullQualifiedName
 }
 
 /**
