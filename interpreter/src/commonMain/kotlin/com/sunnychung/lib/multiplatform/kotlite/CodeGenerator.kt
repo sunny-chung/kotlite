@@ -37,11 +37,15 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
-open class CodeGenerator(protected val node: ASTNode) {
+open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Boolean) {
     var indentLevel = 0
 
     fun generateCode(): String {
         return node.generate()
+    }
+
+    fun debug(s: String): String {
+        return if (isPrintDebugInfo) s else ""
     }
 
     protected fun indent() = " ".repeat(indentLevel * 4)
@@ -134,7 +138,7 @@ open class CodeGenerator(protected val node: ASTNode) {
         = (name?.let { "$name = " } ?: "") + value.generate()
 
     protected fun FunctionCallNode.generate()
-        = "${function.generate()}<f:$functionRefName>(${arguments.joinToString(", ") { it.generate() }})"
+        = "${function.generate()}${debug("<f:$functionRefName>")}(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
         = "fun ${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
@@ -172,7 +176,7 @@ open class CodeGenerator(protected val node: ASTNode) {
         = "$operator(${node?.let { it.generate() } ?: " "})"
 
     protected fun VariableReferenceNode.generate()
-        = "${ownerRef?.let { "$ownerRef." } ?: ""}$variableName<$transformedRefName>"
+        = "${ownerRef?.let { "$ownerRef." } ?: ""}$variableName${debug("<$transformedRefName>")}"
 
     protected fun WhileNode.generate()
         = "while (${condition.generate()})${body?.let { " ${it.generate()}" } ?: ";"}"
@@ -191,7 +195,7 @@ open class CodeGenerator(protected val node: ASTNode) {
     protected fun StringFieldIdentifierNode.generate(): String = (this as VariableReferenceNode).generate()
 
     protected fun LambdaLiteralNode.generate()
-        = "<p=${accessedRefs!!.properties}; f=${accessedRefs!!.functions}; c=${accessedRefs!!.classes}>" +
+        = debug("<p=${accessedRefs!!.properties}; f=${accessedRefs!!.functions}; c=${accessedRefs!!.classes}>") +
             "{${valueParameters.joinToString(", ") {it.generate()}}${if (valueParameters.isNotEmpty()) " ->" else ""}\n" +
             run {
                 ++indentLevel

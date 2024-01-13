@@ -22,4 +22,10 @@ class ExecutionEnvironment(
     internal fun getBuiltinFunctions(topmostSymbolTable: SymbolTable): List<CustomFunctionDeclarationNode> {
         return builtinFunctions.toList()
     }
+
+    fun install(module: LibraryModule) {
+        module.functions.forEach {
+            registerFunction(it)
+        }
+    }
 }

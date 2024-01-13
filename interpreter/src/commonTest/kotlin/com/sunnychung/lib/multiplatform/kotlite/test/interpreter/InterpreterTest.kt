@@ -18,7 +18,7 @@ fun interpreter(code: String, isDebug: Boolean = true, executionEnvironment: Exe
     }
     SemanticAnalyzer(it, executionEnvironment).analyze()
     if (isDebug) {
-        println(CodeGenerator(it).generateCode())
+        println(CodeGenerator(it, isPrintDebugInfo = true).generateCode())
     }
     Interpreter(it, executionEnvironment)
 }

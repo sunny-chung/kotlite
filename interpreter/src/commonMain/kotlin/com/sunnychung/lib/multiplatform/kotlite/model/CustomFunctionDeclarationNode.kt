@@ -4,22 +4,51 @@ import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 
-fun String.toTypeNode() = TypeNode(
-    name = this.removeSuffix("?"),
-    arguments = null,
-    isNullable = this.endsWith("?")
-)
+fun String.toTypeNode() = Parser(Lexer(this)).type()
 
-class CustomFunctionDeclarationNode(private val def: CustomFunctionDefinition) : FunctionDeclarationNode(
-    name = def.functionName,
-    receiver = def.receiverType,
-    returnType = def.returnType.toTypeNode(),
-    valueParameters = def.parameterTypes.map {
+class CustomFunctionDeclarationNode(
+    private val def: CustomFunctionDefinition,
+    name: String? = null,
+    receiver: String? = null,
+    returnType: TypeNode? = null,
+    valueParameters: List<FunctionValueParameterNode>? = null,
+    body: BlockNode? = null,
+    transformedRefName: String? = null,
+) : FunctionDeclarationNode(
+    name = name ?: def.functionName,
+    receiver = receiver ?: def.receiverType,
+    returnType = returnType ?: def.returnType.toTypeNode(),
+    valueParameters = valueParameters ?: def.parameterTypes.map {
         FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() })
     },
-    body = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, def.returnType.toTypeNode()),
+    body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, def.returnType.toTypeNode()),
+    transformedRefName = transformedRefName,
 ) {
     override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>): RuntimeValue {
         return def.executable(receiver, arguments)
+    }
+
+    override fun copy(
+        name: String,
+        receiver: String?,
+        returnType: TypeNode,
+        valueParameters: List<FunctionValueParameterNode>,
+        body: BlockNode,
+        transformedRefName: String?
+    ): FunctionDeclarationNode {
+        if (this::class != CustomFunctionDeclarationNode::class) {
+            throw UnsupportedOperationException("Copying subclasses is not supported")
+        }
+        return CustomFunctionDeclarationNode(
+            def.copy(
+                receiverType = receiver,
+            ),
+            name = name,
+            receiver = receiver,
+            returnType = returnType,
+            valueParameters = valueParameters,
+            body = body,
+            transformedRefName = transformedRefName
+        )
     }
 }

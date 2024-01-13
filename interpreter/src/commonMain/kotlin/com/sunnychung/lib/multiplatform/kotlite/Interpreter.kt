@@ -68,13 +68,15 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
 
     internal val callStack = CallStack()
-    val globalScope = callStack.currentSymbolTable()
+    internal val globalScope = callStack.currentSymbolTable()
 
     init {
         executionEnvironment.getBuiltinFunctions(globalScope).forEach {
             callStack.provideBuiltinFunction(it)
         }
     }
+
+    fun symbolTable() = callStack.currentSymbolTable()
 
     fun DataType.toTypeNode() = TypeNode(name, null, isNullable)
 

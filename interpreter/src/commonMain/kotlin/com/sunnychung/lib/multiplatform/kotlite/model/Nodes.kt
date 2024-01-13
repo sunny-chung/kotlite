@@ -68,7 +68,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
         if (name == "Function" && this !is FunctionTypeNode) throw IllegalArgumentException("function type node should be a FunctionTypeNode instance")
     }
 
-    fun descriptiveName(): String = "$name${arguments?.let { "<${it.joinToString(", ") { it.descriptiveName() }}>" } ?: ""}${if (isNullable) "?" else ""}"
+    open fun descriptiveName(): String = "$name${arguments?.let { "<${it.joinToString(", ") { it.descriptiveName() }}>" } ?: ""}${if (isNullable) "?" else ""}"
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Type $name${if (isNullable) " ?" else ""}\"]"
@@ -184,7 +184,7 @@ open class FunctionDeclarationNode(
         }
     }
 
-    fun copy(
+    open fun copy(
         name: String = this.name,
         receiver: String? = this.receiver,
         returnType: TypeNode = this.returnType,
@@ -378,6 +378,13 @@ data class LambdaLiteralNode(
 
 class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: List<TypeNode>?, val returnType: TypeNode?, isNullable: Boolean)
     : TypeNode("Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
+
+    override fun descriptiveName(): String {
+        var s = "(${parameterTypes!!.joinToString(", ") { it.descriptiveName() }}) -> ${returnType!!.descriptiveName()}"
+        if (isNullable) s = "($s)?"
+        return s
+    }
+
     override fun copy(isNullable: Boolean): FunctionTypeNode {
         return FunctionTypeNode(
             receiverType = receiverType,

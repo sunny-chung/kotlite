@@ -1,9 +1,16 @@
+//buildscript {
+//    dependencies {
+//        classpath("$group:kotlite-stdlib-processor-plugin")
+//    }
+//}
+
 plugins {
     kotlin("multiplatform")
-    `maven-publish`
+    id("com.sunnychung.kotlite-stdlib-processor-plugin") version "0.1"
 }
 
-group = "com.sunnychung"
+//apply("kotlite-stdlib-processor-plugin")
+
 version = "0.1.0-SNAPSHOT"
 
 repositories {
@@ -13,7 +20,7 @@ repositories {
 kotlin {
     jvm {
         jvmToolchain(8)
-        withJava()
+//        withJava()
         testRuns.named("test") {
             executionTask.configure {
                 useJUnitPlatform()
@@ -66,12 +73,14 @@ kotlin {
         macosArm64(),
         macosX64()
     )
-    
+
     sourceSets {
         val commonMain by getting {
             dependencies {
                 implementation("co.touchlab:kermit:1.0.0")
+                implementation(project(":kotlite-interpreter"))
             }
+            kotlin.srcDir("build/generated/common/")
         }
         val commonTest by getting {
             dependencies {
@@ -117,3 +126,10 @@ kotlin {
         }
     }
 }
+
+kotliteStdLibHeaderProcessor {
+    inputDir = "src/kotlinheader/"
+    outputDir = "build/generated/common/"
+}
+
+//configure<> {  }

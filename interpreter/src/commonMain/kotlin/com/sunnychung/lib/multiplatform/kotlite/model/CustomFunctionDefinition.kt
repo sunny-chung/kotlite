@@ -1,6 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-class CustomFunctionDefinition(
+data class CustomFunctionDefinition(
     val receiverType: String?,
     val functionName: String,
 

@@ -34,6 +34,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringFieldIdentifierNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
@@ -1267,7 +1268,7 @@ class Parser(protected val lexer: Lexer) {
      *     | 'dynamic'
      *
      */
-    fun functionDeclaration(): FunctionDeclarationNode {
+    fun functionDeclaration(isProcessBody: Boolean = true): FunctionDeclarationNode {
         eat(TokenType.Identifier).also {
             if (it.value !in setOf("fun")) throw UnexpectedTokenException(it)
         }
@@ -1311,6 +1312,15 @@ class Parser(protected val lexer: Lexer) {
             TypeNode("Unit", null, false)
         }
         // TODO make functionBody optional for interfaces
+        if (!isProcessBody) {
+            return FunctionDeclarationNode(
+                name = name,
+                receiver = receiver,
+                returnType = type,
+                valueParameters = valueParameters,
+                body = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function)
+            )
+        }
         val body = functionBody()
         return FunctionDeclarationNode(name = name, receiver = receiver, returnType = type, valueParameters = valueParameters, body = body)
     }
@@ -1636,6 +1646,16 @@ class Parser(protected val lexer: Lexer) {
         }
         eat(TokenType.EOF)
         return ScriptNode(nodes)
+    }
+
+    fun libFunctionHeaderFile(): List<FunctionDeclarationNode> {
+        val result = mutableListOf<FunctionDeclarationNode>()
+        while (currentTokenExcludingNL().type != TokenType.EOF) {
+            repeatedNL()
+            result += functionDeclaration(isProcessBody = false)
+        }
+        eat(TokenType.EOF)
+        return result
     }
 
 
