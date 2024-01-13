@@ -89,19 +89,19 @@ class ClassMemberPropertyTest {
             val b: MyCls = MyCls()
             a.y = MyCls()
             a.x = 2
-            a.y.y = MyCls()
-            a.y.y.y = MyCls()
-            a.y.y.y.y = MyCls()
-            a.y.y.y.x = 4
+            a.y!!.y = MyCls()
+            a.y!!.y!!.y = MyCls()
+            a.y!!.y!!.y!!.y = MyCls()
+            a.y!!.y!!.y!!.x = 4
             b.y = MyCls()
-            b.y.x = 5
+            b.y!!.x = 5
             val a1: Int = a.x
-            val a2: Int = a.y.x
-            val a3: Int = a.y.y.x
-            val a4: Int = a.y.y.y.x
-            val a5: Int = a.y.y.y.y.x
+            val a2: Int = a.y!!.x
+            val a3: Int = a.y!!.y!!.x
+            val a4: Int = a.y!!.y!!.y!!.x
+            val a5: Int = a.y!!.y!!.y!!.y!!.x
             val b1: Int = b.x
-            val b2: Int = b.y.x
+            val b2: Int = b.y!!.x
         """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()

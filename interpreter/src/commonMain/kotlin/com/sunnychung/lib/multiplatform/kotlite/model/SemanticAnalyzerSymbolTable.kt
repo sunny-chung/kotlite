@@ -35,7 +35,7 @@ class SemanticAnalyzerSymbolTable(
         return extensionFunctionDeclarations.filter { it.value.receiver == receiver && it.value.name == originalName }
             .map { it.value to this } +
                 (Unit.takeIf { !isThisScopeOnly }?.let {
-                    (parentScope as? SemanticAnalyzerSymbolTable)?.findFunctionsByOriginalName(originalName, isThisScopeOnly)
+                    (parentScope as? SemanticAnalyzerSymbolTable)?.findExtensionFunctionsByOriginalName(receiver, originalName, isThisScopeOnly)
                 } ?: emptyList())
     }
 
@@ -82,9 +82,7 @@ class SemanticAnalyzerSymbolTable(
                 )
             }
         } else {
-            receiverClass.memberFunctions.filter {
-                it.value.name == originalName
-            }.map {
+            receiverClass.findMemberFunctionsByDeclaredName(originalName).map {
                 val it = it.value
                 FindCallableResult(
                     transformedName = it.transformedRefName!!,

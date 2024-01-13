@@ -748,6 +748,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         // at this moment subject must not be a primitive
         member.visit(modifier = modifier)
+
+        // find member
+        val subjectType = subject.type().toDataType()
+        val memberName = member.name
+        val clazz = subjectType.nameWithNullable.let { currentScope.findClass(it) ?: throw RuntimeException("Cannot find class `$it`") }.first
+        if (clazz.memberProperties.containsKey(memberName)) return
+        if (clazz.memberPropertyCustomAccessors.containsKey(memberName)) return
+        if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
+        if (currentScope.findExtensionFunctionsByOriginalName(subjectType.nameWithNullable, memberName).isNotEmpty()) return
+        throw SemanticException("Type `${subjectType.nameWithNullable}` has no member `$memberName`")
     }
 
     fun ClassDeclarationNode.visit(modifier: Modifier = Modifier()) {

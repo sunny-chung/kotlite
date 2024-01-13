@@ -68,8 +68,8 @@ class NullTest {
     }
 
     @Test
-    fun throwNPEOnNullAccessClassMemberProperty() {
-        assertFailsWith<EvaluateNullPointerException> {
+    fun preventNullAccessClassMemberProperty() {
+        assertFailsWith<SemanticException> {
             interpreter("""
                 class A {
                     val a: Int = 3
@@ -81,7 +81,7 @@ class NullTest {
     }
 
     @Test
-    fun throwNPEOnNullAccessClassMemberFunction() {
+    fun preventNullAccessClassMemberFunction() {
         assertFailsWith<SemanticException> {
             interpreter("""
                 class A {
@@ -94,7 +94,7 @@ class NullTest {
     }
 
     @Test
-    fun throwNPEOnNullAccessClassExtensionFunction() {
+    fun preventNullAccessClassExtensionFunction() {
         assertFailsWith<SemanticException> {
             interpreter("""
                 class A

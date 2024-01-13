@@ -46,4 +46,7 @@ class ClassDefinition(
     val memberPropertyNameToTransformedName: Map<String, String> = rawMemberProperties
         .filter { it.transformedRefName != null }
         .associate { it.name to it.transformedRefName!! }
+
+    fun findMemberFunctionsByDeclaredName(declaredName: String) =
+        memberFunctions.filter { it.value.name == declaredName }
 }
