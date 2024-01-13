@@ -197,6 +197,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun UnaryOpNode.eval(): RuntimeValue {
         val result = node!!.eval()
+        if (operator == "!!") {
+            if (result == NullValue) {
+                throw EvaluateNullPointerException()
+            }
+            return result as RuntimeValue
+        }
         return when (result) {
             is NumberValue<*> -> when (operator) {
                 "+" -> IntValue(0) + result

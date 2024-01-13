@@ -162,11 +162,11 @@ class ClassMemberFunctionTest {
                 var other: MyCls? = null
                 
                 fun funcA(): Int {
-                    return ++a + other.funcB()
+                    return ++a + other!!.funcB()
                 }
                 
                 fun funcB(): Int {
-                    return other.a++
+                    return other!!.a++
                 }
             }
             val o1: MyCls = MyCls()

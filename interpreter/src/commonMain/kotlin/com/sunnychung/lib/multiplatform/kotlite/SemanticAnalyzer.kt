@@ -1008,7 +1008,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         type = it
     }
 
-    fun UnaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: node!!.type(modifier = modifier).also { type = it }
+    fun UnaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        type?.let { return it }
+        return if (operator == "!!") {
+            node!!.type(modifier = modifier).copy(isNullable = false)
+        } else {
+            node!!.type(modifier = modifier)
+        }.also { type = it }
+    }
 
     // e.g. `name()`, where name is a VariableReferenceNode
     fun VariableReferenceNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()) = type ?: (

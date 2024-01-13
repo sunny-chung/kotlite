@@ -302,10 +302,17 @@ class Parser(protected val lexer: Lexer) {
      *     | navigationSuffix
      */
     fun postfixUnarySuffix(subject: ASTNode): ASTNode {
-        when (currentToken.value) { // TODO complete
+        when (val op = currentToken.value as? String) { // TODO complete
             "(", "{" -> return callSuffix(subject)
-            "++" -> { eat(TokenType.Operator, "++"); return UnaryOpNode(subject, "post++") }
-            "--" -> { eat(TokenType.Operator, "--"); return UnaryOpNode(subject, "post--") }
+            "++", "--" -> { eat(TokenType.Operator, op); return UnaryOpNode(subject, "post$op") }
+            "!" -> { // this rule prevents conflict with consecutive boolean "Not" operators
+                val nextToken = peekNextToken()
+                if (nextToken.type == TokenType.Operator && nextToken.value == "!") {
+                    eat(TokenType.Operator, op)
+                    eat(TokenType.Operator, op)
+                    return UnaryOpNode(subject, "!!")
+                }
+            }
         }
         when (currentTokenExcludingNL().value) {
             ".", "?." -> return navigationSuffix(subject)
