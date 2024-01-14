@@ -1,5 +1,6 @@
 package com.sunnychung.gradle.plugin.kotlite.codegenerator.domain
 
+import com.sunnychung.gradle.plugin.kotlite.codegenerator.KotliteModuleConfig
 import com.sunnychung.lib.multiplatform.kotlite.CodeGenerator
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
@@ -9,8 +10,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 
-internal class StdLibDelegationCodeGenerator(val name: String, val headers: String) {
-    val parser = Parser(Lexer(headers))
+internal class StdLibDelegationCodeGenerator(val name: String, val code: String, val config: KotliteModuleConfig) {
+    val parser = Parser(Lexer(code))
     val extensionProperties: List<PropertyDeclarationNode>
     val functionInterfaces: List<FunctionDeclarationNode>
 
@@ -42,15 +43,16 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
-//import com.sunnychung.lib.multiplatform.kotlite.model.RegexValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 
+${config.imports.joinToString("") { "import $it\n" } }
+
 open class ${name}LibModule : LibraryModule("$name") {
-    override val properties = listOf(${extensionProperties.joinToString("") { "\n${it.generate(indent(8))},\n" }}
+    override val properties = listOf<ExtensionProperty>(${extensionProperties.joinToString("") { "\n${it.generate(indent(8))},\n" }}
     )
     
-    override val functions = listOf(${functionInterfaces.joinToString("") { "\n${it.generate(indent(8))},\n" }}
+    override val functions = listOf<CustomFunctionDefinition>(${functionInterfaces.joinToString("") { "\n${it.generate(indent(8))},\n" }}
     )
 }
 """
