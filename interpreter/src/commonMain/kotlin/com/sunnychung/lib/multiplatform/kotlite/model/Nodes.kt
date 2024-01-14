@@ -102,6 +102,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
 data class PropertyDeclarationNode(
     val name: String,
+    val receiver: String?,
     val declaredType: TypeNode?,
     val isMutable: Boolean,
     val initialValue: ASTNode?,
@@ -312,6 +313,7 @@ data class NavigationNode(
     val operator: String,
     val member: ClassMemberReferenceNode,
     @ModifyByAnalyzer var type: TypeNode? = null,
+    @ModifyByAnalyzer var transformedRefName: String? = null, // for extension property use
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Navigation Node\"]"

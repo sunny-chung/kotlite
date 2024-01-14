@@ -20,6 +20,7 @@ open class SymbolTable(
 
     protected val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
     protected val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
+    protected val extensionProperties = mutableMapOf<String, ExtensionProperty>()
 
     private val classDeclarations = mutableMapOf<String, ClassDefinition>()
 
@@ -185,6 +186,30 @@ open class SymbolTable(
     fun findExtensionFunction(name: String, isThisScopeOnly: Boolean = false): FunctionDeclarationNode? {
         return extensionFunctionDeclarations[name]
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunction(name) }
+    }
+
+    fun declareExtensionProperty(transformedName: String, extensionProperty: ExtensionProperty) {
+        if (extensionProperties.containsKey(transformedName)) {
+            throw DuplicateIdentifierException(name = transformedName, classifier = IdentifierClassifier.Property)
+        }
+        val receiverClass = findClass(extensionProperty.receiver)?.first ?: throw RuntimeException("Class `${extensionProperty.receiver}` not found")
+        if (receiverClass.memberPropertyNameToTransformedName.containsKey(extensionProperty.declaredName)) {
+            throw DuplicateIdentifierException(name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
+        }
+        if (extensionProperties.any { it.value.receiver == extensionProperty.receiver && it.value.declaredName == extensionProperty.declaredName }) {
+            throw DuplicateIdentifierException(name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
+        }
+        extensionProperties[transformedName] = extensionProperty
+    }
+
+    fun findExtensionProperty(name: String, isThisScopeOnly: Boolean = false): ExtensionProperty? {
+        return extensionProperties[name]
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionProperty(name) }
+    }
+
+    fun findExtensionPropertyByDeclaration(receiver: String, declaredName: String, isThisScopeOnly: Boolean = false): Pair<String, ExtensionProperty>? {
+        return extensionProperties.asSequence().firstOrNull { it.value.receiver == receiver && it.value.declaredName == declaredName }?.toPair()
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionPropertyByDeclaration(receiver, declaredName, isThisScopeOnly) }
     }
 
     fun findTransformedNameByDeclaredName(declaredName: String): String

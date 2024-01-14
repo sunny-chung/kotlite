@@ -170,4 +170,38 @@ class MemberExistanceCheckTest {
             a.b.a.f()
         """.trimIndent())
     }
+
+    @Test
+    fun functionCannotBeAccessedWithoutCall() {
+        assertSemanticFail("""
+            class A {
+                fun f() {}
+            }
+            val f = A().f
+        """.trimIndent())
+    }
+
+    @Test
+    fun nonexistMemberPropertyGetter() {
+        assertSemanticFail("""
+            class Cls {
+                val a: Int
+                    set(value) {}
+            }
+            val o: Cls = Cls()
+            val x = o.a
+        """.trimIndent())
+    }
+
+    @Test
+    fun nonexistMemberPropertySetter() {
+        assertSemanticFail("""
+            class Cls {
+                val a: Int
+                    get() = 10
+            }
+            val o: Cls = Cls()
+            o.a = 20
+        """.trimIndent())
+    }
 }

@@ -71,8 +71,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     internal val globalScope = callStack.currentSymbolTable()
 
     init {
+        executionEnvironment.getBuiltinClasses(globalScope).forEach {
+            callStack.provideBuiltinClass(it)
+        }
         executionEnvironment.getBuiltinFunctions(globalScope).forEach {
             callStack.provideBuiltinFunction(it)
+        }
+        executionEnvironment.getExtensionProperties(globalScope).forEach {
+            callStack.provideBuiltinExtensionProperty(it)
         }
     }
 
@@ -265,7 +271,15 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             is NavigationNode -> {
-                val obj = this.subject.eval() as ClassInstance
+                val subject = this.subject.eval() as RuntimeValue
+
+                if (transformedRefName != null) { // extension property
+                    (symbolTable().findExtensionProperty(transformedRefName!!)?.setter
+                        ?: throw RuntimeException("Setter not found"))(subject, value)
+                    return
+                }
+
+                val obj = subject as ClassInstance
 //                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
                 // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
                 obj.assign(obj.clazz.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value)/*?.also {
@@ -707,6 +721,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     val p = it.parameter
                     PropertyDeclarationNode(
                         name = p.name,
+                        receiver = fullQualifiedName,
                         declaredType = p.type,
                         isMutable = it.isMutable,
                         initialValue = p.defaultValue,
@@ -729,8 +744,18 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun NavigationNode.eval(): RuntimeValue {
-        val obj = subject.eval() as? ClassInstance ?: throw EvaluateNullPointerException()
+        val obj = subject.eval() as RuntimeValue
 //        return obj.memberPropertyValues[member.transformedRefName!!]!!
+
+        if (transformedRefName != null) {
+            val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!)
+                ?: throw RuntimeException("Extension property `${member.name}` on receiver `${obj.type().nameWithNullable}` could not be found")
+            extensionProperty.getter?.let { getter ->
+                return getter(obj)
+            }
+        }
+
+        obj as? ClassInstance ?: throw EvaluateNullPointerException()
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)) {
             is RuntimeValue -> r

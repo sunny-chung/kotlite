@@ -21,12 +21,20 @@ class CallStack {
         )
     }
 
+    internal fun provideBuiltinClass(clazz: ClassDefinition) {
+        activationRecords[0].symbolTable.declareClass(clazz)
+    }
+
     internal fun provideBuiltinFunction(function: CustomFunctionDeclarationNode) {
         if (function.receiver == null) {
             activationRecords[0].symbolTable.declareFunction(function.transformedRefName!!, function)
         } else {
             activationRecords[0].symbolTable.declareExtensionFunction(function.transformedRefName!!, function)
         }
+    }
+
+    internal fun provideBuiltinExtensionProperty(property: ExtensionProperty) {
+        activationRecords[0].symbolTable.declareExtensionProperty(property.transformedName!!, property)
     }
 
     fun getStacktrace(): List<String> {

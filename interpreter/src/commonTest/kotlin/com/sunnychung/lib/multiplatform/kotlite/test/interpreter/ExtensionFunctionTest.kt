@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -348,7 +349,7 @@ class ExtensionFunctionTest {
     }
 
     @Test
-    @Ignore
+    @Ignore // TODO wait for ?: operator
     fun nullableExtensionReferenceToThis() {
         val interpreter = interpreter("""
             fun Int?.happyNumber(): Int = (this ?: 100) + 5

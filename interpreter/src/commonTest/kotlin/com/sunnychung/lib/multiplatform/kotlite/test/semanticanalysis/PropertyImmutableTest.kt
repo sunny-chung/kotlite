@@ -238,6 +238,51 @@ class PropertyImmutableTest {
     }
 
     @Test
+    fun memberValProperty1() {
+        assertFailsWith<SemanticException> {
+            interpreter("""
+                class MyCls {
+                    val a: Int = 1
+                }
+                val o: MyCls = MyCls()
+                o.a = 20
+            """.trimIndent()).eval()
+        }
+    }
+
+    @Test
+    fun memberValProperty2() {
+        assertFailsWith<SemanticException> {
+            interpreter("""
+                class MyCls {
+                    val a: Int = 1
+                    fun f() {
+                        a = 2
+                    }
+                }
+                val o: MyCls = MyCls()
+                o.f()
+            """.trimIndent()).eval()
+        }
+    }
+
+    @Test
+    fun memberValProperty3() {
+        assertFailsWith<SemanticException> {
+            interpreter("""
+                class MyCls {
+                    val a: Int = 1
+                    fun f() {
+                        this.a = 2
+                    }
+                }
+                val o: MyCls = MyCls()
+                o.f()
+            """.trimIndent()).eval()
+        }
+    }
+
+    @Test
     fun memberPropertySetterArgument() {
         val analyzer = semanticAnalyzer(
             """

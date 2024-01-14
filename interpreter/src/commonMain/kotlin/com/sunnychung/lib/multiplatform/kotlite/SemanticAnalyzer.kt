@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
+import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
@@ -63,7 +64,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
 class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
     val builtinSymbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
     val symbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = builtinSymbolTable)
-    var currentScope = symbolTable
+    var currentScope = builtinSymbolTable
     var functionDefIndex = 0
     val symbolRecorders = mutableListOf<SymbolReferenceSet>()
 
@@ -88,39 +89,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         .toMap()
 
     init {
-        listOf("Int", "Double", "Boolean", "String", "Char", "Unit", "Nothing", "Function").forEach {
-            builtinSymbolTable.declareClass(ClassDefinition(
-                currentScope = builtinSymbolTable,
-                name = it,
-                isInstanceCreationAllowed = false,
-                orderedInitializersAndPropertyDeclarations = emptyList(),
-                rawMemberProperties = emptyList(),
-                memberFunctions = emptyMap(),
-                primaryConstructor = null,
-            ))
-            builtinSymbolTable.declareClass(ClassDefinition(
-                currentScope = builtinSymbolTable,
-                name = "$it?",
-                isInstanceCreationAllowed = false,
-                orderedInitializersAndPropertyDeclarations = emptyList(),
-                rawMemberProperties = emptyList(),
-                memberFunctions = emptyMap(),
-                primaryConstructor = null,
-            ))
+        executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
+            builtinSymbolTable.declareClass(it)
         }
 
+        executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
+            it.transformedName = "EP//${it.receiver}/${it.declaredName}/${++functionDefIndex}"
+            builtinSymbolTable.declareExtensionProperty(it.transformedName!!, it)
+        }
         val libFunctions = executionEnvironment.getBuiltinFunctions(builtinSymbolTable)
-        libFunctions.forEach {
-                if (it.receiver == null) {
-                    builtinSymbolTable.declareFunction(it.name, it)
-                } else {
-                    builtinSymbolTable.declareExtensionFunction("${it.receiver}/${it.name}", it)
-                }
-            }
-
         libFunctions.forEach {
             it.visit()
         }
+
+        currentScope = symbolTable
     }
 
     fun TypeNode.toNullable() = if (isNullable) {
@@ -272,7 +254,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //                log.v { "Assign $variableName type ${subject.type()} <- type ${value.type()}" }
             }
             is NavigationNode -> {
-                subject.visit(modifier = modifier)
+                subject.visit(modifier = modifier, isCheckWriteAccess = true)
                 // TODO handle NavigationNode
 
 //                log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
@@ -526,7 +508,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
 
             is NavigationNode -> {
-                function.visit(modifier = modifier)
+                function.visit(modifier = modifier, IdentifierClassifier.Function)
                 val receiverType = function.subject.type().toDataType()
                 val lookupReceiverTypes = if (!receiverType.isNullable || function.operator == ".") {
                     listOf(receiverType)
@@ -743,7 +725,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         body?.visit(modifier = modifier)
     }
 
-    fun NavigationNode.visit(modifier: Modifier = Modifier()) {
+    fun NavigationNode.visit(modifier: Modifier = Modifier(), lookupType: IdentifierClassifier = IdentifierClassifier.Property, isCheckWriteAccess: Boolean = false) {
         subject.visit(modifier = modifier)
 
         // at this moment subject must not be a primitive
@@ -753,10 +735,37 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         val subjectType = subject.type().toDataType()
         val memberName = member.name
         val clazz = subjectType.nameWithNullable.let { currentScope.findClass(it) ?: throw RuntimeException("Cannot find class `$it`") }.first
-        if (clazz.memberProperties.containsKey(memberName)) return
-        if (clazz.memberPropertyCustomAccessors.containsKey(memberName)) return
-        if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
-        if (currentScope.findExtensionFunctionsByOriginalName(subjectType.nameWithNullable, memberName).isNotEmpty()) return
+        if (lookupType == IdentifierClassifier.Property) {
+            if (clazz.memberProperties.containsKey(memberName)) {
+                if (isCheckWriteAccess && !clazz.memberProperties[memberName]!!.isMutable) {
+                    throw SemanticException("val `$memberName` cannot be reassigned")
+                }
+                return
+            }
+            if (clazz.memberPropertyCustomAccessors.containsKey(memberName)) {
+                val accessor = clazz.memberPropertyCustomAccessors[memberName]!!
+                if (isCheckWriteAccess) {
+                    if (accessor.setter == null) {
+                        throw SemanticException("Setter for `$memberName` is not declared")
+                    }
+                } else if (accessor.getter == null) {
+                    throw SemanticException("Getter for `$memberName` is not declared")
+                }
+                return
+            }
+            currentScope.findExtensionPropertyByDeclaration(subjectType.nameWithNullable, memberName)?.let {
+                if (isCheckWriteAccess && it.second.setter == null) {
+                    throw SemanticException("Setter for `$memberName` is not declared")
+                } else if (!isCheckWriteAccess && it.second.getter == null) {
+                    throw SemanticException("Getter for `$memberName` is not declared")
+                }
+                transformedRefName = it.first
+                return
+            }
+        } else {
+            if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
+            if (currentScope.findExtensionFunctionsByOriginalName(subjectType.nameWithNullable, memberName).isNotEmpty()) return
+        }
         throw SemanticException("Type `${subjectType.nameWithNullable}` has no member `$memberName`")
     }
 
@@ -808,6 +817,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                             val p = it.parameter
                             PropertyDeclarationNode(
                                 name = p.name,
+                                receiver = fullQualifiedClassName,
                                 declaredType = p.type,
                                 isMutable = it.isMutable,
                                 initialValue = p.defaultValue,
@@ -1035,7 +1045,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 ?: currentScope.getPropertyType(variableName).first.type.toTypeNode()!!
             ).also { type = it }
 
-    fun NavigationNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+    fun NavigationNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier(), lookupType: IdentifierClassifier = IdentifierClassifier.Property): TypeNode {
         type?.let { return it }
         val subjectType = when(val type = subject.type(modifier = modifier)) {
             is FunctionTypeNode -> type.returnType
@@ -1043,18 +1053,38 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         } ?: return typeRegistry["Any"]!!
         val clazz = currentScope.findClass(subjectType.name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
-        clazz.memberFunctions[memberName]?.let {
-            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.returnType, isNullable = false).also { type = it }
-        }
-        clazz.memberPropertyCustomAccessors[memberName]?.let {
-            return it.type(modifier = modifier).also { type = it }
-        }
-        clazz.memberProperties[memberName]?.let {
-            return it.type.toTypeNode().also { type = it }
-        }
-
-        findExtensionFunction(subjectType.toDataType(), memberName)?.let {
-            return FunctionTypeNode(parameterTypes = emptyList(), returnType = it.returnType, isNullable = false).also { type = it }
+        if (lookupType == IdentifierClassifier.Property) {
+            clazz.memberPropertyCustomAccessors[memberName]?.let {
+                return it.type(modifier = modifier).also { type = it }
+            }
+            clazz.memberProperties[memberName]?.let {
+                return it.type.toTypeNode().also { type = it }
+            }
+            transformedRefName?.let {
+                currentScope.findExtensionProperty(it)
+            }?.let {
+                it.typeNode?.let { type ->
+                    return type
+                }
+                return Parser(Lexer(it.type)).type().also { type ->
+                    it.typeNode = type
+                }
+            }
+        } else {
+            clazz.memberFunctions[memberName]?.let {
+                return FunctionTypeNode(
+                    parameterTypes = emptyList(),
+                    returnType = it.returnType,
+                    isNullable = false
+                ).also { type = it }
+            }
+            findExtensionFunction(subjectType.toDataType(), memberName)?.let {
+                return FunctionTypeNode(
+                    parameterTypes = emptyList(),
+                    returnType = it.returnType,
+                    isNullable = false
+                ).also { type = it }
+            }
         }
 
         throw SemanticException("Could not find member `$memberName` for type ${clazz.name}")
@@ -1066,7 +1096,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     fun FunctionCallNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         returnType?.let { return it }
-        val functionType = function.type(modifier = modifier)
+        val functionType = when (function) {
+            is NavigationNode -> {
+                function.type(modifier = modifier, lookupType = IdentifierClassifier.Function)
+            }
+            else -> function.type(modifier = modifier)
+        }
         if (functionType !is FunctionTypeNode) {
             throw SemanticException("Cannot invoke non-function expression")
         }

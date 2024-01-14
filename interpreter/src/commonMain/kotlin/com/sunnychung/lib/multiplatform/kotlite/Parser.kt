@@ -1046,7 +1046,13 @@ class Parser(protected val lexer: Lexer) {
             }
         }
         repeatedNL()
-        val (name, type) = variableDeclaration()
+        val (receiver, name) = receiverTypeAndIdentifier()
+        val type = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
+            repeatedNL()
+            eat(TokenType.Symbol, ":")
+            repeatedNL()
+            type()
+        } else null
 
         val initialValue = if (currentToken.type == TokenType.Symbol && currentToken.value == "=") {
             eat(TokenType.Symbol, "=")
@@ -1098,7 +1104,7 @@ class Parser(protected val lexer: Lexer) {
             }
             else -> null
         }
-        return PropertyDeclarationNode(name = name, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
+        return PropertyDeclarationNode(name = name, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
     }
 
     /**
@@ -1241,22 +1247,6 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
-     *
-     * functionDeclaration:
-     *     [modifiers]
-     *     'fun'
-     *     [{NL} typeParameters]
-     *     [{NL} receiverType {NL} '.']
-     *     {NL}
-     *     simpleIdentifier
-     *     {NL}
-     *     functionValueParameters
-     *     [{NL} ':' {NL} type]
-     *     [{NL} typeConstraints]
-     *     [{NL} functionBody]
-     *
-     *
-     *
      * receiverType:
      *     [typeModifiers] (parenthesizedType | nullableType | typeReference)
      *
@@ -1266,13 +1256,8 @@ class Parser(protected val lexer: Lexer) {
      * typeReference:
      *     userType
      *     | 'dynamic'
-     *
      */
-    fun functionDeclaration(isProcessBody: Boolean = true): FunctionDeclarationNode {
-        eat(TokenType.Identifier).also {
-            if (it.value !in setOf("fun")) throw UnexpectedTokenException(it)
-        }
-        repeatedNL()
+    fun receiverTypeAndIdentifier(): Pair<String?, String> {
         val identifiers = mutableListOf<String>()
         var hasEatenQuestionMark = false
         var numOfDotsAfterQuestionMark = 0
@@ -1300,6 +1285,31 @@ class Parser(protected val lexer: Lexer) {
         } while (isCurrentToken(TokenType.Operator, ".") || isCurrentToken(TokenType.Operator, "?."))
         val name = identifiers.removeLast()
         val receiver = identifiers.takeIf { it.isNotEmpty() }?.joinToString(".")
+        return receiver to name
+    }
+
+    /**
+     *
+     * functionDeclaration:
+     *     [modifiers]
+     *     'fun'
+     *     [{NL} typeParameters]
+     *     [{NL} receiverType {NL} '.']
+     *     {NL}
+     *     simpleIdentifier
+     *     {NL}
+     *     functionValueParameters
+     *     [{NL} ':' {NL} type]
+     *     [{NL} typeConstraints]
+     *     [{NL} functionBody]
+     *
+     */
+    fun functionDeclaration(isProcessBody: Boolean = true): FunctionDeclarationNode {
+        eat(TokenType.Identifier).also {
+            if (it.value !in setOf("fun")) throw UnexpectedTokenException(it)
+        }
+        repeatedNL()
+        val (receiver, name) = receiverTypeAndIdentifier()
         val valueParameters = functionValueParameters()
         repeatedNL()
         val type = if (isCurrentToken(type = TokenType.Symbol, value = ":")) {

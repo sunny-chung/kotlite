@@ -14,7 +14,12 @@ fun semanticAnalyzer(code: String, environment: ExecutionEnvironment = Execution
 fun assertSemanticFail(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) {
     assertFailsWith<SemanticException> {
         val a = semanticAnalyzer(code, environment)
-        a.analyze()
+        try {
+            a.analyze()
+        } catch (e: SemanticException) {
+            println(e.message)
+            throw e
+        }
     }
 }
 fun assertTypeCheckFail(code: String) {

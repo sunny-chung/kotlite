@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
