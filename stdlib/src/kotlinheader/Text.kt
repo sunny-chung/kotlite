@@ -1,5 +1,11 @@
 // package kotlin.text
 
+val String.length: Int
+    get()
+
+val String.lastIndex: Int
+    get()
+
 fun String.all(predicate: (Char) -> Boolean): Boolean
 fun String.any(predicate: (Char) -> Boolean): Boolean
 //fun String.chunked(size: Int): List<String>
@@ -36,7 +42,7 @@ fun String.isNotEmpty(): Boolean
 fun String?.isNullOrBlank(): Boolean
 fun String?.isNullOrEmpty(): Boolean
 fun String.last(): Char
-//fun String.lastIndexOf(string: String, startIndex: Int = lastIndex, ignoreCase: Boolean = false): Int
+fun String.lastIndexOf(string: String, startIndex: Int = lastIndex, ignoreCase: Boolean = false): Int
 fun String.lastOrNull(): Char?
 //fun String.lines(): List<String>
 fun String.lowercase(): String
@@ -73,7 +79,7 @@ fun String.singleOrNull(): Char?
 //fun String.split(delimiter: String, ignoreCase: Boolean = false, limit: Int = 0): List<String>
 //fun String.split(regex: Regex, limit: Int = 0): List<String>
 fun String.startsWith(prefix: String, ignoreCase: Boolean = false): Boolean
-fun String.substring(startIndex: Int, endIndex: Int /*= this.length*/): String
+fun String.substring(startIndex: Int, endIndex: Int = length): String
 fun String.substringAfter(delimiter: String, missingDelimiterValue: String = this): String
 fun String.substringAfterLast(delimiter: String, missingDelimiterValue: String = this): String
 fun String.substringBefore(delimiter: String, missingDelimiterValue: String = this): String

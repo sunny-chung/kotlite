@@ -1037,7 +1037,7 @@ class Parser(protected val lexer: Lexer) {
      *
      *
      */
-    fun propertyDeclaration(): ASTNode {
+    fun propertyDeclaration(isProcessBody: Boolean = true): PropertyDeclarationNode {
         val isMutable = eat(TokenType.Identifier).let {
             when (it.value) {
                 "val" -> false
@@ -1079,12 +1079,12 @@ class Parser(protected val lexer: Lexer) {
                 if (type == null) { // TODO make type infer possible
                     throw RuntimeException("Type is needed if there is custom accessor")
                 }
-                val getter = getter(type)
+                val getter = getter(type, isProcessBody)
                 val next = nextNonNLSemiToken()
                 val setter = if (next.type == TokenType.Identifier && next.value == "set") {
                     repeatedNL()
                     if (isSemi()) semi()
-                    setter(type)
+                    setter(type, isProcessBody)
                 } else null
                 PropertyAccessorsNode(type, getter, setter)
             }
@@ -1093,12 +1093,12 @@ class Parser(protected val lexer: Lexer) {
                 if (type == null) { // TODO make type infer possible
                     throw RuntimeException("Type is needed if there is custom accessor")
                 }
-                val setter = setter(type)
+                val setter = setter(type, isProcessBody)
                 val next = nextNonNLSemiToken()
                 val getter = if (next.type == TokenType.Identifier && next.value == "get") {
                     repeatedNL()
                     if (isSemi()) semi()
-                    getter(type)
+                    getter(type, isProcessBody)
                 } else null
                 PropertyAccessorsNode(type, getter, setter)
             }
@@ -1112,14 +1112,14 @@ class Parser(protected val lexer: Lexer) {
      *     [modifiers] 'get' [{NL} '(' {NL} ')' [{NL} ':' {NL} type] {NL} functionBody]
      *
      */
-    fun getter(type: TypeNode): FunctionDeclarationNode {
+    fun getter(type: TypeNode, isProcessBody: Boolean = true): FunctionDeclarationNode {
         eat(TokenType.Identifier, "get")
         repeatedNL()
         eat(TokenType.Operator, "(")
         repeatedNL()
         eat(TokenType.Operator, ")")
         repeatedNL()
-        val body = functionBody()
+        val body = if (isProcessBody) functionBody() else dummyBlockNode()
         return FunctionDeclarationNode(name = "get", returnType = type, valueParameters = emptyList(), body = body)
     }
 
@@ -1134,7 +1134,7 @@ class Parser(protected val lexer: Lexer) {
      *     simpleIdentifier {NL} [':' {NL} type]
      *
      */
-    fun setter(type: TypeNode): FunctionDeclarationNode {
+    fun setter(type: TypeNode, isProcessBody: Boolean = true): FunctionDeclarationNode {
         eat(TokenType.Identifier, "set")
         repeatedNL()
         eat(TokenType.Operator, "(")
@@ -1151,7 +1151,7 @@ class Parser(protected val lexer: Lexer) {
         } else {
             TypeNode("Unit", null, false)
         }
-        val body = functionBody()
+        val body = if (isProcessBody) functionBody() else dummyBlockNode()
         return FunctionDeclarationNode(
             name = "set",
             returnType = returnType,
@@ -1328,12 +1328,14 @@ class Parser(protected val lexer: Lexer) {
                 receiver = receiver,
                 returnType = type,
                 valueParameters = valueParameters,
-                body = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function)
+                body = dummyBlockNode()
             )
         }
         val body = functionBody()
         return FunctionDeclarationNode(name = name, receiver = receiver, returnType = type, valueParameters = valueParameters, body = body)
     }
+
+    fun dummyBlockNode() = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function)
 
     /**
      * classParameter:
@@ -1658,11 +1660,18 @@ class Parser(protected val lexer: Lexer) {
         return ScriptNode(nodes)
     }
 
-    fun libFunctionHeaderFile(): List<FunctionDeclarationNode> {
-        val result = mutableListOf<FunctionDeclarationNode>()
+    /**
+     * @return list of FunctionDeclarationNode and PropertyDeclarationNode
+     */
+    fun libHeaderFile(): List<ASTNode> {
+        val result = mutableListOf<ASTNode>()
         while (currentTokenExcludingNL().type != TokenType.EOF) {
             repeatedNL()
-            result += functionDeclaration(isProcessBody = false)
+            if (isCurrentToken(TokenType.Identifier, "val") || isCurrentToken(TokenType.Identifier, "var")) {
+                result += propertyDeclaration(isProcessBody = false)
+            } else {
+                result += functionDeclaration(isProcessBody = false)
+            }
         }
         eat(TokenType.EOF)
         return result

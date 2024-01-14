@@ -14,8 +14,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+fun parser(code: String) = Parser(Lexer(code))
+
 class ParserTest {
-    private fun parser(code: String) = Parser(Lexer(code))
 
     fun Token.assertToken(type: TokenType, value: Any) {
         assertEquals(type, this.type)

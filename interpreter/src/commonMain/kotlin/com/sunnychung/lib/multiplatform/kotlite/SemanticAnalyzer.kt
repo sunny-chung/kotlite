@@ -41,6 +41,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NullType
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyOwnerInfo
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
@@ -94,6 +95,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
 
         executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
+            Parser(Lexer(it.type)).type().also { type ->
+                it.typeNode = type
+            }
             it.transformedName = "EP//${it.receiver}/${it.declaredName}/${++functionDefIndex}"
             builtinSymbolTable.declareExtensionProperty(it.transformedName!!, it)
         }
@@ -362,7 +366,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
             if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(l)) {
                 val symbols = symbolRecorders.last()
-                symbols.properties += ownerRef ?: transformedRefName!!
+                symbols.properties += ownerRef?.ownerRefName ?: transformedRefName!!
             }
         } else if (variableName == "this") {
             if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(l)) {
@@ -390,11 +394,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     fun FunctionDeclarationNode.visit(modifier: Modifier = Modifier()) {
         val previousScope = currentScope
+        var additionalScopeCount = 0
         pushScope(
             scopeName = name,
             scopeType = ScopeType.Function,
             returnType = returnType.toDataType(),
         )
+        ++additionalScopeCount
 
         if (receiver == null) {
             valueParameters.forEach { it.visit(modifier = modifier) }
@@ -426,6 +432,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/$receiver")
                 }
             }
+            currentScope.findExtensionPropertyByReceiver(typeNode.descriptiveName()).forEach {
+                currentScope.declareProperty(
+                    name = it.second.declaredName,
+                    type = it.second.typeNode!!,
+                    isMutable = it.second.setter != null
+                )
+                currentScope.declarePropertyOwner(
+                    name = "${it.second.declaredName}/${currentScope.scopeLevel}",
+                    owner = "this/$receiver",
+                    extensionPropertyRef = it.first,
+                )
+            }
+
+            pushScope("$name(valueParameters)", ScopeType.FunctionParameters)
+            ++additionalScopeCount
 
             valueParameters.forEach { it.visit(modifier = modifier) }
 
@@ -443,7 +464,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         body.visit(modifier = modifier)
 
-        // TODO check for return
+        // TODO check for return statement
 
         val valueType = body.type().toDataType()
         val subjectType = returnType.toDataType()
@@ -451,7 +472,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
         }
 
-        popScope()
+        while (additionalScopeCount-- > 0) {
+            popScope()
+        }
 
         evaluateAndRegisterReturnType(this)
     }
@@ -480,7 +503,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 )
                     .firstOrNull()
                     ?: throw SemanticException("No matching function `${function.variableName}` found")
-                function.ownerRef = resolution.owner
+                function.ownerRef = resolution.owner?.let { PropertyOwnerInfo(it) }
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
 
@@ -1063,12 +1086,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             transformedRefName?.let {
                 currentScope.findExtensionProperty(it)
             }?.let {
-                it.typeNode?.let { type ->
-                    return type
-                }
-                return Parser(Lexer(it.type)).type().also { type ->
-                    it.typeNode = type
-                }
+                return it.typeNode!!
             }
         } else {
             clazz.memberFunctions[memberName]?.let {

@@ -14,7 +14,7 @@ open class SymbolTable(
 ) {
     private val propertyDeclarations = mutableMapOf<String, PropertyType>()
     internal val propertyValues = mutableMapOf<String, RuntimeValueAccessor>()
-    internal val propertyOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
+    internal val propertyOwners = mutableMapOf<String, PropertyOwnerInfo>() // only use in SemanticAnalyzer
     internal val functionOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
     internal val transformedSymbols = mutableMapOf<Pair<IdentifierClassifier, String>, String>() // only use in SemanticAnalyzer. transformed name -> original name
 
@@ -64,8 +64,8 @@ open class SymbolTable(
     /**
      * Only use in SemanticAnalyzer
      */
-    fun declarePropertyOwner(name: String, owner: String) {
-        propertyOwners[name] = owner
+    fun declarePropertyOwner(name: String, owner: String, extensionPropertyRef: String? = null) {
+        propertyOwners[name] = PropertyOwnerInfo(ownerRefName = owner, extensionPropertyRef = extensionPropertyRef)
     }
 
     /**
@@ -80,7 +80,7 @@ open class SymbolTable(
      *
      * @param name use transformed name
      */
-    fun findPropertyOwner(name: String): String? {
+    fun findPropertyOwner(name: String): PropertyOwnerInfo? {
         if (propertyOwners.containsKey(name)) {
             return propertyOwners[name]
         } else {
@@ -210,6 +210,12 @@ open class SymbolTable(
     fun findExtensionPropertyByDeclaration(receiver: String, declaredName: String, isThisScopeOnly: Boolean = false): Pair<String, ExtensionProperty>? {
         return extensionProperties.asSequence().firstOrNull { it.value.receiver == receiver && it.value.declaredName == declaredName }?.toPair()
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionPropertyByDeclaration(receiver, declaredName, isThisScopeOnly) }
+    }
+
+    fun findExtensionPropertyByReceiver(receiver: String, isThisScopeOnly: Boolean = false): List<Pair<String, ExtensionProperty>> {
+        return extensionProperties.filter { it.value.receiver == receiver }.map { it.toPair() }.toList() +
+            (Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionPropertyByReceiver(receiver, isThisScopeOnly) }
+                ?: emptyList())
     }
 
     fun findTransformedNameByDeclaredName(declaredName: String): String

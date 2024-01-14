@@ -6,11 +6,19 @@ import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 
 internal class StdLibDelegationCodeGenerator(val name: String, val headers: String) {
     val parser = Parser(Lexer(headers))
-    val functionInterfaces: List<FunctionDeclarationNode> = parser.libFunctionHeaderFile()
+    val extensionProperties: List<PropertyDeclarationNode>
+    val functionInterfaces: List<FunctionDeclarationNode>
+
+    init {
+        val parsed = parser.libHeaderFile()
+        extensionProperties = parsed.filterIsInstance<PropertyDeclarationNode>()
+        functionInterfaces = parsed.filterIsInstance<FunctionDeclarationNode>()
+    }
 
     init {
         if (name.any { !it.isJavaIdentifierPart() }) {
@@ -29,6 +37,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
@@ -37,7 +46,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 
-class ${name}LibModule : LibraryModule("$name") {
+open class ${name}LibModule : LibraryModule("$name") {
+    override val properties = listOf(${extensionProperties.joinToString("") { "\n${it.generate(indent(8))},\n" }}
+    )
+    
     override val functions = listOf(${functionInterfaces.joinToString("") { "\n${it.generate(indent(8))},\n" }}
     )
 }
@@ -86,11 +98,11 @@ class ${name}LibModule : LibraryModule("$name") {
 
     fun generateLambda(variableName: String, type: FunctionTypeNode, indent: Int): String {
         return """{ ${type.parameterTypes!!.mapIndexed { i, it -> "arg$i: ${it.descriptiveName()}" }.joinToString(", ")} ${if (!type.parameterTypes!!.isEmpty()) "->" else ""}
-${type.parameterTypes!!.mapIndexed { i, it -> "    val wa$i = ${wrap("arg$i", it)}" }.joinToString("\n")}
+${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i", it)}" }.joinToString("\n")}
 
-    val result = ($variableName as LambdaValue).execute(arrayOf(${type.parameterTypes!!.indices.joinToString(", ") { "wa$it" }}))
-    ${unwrap("result", type.returnType!!)}
-}""".prependIndent(indent(indent)).trimStart()
+        val result = ($variableName as LambdaValue).execute(arrayOf(${type.parameterTypes!!.indices.joinToString(", ") { "wa$it" }}))
+        ${unwrap("result", type.returnType!!)}
+    }""".prependIndent(indent(indent)).trimStart()
     }
 
     fun FunctionValueParameterNode.generate(indent: String): String {
@@ -99,7 +111,28 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "    val wa$i = ${wrap("arg$i", it
                 ", defaultValueExpression = \"${CodeGenerator(defaultValue!!, isPrintDebugInfo = false).generateCode().escape()}\""
             } else ""
         })"""
-    } // TODO geenerate default value
+    }
+
+    fun PropertyDeclarationNode.generate(indent: String): String {
+        val isReceiverNullable = receiver!!.endsWith('?')
+        val receiverQuestion = if (isReceiverNullable) "?" else ""
+
+        return """ExtensionProperty(
+    declaredName = "${name.escape()}",
+    receiver = "${receiver!!.escape()}",
+    type = "${type.descriptiveName().escape()}",
+    getter = ${accessors?.getter?.let { """{ receiver ->
+        val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value
+        val result = unwrappedReceiver.$name
+        ${wrap("result", type)}
+    }""" } ?: "null"},
+    setter = ${accessors?.setter?.let { """{ receiver, value ->
+        val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value
+        val unwrappedValue = ${unwrap("value", type)}
+        unwrappedReceiver.$name = unwrappedValue
+    }""" } ?: "null"},
+)""".prependIndent(indent)
+    }
 
     fun indent(n: Int) = " ".repeat(n)
 

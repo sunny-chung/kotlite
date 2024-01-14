@@ -264,7 +264,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         when (this) {
             is VariableReferenceNode -> {
                 if (this.ownerRef != null) {
-                    NavigationNode(VariableReferenceNode(ownerRef!!), ".", ClassMemberReferenceNode(this.variableName, this.transformedRefName)).write(value)
+                    NavigationNode(
+                        subject = VariableReferenceNode(ownerRef!!.ownerRefName),
+                        operator = ".",
+                        member = ClassMemberReferenceNode(this.variableName, this.transformedRefName),
+                        transformedRefName = ownerRef!!.extensionPropertyRef
+                    ).write(value)
                 } else {
                     callStack.currentSymbolTable().assign(this.transformedRefName ?: this.variableName, value)
                 }
@@ -331,7 +336,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         // usual variable -> transformedRefName
         // class constructor -> variableName? TODO
         if (ownerRef != null) {
-            return NavigationNode(VariableReferenceNode(ownerRef!!), ".", ClassMemberReferenceNode(variableName, transformedRefName)).eval()
+            return NavigationNode(
+                subject = VariableReferenceNode(ownerRef!!.ownerRefName),
+                operator = ".",
+                member = ClassMemberReferenceNode(variableName, transformedRefName),
+                transformedRefName = ownerRef!!.extensionPropertyRef,
+            ).eval()
         }
         return callStack.currentSymbolTable().read(transformedRefName ?: variableName)
     }
@@ -353,9 +363,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 if (this.function.ownerRef != null) {
                     return this.copy(
                         function = NavigationNode(
-                            VariableReferenceNode(this.function.ownerRef!!),
-                            ".",
-                            ClassMemberReferenceNode(directName)
+                            subject = VariableReferenceNode(this.function.ownerRef!!.ownerRefName),
+                            operator = ".",
+                            member = ClassMemberReferenceNode(directName),
+                            transformedRefName = this.function.ownerRef!!.extensionPropertyRef,
                         )
                     ).eval()
                 }
@@ -755,7 +766,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
         }
 
-        obj as? ClassInstance ?: throw EvaluateNullPointerException()
+        if (obj == NullValue) throw EvaluateNullPointerException()
+        obj as? ClassInstance ?: throw RuntimeException("Cannot access member `${member.name}` for type `${obj.type().nameWithNullable}`")
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)) {
             is RuntimeValue -> r

@@ -115,4 +115,46 @@ class ClassMemberPropertyTest {
         assertEquals(1, (symbolTable.findPropertyByDeclaredName("b1") as IntValue).value)
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
     }
+
+    @Test
+    fun propertyOverriddenByLocalVariable() {
+        val interpreter = interpreter("""
+            class MyCls {
+                var a: Int = 1
+                fun f(): Int {
+                    var a: Int = 2
+                    return a
+                }
+            }
+            val o: MyCls = MyCls()
+            val x: Int = o.f()
+        """.trimIndent(), isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun propertyOverriddenByFunctionParameter() {
+        val interpreter = interpreter("""
+            var a: Int = -1
+            class MyCls {
+                var a: Int = 1
+                fun f(a: Int): Int {
+                    return a
+                }
+            }
+            val o: MyCls = MyCls()
+            val x: Int = o.f(a = 2)
+        """.trimIndent(), isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }

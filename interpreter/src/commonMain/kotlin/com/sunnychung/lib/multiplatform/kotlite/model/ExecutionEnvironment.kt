@@ -65,6 +65,9 @@ class ExecutionEnvironment(
     }
 
     fun install(module: LibraryModule) {
+        module.properties.forEach {
+            registerExtensionProperty(it)
+        }
         module.functions.forEach {
             registerFunction(it)
         }

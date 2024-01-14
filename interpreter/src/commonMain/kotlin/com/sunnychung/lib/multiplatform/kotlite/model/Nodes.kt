@@ -129,7 +129,7 @@ data class AssignmentNode(val subject: ASTNode, val operator: String, val value:
     }
 }
 
-open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: String? = null, @ModifyByAnalyzer var type: TypeNode? = null) : ASTNode {
+open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: PropertyOwnerInfo? = null, @ModifyByAnalyzer var type: TypeNode? = null) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 

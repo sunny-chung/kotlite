@@ -73,7 +73,7 @@ class SemanticAnalyzerSymbolTable(
                 val transformedName = "$originalName/${this.scopeLevel}"
                 thisScopeCandidates += FindCallableResult(
                     transformedName = transformedName,
-                    owner = findPropertyOwner(transformedName),
+                    owner = findPropertyOwner(transformedName)?.ownerRefName,
                     type = CallableType.Property,
                     arguments = (it.first.type as FunctionType).arguments,
                     returnType = (it.first.type as FunctionType).returnType.toTypeNode(),
