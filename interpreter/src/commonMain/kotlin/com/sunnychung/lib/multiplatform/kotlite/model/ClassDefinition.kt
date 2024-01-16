@@ -1,7 +1,9 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-class ClassDefinition(
-    currentScope: SymbolTable,
+import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+
+open class ClassDefinition(
+    currentScope: SymbolTable?,
 
     val name: String,
     val fullQualifiedName: String = name, // TODO
@@ -22,10 +24,21 @@ class ClassDefinition(
     val primaryConstructor: ClassPrimaryConstructorNode?,
 ) {
     // key = original name
+    // does not include properties with custom accessors
     val memberProperties: Map<String, PropertyType> = rawMemberProperties
         .filter { it.accessors == null }
         .associate {
-            it.name to (currentScope.typeNodeToPropertyType(
+            it.name to (currentScope!!.typeNodeToPropertyType(
+                it.type,
+                it.isMutable
+            ) ?: if (it.type.name == name) {
+                PropertyType(ObjectType(this, it.type.isNullable), it.isMutable)
+            } else throw RuntimeException("Unknown type ${it.type.name}"))
+        }
+    // key = original name
+    val memberPropertyTypes: Map<String, PropertyType> = rawMemberProperties
+        .associate {
+            it.name to (currentScope!!.typeNodeToPropertyType(
                 it.type,
                 it.isMutable
             ) ?: if (it.type.name == name) {
@@ -49,4 +62,8 @@ class ClassDefinition(
 
     fun findMemberFunctionsByDeclaredName(declaredName: String) =
         memberFunctions.filter { it.value.name == declaredName }
+
+    open fun construct(interpreter: Interpreter, callArguments: Array<RuntimeValue>, callPosition: SourcePosition): ClassInstance {
+        return interpreter.constructClassInstance(callArguments, callPosition, this@ClassDefinition)
+    }
 }

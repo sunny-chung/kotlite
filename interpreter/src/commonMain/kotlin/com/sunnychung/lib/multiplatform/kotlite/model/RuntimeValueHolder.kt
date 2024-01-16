@@ -1,13 +1,15 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+
 /**
  * Its main use cases are to allow mutations to member properties of nested class instances and in lambdas.
  */
 interface RuntimeValueAccessor {
     val type: DataType
 
-    fun assign(value: RuntimeValue)
-    fun read(): RuntimeValue
+    fun assign(interpreter: Interpreter? = null, value: RuntimeValue)
+    fun read(interpreter: Interpreter? = null): RuntimeValue
 }
 
 class RuntimeValueHolder(override val type: DataType, val isMutable: Boolean, value: RuntimeValue? = null) : RuntimeValueAccessor {
@@ -15,11 +17,11 @@ class RuntimeValueHolder(override val type: DataType, val isMutable: Boolean, va
 
     init {
         if (value != null) {
-            assign(value)
+            assign(value = value)
         }
     }
 
-    override fun assign(value: RuntimeValue) {
+    override fun assign(interpreter: Interpreter?, value: RuntimeValue) {
         if (!isMutable && this.value != null) {
             throw RuntimeException("val cannot be reassigned")
         }
@@ -29,7 +31,7 @@ class RuntimeValueHolder(override val type: DataType, val isMutable: Boolean, va
         this.value = value
     }
 
-    override fun read() = value!!
+    override fun read(interpreter: Interpreter?) = value!!
 
     override fun toString(): String = value.toString()
 }
@@ -37,14 +39,14 @@ class RuntimeValueHolder(override val type: DataType, val isMutable: Boolean, va
 /**
  * For class members with custom accessors
  */
-class RuntimeValueDelegate(override val type: DataType, val reader: (() -> RuntimeValue)?, val writer: ((RuntimeValue) -> Unit)?) : RuntimeValueAccessor {
-    override fun assign(value: RuntimeValue) {
+class RuntimeValueDelegate(override val type: DataType, val reader: ((Interpreter?) -> RuntimeValue)?, val writer: ((Interpreter?, RuntimeValue) -> Unit)?) : RuntimeValueAccessor {
+    override fun assign(interpreter: Interpreter?, value: RuntimeValue) {
         if (writer == null) throw RuntimeException("Setter is not defined")
-        writer!!(value)
+        writer!!(interpreter, value)
     }
 
-    override fun read(): RuntimeValue {
+    override fun read(interpreter: Interpreter?): RuntimeValue {
         if (reader == null) throw RuntimeException("Getter is not defined")
-        return reader!!()
+        return reader!!(interpreter)
     }
 }

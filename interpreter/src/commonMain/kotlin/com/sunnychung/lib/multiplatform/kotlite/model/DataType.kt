@@ -2,7 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 sealed interface DataType {
 
-    val name: String
+    val name: String // fully qualified name
     val isNullable: Boolean
 
     val nameWithNullable get() = "$name${if (isNullable) "?" else ""}"

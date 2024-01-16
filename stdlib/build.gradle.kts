@@ -1,3 +1,5 @@
+import com.sunnychung.gradle.plugin.kotlite.codegenerator.KotliteModuleConfig
+
 //buildscript {
 //    dependencies {
 //        classpath("$group:kotlite-stdlib-processor-plugin")
@@ -130,6 +132,10 @@ kotlin {
 kotliteStdLibHeaderProcessor {
     inputDir = "src/kotlinheader/"
     outputDir = "build/generated/common/"
+    outputPackage = "com.sunnychung.lib.multiplatform.kotlite.stdlib"
+    configs = mapOf(
+        "Regex" to KotliteModuleConfig(
+            imports = listOf("com.sunnychung.lib.multiplatform.kotlite.stdlib.regex.RegexValue")
+        )
+    )
 }
-
-//configure<> {  }

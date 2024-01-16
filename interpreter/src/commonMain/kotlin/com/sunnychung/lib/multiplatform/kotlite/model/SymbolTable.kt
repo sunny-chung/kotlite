@@ -108,7 +108,7 @@ open class SymbolTable(
             if (!type.type.isAssignableFrom(value.type())) {
                 throw RuntimeException("Type ${value.type().name} cannot be casted to ${type.type.name}")
             }
-            propertyValues.getOrPut(name) { RuntimeValueHolder(type.type, type.isMutable, null) }.assign(value)
+            propertyValues.getOrPut(name) { RuntimeValueHolder(type.type, type.isMutable, null) }.assign(value = value)
             return true
         } else if (parentScope?.assign(name, value) == true) {
             return true

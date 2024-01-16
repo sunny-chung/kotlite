@@ -50,7 +50,6 @@ fun String.lowercase(): String
 //fun <R> String.mapIndexed(transform: (Int, Char) -> R): List<R>
 //fun <R> String.mapIndexedNotNull(transform: (Int, Char) -> R?): List<R>
 //fun <R> String.mapNotNull(transform: (Char) -> R?): List<R>
-//fun String.matches(regex: Regex): Boolean
 fun String.none(predicate: (Char) -> Boolean): Boolean
 fun String?.orEmpty(): String
 fun String.padEnd(length: Int, padChar: Char = ' '): String
@@ -63,21 +62,18 @@ fun String.removeRange(startIndex: Int, endIndex: Int): String
 fun String.removeSuffix(suffix: String): String
 fun String.removeSurrounding(prefix: String, suffix: String): String
 fun String.repeat(n: Int): String
-//fun String.replace(regex: Regex, replacement: String): String
 fun String.replace(oldValue: Char, newValue: Char, ignoreCase: Boolean = false): String
 fun String.replace(oldValue: String, newValue: String, ignoreCase: Boolean = false): String
 fun String.replaceAfter(delimiter: String, replacement: String, missingDelimiterValue: String = this): String
 fun String.replaceAfterLast(delimiter: String, replacement: String, missingDelimiterValue: String = this): String
 fun String.replaceBefore(delimiter: String, replacement: String, missingDelimiterValue: String = this): String
 fun String.replaceBeforeLast(delimiter: String, replacement: String, missingDelimiterValue: String = this): String
-//fun String.replaceFirst(regex: Regex, replacement: String): String
 fun String.replaceFirst(oldValue: String, newValue: String, ignoreCase: Boolean = false): String
 fun String.replaceRange(startIndex: Int, endIndex: Int, replacement: String): String
 fun String.reversed(): String
 fun String.single(): Char
 fun String.singleOrNull(): Char?
 //fun String.split(delimiter: String, ignoreCase: Boolean = false, limit: Int = 0): List<String>
-//fun String.split(regex: Regex, limit: Int = 0): List<String>
 fun String.startsWith(prefix: String, ignoreCase: Boolean = false): Boolean
 fun String.substring(startIndex: Int, endIndex: Int = length): String
 fun String.substringAfter(delimiter: String, missingDelimiterValue: String = this): String

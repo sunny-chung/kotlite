@@ -10,7 +10,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 
-internal class StdLibDelegationCodeGenerator(val name: String, val code: String, val config: KotliteModuleConfig) {
+internal class StdLibDelegationCodeGenerator(val name: String, val code: String, val outputPackage: String, val config: KotliteModuleConfig) {
     val parser = Parser(Lexer(code))
     val extensionProperties: List<PropertyDeclarationNode>
     val functionInterfaces: List<FunctionDeclarationNode>
@@ -31,7 +31,7 @@ internal class StdLibDelegationCodeGenerator(val name: String, val code: String,
         return """
 /** Generated code. DO NOT MODIFY! Changes to this file will be overwritten. **/
 
-package com.sunnychung.lib.multiplatform.kotlite.stdlib
+package $outputPackage
 
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
@@ -43,12 +43,15 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 
 ${config.imports.joinToString("") { "import $it\n" } }
 
-open class ${name}LibModule : LibraryModule("$name") {
+abstract class Abstract${name}LibModule : LibraryModule("$name") {
+    override val classes = emptyList<ProvidedClassDefinition>()
+
     override val properties = listOf<ExtensionProperty>(${extensionProperties.joinToString("") { "\n${it.generate(indent(8))},\n" }}
     )
     

@@ -12,6 +12,7 @@ class ExecutionEnvironment(
 ) {
     private val builtinFunctions: MutableList<CustomFunctionDeclarationNode> = mutableListOf()
     private val extensionProperties: MutableList<ExtensionProperty> = mutableListOf()
+    private val providedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
 
     fun registerFunction(function: CustomFunctionDefinition) {
         if (functionRegistrationFilter(function)) {
@@ -24,6 +25,12 @@ class ExecutionEnvironment(
     fun registerExtensionProperty(property: ExtensionProperty) {
         if (propertyRegistrationFilter(property)) {
             extensionProperties += property
+        }
+    }
+
+    fun registerClass(clazz: ProvidedClassDefinition) {
+        if (classRegistrationFilter(clazz.fullQualifiedName)) {
+            providedClasses += clazz
         }
     }
 
@@ -61,10 +68,17 @@ class ExecutionEnvironment(
                     )
                 }
             )
-        }
+        } +
+                providedClasses.filter { classRegistrationFilter(it.fullQualifiedName) } +
+                providedClasses.filter { classRegistrationFilter("${it.fullQualifiedName}?") }.map {
+                    it.copyNullableClassDefinition()
+                }
     }
 
     fun install(module: LibraryModule) {
+        module.classes.forEach {
+            registerClass(it)
+        }
         module.properties.forEach {
             registerExtensionProperty(it)
         }

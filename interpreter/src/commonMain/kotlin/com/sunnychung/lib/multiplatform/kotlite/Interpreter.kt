@@ -287,7 +287,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 val obj = subject as ClassInstance
 //                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
                 // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-                obj.assign(obj.clazz.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value)/*?.also {
+                obj.assign(interpreter = this@Interpreter, name = obj.clazz!!.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value = value)/*?.also {
                     FunctionCallNode(
                         it,
                         listOf(FunctionCallArgumentNode(index = 0, value = ValueNode(value))),
@@ -527,9 +527,6 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun FunctionCallNode.evalCreateClassInstance(clazz: ClassDefinition): ClassInstance {
-        val instance = ClassInstance(this@Interpreter, clazz)
-        val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
-
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassInitializer, callPosition = this.position)
         try {
             // TODO generalize duplicated code
@@ -552,91 +549,103 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             val symbolTable = callStack.currentSymbolTable()
-            val nonPropertyArguments = mutableMapOf<String, Pair<TypeNode, RuntimeValue>>()
             clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
                 // no need to use transformedRefName as duplicated declarations are not possible here
                 val value = callArguments[index] ?: (it.parameter.defaultValue!!.eval() as RuntimeValue)
                 symbolTable.declareProperty(it.parameter.transformedRefName!!, it.parameter.type, false)
                 symbolTable.assign(it.parameter.transformedRefName!!, value)
-                if (it.isProperty) {
-                    instance.assign(it.parameter.transformedRefName!!, value)
-//                    instance.memberPropertyValues[it.parameter.transformedRefName!!] = value
-                } else {
-                    nonPropertyArguments[it.parameter.transformedRefName!!] = Pair(it.parameter.type, value)
-                }
+                callArguments[index] = value
             }
 
-            // move nonPropertyArguments from outer scope into inner scope
-            nonPropertyArguments.keys.forEach {
-                symbolTable.undeclareProperty(it)
+            return clazz.construct(this@Interpreter, callArguments as Array<RuntimeValue>, position)
+        } finally {
+            callStack.pop(ScopeType.ClassInitializer)
+        }
+    }
+
+    fun constructClassInstance(callArguments: Array<RuntimeValue>, callPosition: SourcePosition, clazz: ClassDefinition): ClassInstance {
+        val instance = ClassInstance(clazz.fullQualifiedName, clazz)
+        val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
+
+        val symbolTable = callStack.currentSymbolTable()
+        val nonPropertyArguments = mutableMapOf<String, Pair<TypeNode, RuntimeValue>>()
+        clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
+            val value = callArguments[index]
+            if (it.isProperty) {
+                instance.assign(name = it.parameter.transformedRefName!!, value = value)
+//                    instance.memberPropertyValues[it.parameter.transformedRefName!!] = value
+            } else {
+                nonPropertyArguments[it.parameter.transformedRefName!!] = Pair(it.parameter.type, value)
             }
+        }
+
+        // move nonPropertyArguments from outer scope into inner scope
+        nonPropertyArguments.keys.forEach {
+            symbolTable.undeclareProperty(it)
+        }
 //            clazz.primaryConstructor?.parameters?.forEach {
 //                symbolTable.undeclareProperty(it.parameter.transformedRefName!!)
 //            }
 
-            // variable "this" is available after primary constructor
-            symbolTable.declareProperty("this/${instance.clazz.fullQualifiedName}", TypeNode(instance.clazz.name, null, false), false)
-            symbolTable.assign("this/${instance.clazz.fullQualifiedName}", instance)
+        // variable "this" is available after primary constructor
+        symbolTable.declareProperty("this/${instance.clazz!!.fullQualifiedName}", TypeNode(instance.clazz!!.name, null, false), false)
+        symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
 //            instance.memberPropertyValues.forEach {
-//                symbolTable.putPropertyHolder(instance.clazz.memberPropertyNameToTransformedName[it.key]!!, it.value)
+//                symbolTable.putPropertyHolder(instance.clazz!!.memberPropertyNameToTransformedName[it.key]!!, it.value)
 //            }
 
-            clazz.orderedInitializersAndPropertyDeclarations.forEach {
-                callStack.push(
-                    functionFullQualifiedName = "init-property",
-                    scopeType = ScopeType.ClassInitializer,
-                    callPosition = this.position
-                )
-                try {
-                    val innerSymbolTable = callStack.currentSymbolTable()
-                    nonPropertyArguments.forEach {
-                        val keyWithIncreasedScope = it.key.replaceAfterLast("/", innerSymbolTable.scopeLevel.toString())
-                        log.v("keyWithIncreasedScope = $keyWithIncreasedScope")
-                        innerSymbolTable.declareProperty(keyWithIncreasedScope, it.value.first, false)
-                        innerSymbolTable.assign(keyWithIncreasedScope, it.value.second)
-                    }
-                    when (it) {
-                        is PropertyDeclarationNode -> {
-                            properties += it.transformedRefName!!
-                            val value = it.initialValue?.eval() as RuntimeValue?
-                            value?.let { value ->
-                                instance.assign(it.transformedRefName!!, value)
-                            }
-                        }
-
-                        is ClassInstanceInitializerNode -> {
-                            val init = FunctionDeclarationNode(
-                                name = "init",
-                                returnType = TypeNode("Unit", null, false),
-                                valueParameters = emptyList(),
-                                body = it.block
-                            )
-                            evalFunctionCall(
-                                callNode = FunctionCallNode(
-                                    function = this, /* not used */
-                                    arguments = emptyList(),
-                                    position = this.position,
-                                ),
-                                functionNode = init,
-                                extraScopeParameters = emptyMap(),
-                            )
-                        }
-
-                        else -> Unit
-                    }
-                } finally {
-                    callStack.pop(ScopeType.ClassInitializer)
+        clazz!!.orderedInitializersAndPropertyDeclarations.forEach {
+            callStack.push(
+                functionFullQualifiedName = "init-property",
+                scopeType = ScopeType.ClassInitializer,
+                callPosition = callPosition
+            )
+            try {
+                val innerSymbolTable = callStack.currentSymbolTable()
+                nonPropertyArguments.forEach {
+                    val keyWithIncreasedScope = it.key.replaceAfterLast("/", innerSymbolTable.scopeLevel.toString())
+                    log.v("keyWithIncreasedScope = $keyWithIncreasedScope")
+                    innerSymbolTable.declareProperty(keyWithIncreasedScope, it.value.first, false)
+                    innerSymbolTable.assign(keyWithIncreasedScope, it.value.second)
                 }
-            }
-        } finally {
-            callStack.pop(ScopeType.ClassInitializer)
-        }
+                when (it) {
+                    is PropertyDeclarationNode -> {
+                        properties += it.transformedRefName!!
+                        val value = it.initialValue?.eval() as RuntimeValue?
+                        value?.let { value ->
+                            instance.assign(name = it.transformedRefName!!, value = value)
+                        }
+                    }
 
+                    is ClassInstanceInitializerNode -> {
+                        val init = FunctionDeclarationNode(
+                            name = "init",
+                            returnType = TypeNode("Unit", null, false),
+                            valueParameters = emptyList(),
+                            body = it.block
+                        )
+                        evalFunctionCall(
+                            callNode = FunctionCallNode(
+                                function = init, /* not used */
+                                arguments = emptyList(),
+                                position = callPosition,
+                            ),
+                            functionNode = init,
+                            extraScopeParameters = emptyMap(),
+                        )
+                    }
+
+                    else -> Unit
+                }
+            } finally {
+                callStack.pop(ScopeType.ClassInitializer)
+            }
+        }
         return instance
     }
 
 //    fun FunctionCallNode.evalClassMemberFunctionCall(subject: ClassInstance, member: ClassMemberReferenceNode): RuntimeValue {
-//        val function = subject.clazz.memberFunctions[member.name] ?: throw EvaluateRuntimeException("Member function `${member.name}` not found")
+//        val function = subject.clazz!!.memberFunctions[member.name] ?: throw EvaluateRuntimeException("Member function `${member.name}` not found")
 //        return evalClassMemberAnyFunctionCall(subject, function)
 //    }
 
@@ -652,7 +661,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //            // TODO optimize to only copy needed members
 //            if (subject is ClassInstance) {
 //                subject.memberPropertyValues.forEach {
-//                    symbolTable.putPropertyHolder(subject.clazz.memberPropertyNameToTransformedName[it.key]!!, it.value)
+//                    symbolTable.putPropertyHolder(subject.clazz!!.memberPropertyNameToTransformedName[it.key]!!, it.value)
 //                }
 //            }
 
@@ -769,7 +778,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         if (obj == NullValue) throw EvaluateNullPointerException()
         obj as? ClassInstance ?: throw RuntimeException("Cannot access member `${member.name}` for type `${obj.type().nameWithNullable}`")
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-        return when (val r = obj.read(obj.clazz.memberPropertyNameToTransformedName[member.name]!!)) {
+        return when (val r = obj.read(interpreter = this@Interpreter, name = obj.clazz!!.memberPropertyNameToTransformedName[member.name]!!)) {
             is RuntimeValue -> r
             /*is FunctionDeclarationNode -> {
                 FunctionCallNode(

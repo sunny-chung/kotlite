@@ -19,6 +19,9 @@ abstract class KotliteCommonKotlinCodeGenerateTask : DefaultTask() {
     abstract val outputDir: DirectoryProperty
 
     @get:Input
+    abstract val outputPackage: Property<String>
+
+    @get:Input
     abstract val configs: MapProperty<String, KotliteModuleConfig>
 
     @TaskAction
@@ -29,7 +32,12 @@ abstract class KotliteCommonKotlinCodeGenerateTask : DefaultTask() {
             if (!it.name.endsWith(".kt")) return@forEach
             val name = it.nameWithoutExtension
             val config = configs.get()[name] ?: KotliteModuleConfig()
-            val output = StdLibDelegationCodeGenerator(name, it.readText(), config).generate()
+            val output = StdLibDelegationCodeGenerator(
+                name = name,
+                code = it.readText(),
+                outputPackage = outputPackage.get(),
+                config = config
+            ).generate()
             File(outputDirObj, "${name}LibModule.kt").writeText(output)
         }
     }

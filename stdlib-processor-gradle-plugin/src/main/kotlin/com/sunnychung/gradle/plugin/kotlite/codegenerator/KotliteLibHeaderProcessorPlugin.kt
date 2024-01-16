@@ -15,6 +15,7 @@ class KotliteLibHeaderProcessorPlugin : Plugin<Project> {
         project.tasks.register(taskName, KotliteCommonKotlinCodeGenerateTask::class.java) {
             it.inputDir.set(File(extension.inputDir.get()))
             it.outputDir.set(File(extension.outputDir.get()))
+            it.outputPackage.set(extension.outputPackage.get())
             it.configs.set(extension.configs.get())
         }
         project.afterEvaluate {
@@ -30,6 +31,7 @@ class KotliteLibHeaderProcessorPlugin : Plugin<Project> {
 interface KotliteLibHeaderProcessorPluginExtension {
     val inputDir: Property<String>
     val outputDir: Property<String>
+    val outputPackage: Property<String>
     val configs: MapProperty<String, KotliteModuleConfig>
 }
 

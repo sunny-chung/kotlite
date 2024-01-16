@@ -2,21 +2,32 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 
-class ClassInstance(interpreter: Interpreter, val clazz: ClassDefinition, val memberPropertyValues: MutableMap<String, RuntimeValueAccessor> = mutableMapOf()) : RuntimeValue {
-
-    override fun type(): DataType = ObjectType(clazz)
+open class ClassInstance(protected val fullClassName: String, clazz: ClassDefinition? = null, val memberPropertyValues: MutableMap<String, RuntimeValueAccessor> = mutableMapOf()) : RuntimeValue {
+    internal var clazz: ClassDefinition? = null
+    internal var hasInitialized: Boolean = false
 
     init {
+        if (clazz != null) {
+            attach(clazz)
+        }
+    }
+
+    final override fun type(): DataType = ObjectType(clazz ?: throw RuntimeException("This object has not been initialized"))
+
+    internal fun attach(clazz: ClassDefinition) {
+        if (clazz.fullQualifiedName != fullClassName) throw RuntimeException("The class to attach does not match with class name")
+        if (this.clazz != null) throw RuntimeException("This object has already been initialized")
+        this.clazz = clazz
+
         clazz.memberProperties.forEach {
             memberPropertyValues[it.key] = RuntimeValueHolder(it.value.type, it.value.isMutable, null)
         }
 
-        val symbolTable = interpreter.callStack.currentSymbolTable()
         clazz.memberPropertyCustomAccessors.forEach {
             memberPropertyValues[it.key] = RuntimeValueDelegate(
-                type = symbolTable.typeNodeToPropertyType(it.value.type, false)!!.type,
-                reader = {
-                    with(interpreter) {
+                type = clazz.memberPropertyTypes[it.key]!!.type,
+                reader = { interpreter ->
+                    with(interpreter!!) {
                         val function = it.value.getter!!
                         FunctionCallNode(
                             function,
@@ -25,8 +36,8 @@ class ClassInstance(interpreter: Interpreter, val clazz: ClassDefinition, val me
                         ).evalClassMemberAnyFunctionCall(this@ClassInstance, function)
                     }
                 },
-                writer = { value ->
-                    with(interpreter) {
+                writer = { interpreter, value ->
+                    with(interpreter!!) {
                         val function = it.value.setter!!
                         FunctionCallNode(
                             function,
@@ -37,22 +48,24 @@ class ClassInstance(interpreter: Interpreter, val clazz: ClassDefinition, val me
                 }
             )
         }
+
+        hasInitialized = true
     }
 
-    fun assign(name: String, value: RuntimeValue): FunctionDeclarationNode? {
-        val name = clazz.memberTransformedNameToPropertyName[name]
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz.name}")
+    fun assign(interpreter: Interpreter? = null, name: String, value: RuntimeValue): FunctionDeclarationNode? {
+        val name = clazz!!.memberTransformedNameToPropertyName[name]
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
 
         // TODO remove
-        val customAccessor = clazz.memberPropertyCustomAccessors[name]
+        val customAccessor = clazz!!.memberPropertyCustomAccessors[name]
         customAccessor?.setter?.let {
 //            return it
-            memberPropertyValues[name]!!.assign(value)
+            memberPropertyValues[name]!!.assign(interpreter, value)
             return null
         }
 
-        val propertyDefinition = clazz.memberProperties[name]
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz.name}")
+        val propertyDefinition = clazz!!.memberProperties[name]
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
 //        if (!propertyDefinition.isMutable && memberPropertyValues.containsKey(name)) {
 //            throw RuntimeException("val cannot be reassigned")
 //        }
@@ -60,42 +73,42 @@ class ClassInstance(interpreter: Interpreter, val clazz: ClassDefinition, val me
             throw RuntimeException("Type ${value.type().name} cannot be casted to ${propertyDefinition.type.name}")
         }
 
-        memberPropertyValues[name]!!.assign(value)
+        memberPropertyValues[name]!!.assign(interpreter, value)
         return null
     }
 
     /**
      * Return value must be either FunctionDeclarationNode (if custom getter is defined) or RuntimeValue
      */
-    fun read(name: String): Any {
-        val name = clazz.memberTransformedNameToPropertyName[name]
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz.name}")
+    fun read(interpreter: Interpreter? = null, name: String): Any {
+        val name = clazz!!.memberTransformedNameToPropertyName[name]
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
 
         // TODO remove
-        val customAccessor = clazz.memberPropertyCustomAccessors[name]
+        val customAccessor = clazz!!.memberPropertyCustomAccessors[name]
         customAccessor?.getter?.let {
 //            return it
-            return memberPropertyValues[name]!!.read()
+            return memberPropertyValues[name]!!.read(interpreter)
         }
 
-        val propertyDefinition = clazz.memberProperties[name]
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz.name}")
+        val propertyDefinition = clazz!!.memberProperties[name]
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
 
-        return memberPropertyValues[name]!!.read()
+        return memberPropertyValues[name]!!.read(interpreter)
     }
 
     fun getPropertyHolder(name: String): RuntimeValueAccessor? {
-        val name = clazz.memberTransformedNameToPropertyName[name]
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz.name}")
+        val name = clazz!!.memberTransformedNameToPropertyName[name]
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
 
         return memberPropertyValues[name]
     }
 
-    fun findPropertyByDeclaredName(declaredName: String): RuntimeValue {
-        return memberPropertyValues[declaredName]!!.read()
+    fun findPropertyByDeclaredName(declaredName: String, interpreter: Interpreter? = null): RuntimeValue {
+        return memberPropertyValues[declaredName]!!.read(interpreter)
     }
 
-    override fun convertToString(): String = "${clazz.fullQualifiedName}()" // TODO
+    override fun convertToString(): String = "${clazz!!.fullQualifiedName}()" // TODO
 
-    override fun toString(): String = "${clazz.fullQualifiedName}($memberPropertyValues)"
+    override fun toString(): String = "${clazz!!.fullQualifiedName}($memberPropertyValues)"
 }
