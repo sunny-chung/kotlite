@@ -92,4 +92,36 @@ class StringLibTest {
         assertEquals(7, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(6, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
+
+    @Test
+    fun toInt() {
+        val env = ExecutionEnvironment().apply {
+            install(TextLibModule())
+        }
+        val interpreter = interpreter("""
+            val a = "1234"
+            val b = a.toInt() + 123
+            val c = "567".toInt() + 12
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(1357, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(579, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun toBoolean() {
+        val env = ExecutionEnvironment().apply {
+            install(TextLibModule())
+        }
+        val interpreter = interpreter("""
+            val a: String? = null
+            val b = a.toBoolean()
+            val c = "true".toBoolean()
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+    }
 }

@@ -84,6 +84,14 @@ fun String.take(n: Int): String
 fun String.takeLast(n: Int): String
 fun String.takeLastWhile(predicate: (Char) -> Boolean): String
 fun String.takeWhile(predicate: (Char) -> Boolean): String
+fun String?.toBoolean(): Boolean
+fun String.toBooleanStrictOrNull(): Boolean?
+fun String.toDouble(): Double
+fun String.toDoubleOrNull(): Double?
+fun String.toInt(): Int
+fun String.toInt(radix: Int): Int
+fun String.toIntOrNull(): Int?
+fun String.toIntOrNull(radix: Int): Int?
 fun String.trim(): String
 fun String.trimEnd(): String
 fun String.trimStart(): String
