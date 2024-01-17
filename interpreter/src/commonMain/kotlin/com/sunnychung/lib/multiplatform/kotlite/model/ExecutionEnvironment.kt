@@ -43,7 +43,7 @@ class ExecutionEnvironment(
     }
 
     internal fun getBuiltinClasses(topmostSymbolTable: SymbolTable): List<ClassDefinition> {
-        return listOf("Int", "Double", "Boolean", "String", "Char", "Unit", "Nothing", "Function").flatMap { className ->
+        return listOf("Int", "Double", "Boolean", "String", "Char", "Unit", "Nothing", "Function", "Class", "Any").flatMap { className ->
             if (!classRegistrationFilter(className)) return@flatMap emptyList()
             listOf(
                 ClassDefinition(

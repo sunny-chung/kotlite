@@ -25,6 +25,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentInfo
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -410,7 +411,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         pushScope(
             scopeName = name,
             scopeType = ScopeType.Function,
-            returnType = returnType.toDataType(),
+            returnType = declaredReturnType?.toDataType() ?: typeRegistry["Any?"]!!.toDataType(),
         )
         ++additionalScopeCount
 
@@ -482,9 +483,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         // TODO check for return statement
 
         val valueType = body.type().toDataType()
-        val subjectType = returnType.toDataType()
-        if (subjectType !is UnitType && !subjectType.isAssignableFrom(valueType)) {
-            throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
+        if (declaredReturnType == null && body.format == FunctionBodyFormat.Expression) {
+            inferredReturnType = body.type()
+        } else {
+            val subjectType = returnType.toDataType()
+            if (subjectType !is UnitType && !subjectType.isAssignableFrom(valueType)) {
+                throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
+            }
         }
 
         while (additionalScopeCount-- > 0) {

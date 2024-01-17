@@ -629,7 +629,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     is ClassInstanceInitializerNode -> {
                         val init = FunctionDeclarationNode(
                             name = "init",
-                            returnType = TypeNode("Unit", null, false),
+                            declaredReturnType = TypeNode("Unit", null, false),
                             valueParameters = emptyList(),
                             body = it.block
                         )

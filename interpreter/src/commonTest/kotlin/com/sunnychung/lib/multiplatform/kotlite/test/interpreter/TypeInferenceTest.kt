@@ -1,10 +1,13 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -106,8 +109,7 @@ class TypeInferenceTest {
 
     @Test
     fun propertyNothing() {
-        val interpreter = interpreter(
-            """
+        val interpreter = interpreter("""
             val a = null
             val b = a == null
             val c = null != a
@@ -121,6 +123,25 @@ class TypeInferenceTest {
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
         assertEquals("nullnull", (symbolTable.findPropertyByDeclaredName("d") as StringValue).value)
+    }
+
+    @Test
+    fun propertyObject() {
+        val interpreter = interpreter("""
+            class A(val x: Int)
+            val a = A(10)
+            val b = A(20)
+            val c = a.x
+            val d = b.x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("a") is ClassInstance)
+        assertTrue(symbolTable.findPropertyByDeclaredName("b") is ClassInstance)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
     }
 
     @Test
@@ -337,5 +358,269 @@ class TypeInferenceTest {
         assertEquals(2, symbolTable.propertyValues.size)
         assertEquals("a1", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
         assertEquals("b2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
+
+    @Test
+    fun functionBlockDoesNotInferReturnType() {
+        assertSemanticFail("""
+            fun f() {
+                3
+            }
+            val a = f()
+            val b = a + 1
+        """.trimIndent())
+    }
+
+    @Test
+    fun functionReturnsInt() {
+        val interpreter = interpreter("""
+            fun f() = 3
+            fun g(a: Int) = 4 + a
+            val a = f()
+            val b = g(a)
+            val c = g(b) + f()
+            val d = f() + g(b)
+            val e = 1 - g(b)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(7, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(-10, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+    }
+
+    @Test
+    fun functionReturnsDouble() {
+        val interpreter = interpreter("""
+            fun f() = 3.14
+            fun g(a: Double) = 1 + a
+            val a = f()
+            val b = g(a)
+            val c = g(b) + f()
+            val d = f() + g(b)
+            val e = 1 - g(b)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        compareNumber(3.14, symbolTable.findPropertyByDeclaredName("a") as DoubleValue)
+        compareNumber(4.14, symbolTable.findPropertyByDeclaredName("b") as DoubleValue)
+        compareNumber(8.28, symbolTable.findPropertyByDeclaredName("c") as DoubleValue)
+        compareNumber(8.28, symbolTable.findPropertyByDeclaredName("d") as DoubleValue)
+        compareNumber(-4.14, symbolTable.findPropertyByDeclaredName("e") as DoubleValue)
+    }
+
+    @Test
+    fun functionReturnsString() {
+        val interpreter = interpreter("""
+            fun f() = "abcd"
+            fun g(a: Int) = "efgh" + a
+            val a = f()
+            val b = g(2)
+            val c = g(3) + f()
+            val d = f() + g(3)
+            val e = f() + "xyz"
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals("abcd", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("efgh2", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals("efgh3abcd", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals("abcdefgh3", (symbolTable.findPropertyByDeclaredName("d") as StringValue).value)
+        assertEquals("abcdxyz", (symbolTable.findPropertyByDeclaredName("e") as StringValue).value)
+    }
+
+    @Test
+    fun functionReturnsBoolean() {
+        val interpreter = interpreter("""
+            fun f() = false
+            fun g(a: Int) = a > 0
+            val a = f()
+            val b = g(2)
+            val c = g(-3)
+            val d = f() || g(3)
+            val e = f() && g(4)
+            val f = !f() && (false || f() || f() || true)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
+    }
+
+    @Test
+    fun functionReturnsNothing() {
+        val interpreter = interpreter("""
+            fun f() = null
+            fun g(a: Int) = if (a > 0) null else null
+            val a = f()
+            val b = g(10)
+            val c = f() + null
+            val d = f() + g(20)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("a") is NullValue)
+        assertTrue(symbolTable.findPropertyByDeclaredName("b") is NullValue)
+        assertEquals("nullnull", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals("nullnull", (symbolTable.findPropertyByDeclaredName("d") as StringValue).value)
+    }
+
+    @Test
+    fun functionReturnsObject() {
+        val interpreter = interpreter("""
+            class A(val x: Int)
+            fun f() = A(1)
+            fun g(a: Int) = A(a)
+            val a = f()
+            val b = g(10)
+            val c = f().x + g(20).x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("a") is ClassInstance)
+        assertTrue(symbolTable.findPropertyByDeclaredName("b") is ClassInstance)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun functionReturnsNullableObject() {
+        val interpreter = interpreter("""
+            class A(val x: Int)
+            fun f() = A(1)
+            fun g(a: Int) = if (a > 0) {
+                A(a)
+            } else {
+                null
+            }
+            val a = f()
+            val b = g(10)
+            val c = g(-10)
+            val d = f().x + g(20)!!.x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("a") is ClassInstance)
+        assertTrue(symbolTable.findPropertyByDeclaredName("b") is ClassInstance)
+        assertTrue(symbolTable.findPropertyByDeclaredName("c") is NullValue)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
+
+    @Test
+    fun functionReturnsLambdaErrorCase() {
+        assertSemanticFail("""
+            class A(val x: Int)
+            fun f() = { a: Int ->
+                if (a > 0) {
+                    A(a)
+                } else {
+                    null
+                }
+            }
+            val a = f()
+            val b = a(10)
+            val c = b.x
+        """.trimIndent())
+    }
+
+    @Test
+    fun functionReturnsLambda() {
+        val interpreter = interpreter("""
+            class A(val x: Int)
+            fun f() = { a: Int ->
+                if (a > 0) {
+                    A(a)
+                } else {
+                    null
+                }
+            }
+            val a = f()
+            val b = a(10)
+            val c = b!!.x
+            val d = a(-10)
+            val e = f()(20)!!.x
+            val f = f()(-20)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("a") is LambdaValue)
+        assertTrue(symbolTable.findPropertyByDeclaredName("b") is ClassInstance)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertTrue(symbolTable.findPropertyByDeclaredName("d") is NullValue)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertTrue(symbolTable.findPropertyByDeclaredName("f") is NullValue)
+    }
+
+    @Test
+    fun functionReturnsNullableLambdaErrorCase() {
+        assertSemanticFail("""
+            class A(val x: Int)
+            fun f(x: Int) = if (x > 0) {
+                { a: Int ->
+                    if (a > 0) {
+                        A(a)
+                    } else {
+                        null
+                    }
+                }
+            } else null
+            val a = f(1)
+            val b = a(10)
+        """.trimIndent())
+    }
+
+    @Test
+    fun functionReturnsNullableLambda() {
+        val interpreter = interpreter("""
+            class A(val x: Int)
+            fun f(x: Int) = if (x > 0) {
+                { a: Int ->
+                    if (a > 0) {
+                        A(a)
+                    } else {
+                        null
+                    }
+                }
+            } else null
+            val a = f(1)
+            val b = a!!(10)
+            val c = b!!.x
+            val d = a!!(-10)
+            val e = f(1)!!(20)!!.x
+            val f = f(1)!!(-20)
+            val g = f(-1)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("a") is LambdaValue)
+        assertTrue(symbolTable.findPropertyByDeclaredName("b") is ClassInstance)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertTrue(symbolTable.findPropertyByDeclaredName("d") is NullValue)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertTrue(symbolTable.findPropertyByDeclaredName("f") is NullValue)
+        assertTrue(symbolTable.findPropertyByDeclaredName("g") is NullValue)
     }
 }

@@ -20,6 +20,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -610,7 +611,7 @@ class Parser(protected val lexer: Lexer) {
         repeatedNL()
         eat(TokenType.Symbol, "}")
 
-        return LambdaLiteralNode(parameters, BlockNode(statements, position, ScopeType.FunctionBlock))
+        return LambdaLiteralNode(parameters, BlockNode(statements, position, ScopeType.FunctionBlock, FunctionBodyFormat.Lambda))
     }
 
     /**
@@ -843,7 +844,7 @@ class Parser(protected val lexer: Lexer) {
         val statements = statements()
         repeatedNL()
         eat(TokenType.Symbol, "}")
-        return BlockNode(statements, position, type)
+        return BlockNode(statements, position, type, FunctionBodyFormat.Block)
     }
 
     /**
@@ -858,7 +859,7 @@ class Parser(protected val lexer: Lexer) {
             block(type)
         } else {
             val position = currentToken.position
-            BlockNode(listOf(statement()), position, type)
+            BlockNode(listOf(statement()), position, type, FunctionBodyFormat.Statement)
         }
     }
 
@@ -1120,7 +1121,7 @@ class Parser(protected val lexer: Lexer) {
         eat(TokenType.Operator, ")")
         repeatedNL()
         val body = if (isProcessBody) functionBody() else dummyBlockNode()
-        return FunctionDeclarationNode(name = "get", returnType = type, valueParameters = emptyList(), body = body)
+        return FunctionDeclarationNode(name = "get", declaredReturnType = type, valueParameters = emptyList(), body = body)
     }
 
     /**
@@ -1154,7 +1155,7 @@ class Parser(protected val lexer: Lexer) {
         val body = if (isProcessBody) functionBody() else dummyBlockNode()
         return FunctionDeclarationNode(
             name = "set",
-            returnType = returnType,
+            declaredReturnType = returnType,
             valueParameters = listOf(
                 FunctionValueParameterNode(parameterName, type, null)
             ),
@@ -1240,7 +1241,7 @@ class Parser(protected val lexer: Lexer) {
         if (currentToken.type == TokenType.Symbol && currentToken.value == "=") {
             eat(TokenType.Symbol, "=")
             repeatedNL()
-            return BlockNode(listOf(expression()), position, ScopeType.Function)
+            return BlockNode(listOf(expression()), position, ScopeType.Function, FunctionBodyFormat.Expression)
         } else {
             return block(ScopeType.Function)
         }
@@ -1319,23 +1320,29 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             type
         } else {
-            TypeNode("Unit", null, false)
+            null
         }
         // TODO make functionBody optional for interfaces
         if (!isProcessBody) {
             return FunctionDeclarationNode(
                 name = name,
                 receiver = receiver,
-                returnType = type,
+                declaredReturnType = type ?: TypeNode("Unit", null, false),
                 valueParameters = valueParameters,
                 body = dummyBlockNode()
             )
         }
         val body = functionBody()
-        return FunctionDeclarationNode(name = name, receiver = receiver, returnType = type, valueParameters = valueParameters, body = body)
+        return FunctionDeclarationNode(
+            name = name,
+            receiver = receiver,
+            declaredReturnType = type ?: TypeNode("Unit", null, false).takeIf { body.format == FunctionBodyFormat.Block },
+            valueParameters = valueParameters,
+            body = body
+        )
     }
 
-    fun dummyBlockNode() = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function)
+    fun dummyBlockNode() = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block)
 
     /**
      * classParameter:

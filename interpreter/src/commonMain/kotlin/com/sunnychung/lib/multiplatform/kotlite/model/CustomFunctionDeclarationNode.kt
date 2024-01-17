@@ -17,11 +17,11 @@ class CustomFunctionDeclarationNode(
 ) : FunctionDeclarationNode(
     name = name ?: def.functionName,
     receiver = receiver ?: def.receiverType,
-    returnType = returnType ?: def.returnType.toTypeNode(),
+    declaredReturnType = returnType ?: def.returnType.toTypeNode(),
     valueParameters = valueParameters ?: def.parameterTypes.map {
         FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() })
     },
-    body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, def.returnType.toTypeNode()),
+    body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode()),
     transformedRefName = transformedRefName,
 ) {
     override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>): RuntimeValue {
@@ -31,10 +31,11 @@ class CustomFunctionDeclarationNode(
     override fun copy(
         name: String,
         receiver: String?,
-        returnType: TypeNode,
+        declaredReturnType: TypeNode?,
         valueParameters: List<FunctionValueParameterNode>,
         body: BlockNode,
-        transformedRefName: String?
+        transformedRefName: String?,
+        inferredReturnType: TypeNode?,
     ): FunctionDeclarationNode {
         if (this::class != CustomFunctionDeclarationNode::class) {
             throw UnsupportedOperationException("Copying subclasses is not supported")
@@ -45,7 +46,7 @@ class CustomFunctionDeclarationNode(
             ),
             name = name,
             receiver = receiver,
-            returnType = returnType,
+            returnType = declaredReturnType,
             valueParameters = valueParameters,
             body = body,
             transformedRefName = transformedRefName

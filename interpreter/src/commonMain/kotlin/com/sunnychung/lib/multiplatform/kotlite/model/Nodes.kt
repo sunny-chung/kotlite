@@ -147,6 +147,7 @@ data class BlockNode(
     val statements: List<ASTNode>,
     val position: SourcePosition,
     val type: ScopeType,
+    val format: FunctionBodyFormat,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
 ) : ASTNode {
@@ -167,15 +168,18 @@ interface CallableNode {
 open class FunctionDeclarationNode(
     override val name: String,
     val receiver: String? = null,
-    override val returnType: TypeNode,
+    val declaredReturnType: TypeNode?,
     override val valueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
     @ModifyByAnalyzer var transformedRefName: String? = null,
+    @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,
 ) : ASTNode, CallableNode {
+    override val returnType: TypeNode
+        get() = declaredReturnType ?: inferredReturnType!!
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name`\"]"
-        return "$self-- type -->${returnType.toMermaid()}\n" +
+        return (declaredReturnType?.let { "$self-- type -->${it.toMermaid()}\n" } ?: "") +
                 "$self-->${body.toMermaid()}\n"
     }
 
@@ -188,10 +192,11 @@ open class FunctionDeclarationNode(
     open fun copy(
         name: String = this.name,
         receiver: String? = this.receiver,
-        returnType: TypeNode = this.returnType,
+        declaredReturnType: TypeNode? = this.declaredReturnType,
         valueParameters: List<FunctionValueParameterNode> = this.valueParameters,
         body: BlockNode = this.body,
-        transformedRefName: String? = this.transformedRefName
+        transformedRefName: String? = this.transformedRefName,
+        inferredReturnType: TypeNode? = this.inferredReturnType,
     ): FunctionDeclarationNode {
         if (this::class != FunctionDeclarationNode::class) {
             throw UnsupportedOperationException("Copying subclasses is not supported")
@@ -199,10 +204,11 @@ open class FunctionDeclarationNode(
         return FunctionDeclarationNode(
             name = name,
             receiver = receiver,
-            returnType = returnType,
+            declaredReturnType = declaredReturnType,
             valueParameters = valueParameters,
             body = body,
-            transformedRefName = transformedRefName
+            transformedRefName = transformedRefName,
+            inferredReturnType = inferredReturnType,
         )
     }
 
