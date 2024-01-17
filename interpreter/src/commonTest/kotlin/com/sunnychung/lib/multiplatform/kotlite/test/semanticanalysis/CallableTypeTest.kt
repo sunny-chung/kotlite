@@ -202,4 +202,34 @@ class CallableTypeTest {
             val a: Int = f(3, 4)
         """.trimIndent())
     }
+
+    @Test
+    fun callNullableLambda1() {
+        assertSemanticFail("""
+            fun f(a: Int): (() -> Int)? {
+                return if (a > 0) {
+                    { a }
+                } else {
+                    null
+                }
+            }
+            val a: Int = f(10)()
+        """.trimIndent())
+    }
+
+    @Test
+    fun callNullableLambda2() {
+        assertSemanticFail("""
+            class A {
+                fun f(a: Int): (() -> Int)? {
+                    return if (a > 0) {
+                        { a }
+                    } else {
+                        null
+                    }
+                }
+            }
+            val a: Int = A().f(10)()
+        """.trimIndent())
+    }
 }

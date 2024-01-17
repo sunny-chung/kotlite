@@ -595,7 +595,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 function.visit(modifier = modifier)
                 val type = function.type()
                 if (type is FunctionTypeNode) { // function's return type is FunctionTypeNode
-                    type.parameterTypes!! to type.returnType
+                    if (!type.isNullable) {
+                        type.parameterTypes!! to type.returnType
+                    } else {
+                        throw SemanticException("${type.descriptiveName()} is not callable")
+                    }
                 } else {
                     throw SemanticException("${type.descriptiveName()} is not callable")
                 }
