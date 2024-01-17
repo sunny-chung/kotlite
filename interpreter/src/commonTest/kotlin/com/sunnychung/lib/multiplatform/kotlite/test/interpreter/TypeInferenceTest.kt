@@ -273,8 +273,8 @@ class TypeInferenceTest {
             val f: ((Int, String) -> String)? = { i, s ->
                 s + i
             }
-            val a = f(1, "a")
-            val b = f(2, "b")
+            val a = f!!(1, "a")
+            val b = f!!(2, "b")
         """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
@@ -309,8 +309,8 @@ class TypeInferenceTest {
             f = { i, s ->
                 s + i
             }
-            val a = f(1, "a")
-            val b = f(2, "b")
+            val a = f!!(1, "a")
+            val b = f!!(2, "b")
         """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()

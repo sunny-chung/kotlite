@@ -591,7 +591,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 resolution.arguments to returnType
             }
 
-            else -> {
+            else -> { // including `{ ... }()`, `f!!()`, etc.
                 function.visit(modifier = modifier)
                 val type = function.type()
                 if (type is FunctionTypeNode) { // function's return type is FunctionTypeNode

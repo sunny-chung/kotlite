@@ -949,7 +949,7 @@ class LambdaTest {
                 if (g == null) {
                     return x
                 }
-                return g(x)
+                return g!!(x)
             }
             var b: Int = f(10, {x: Int -> x * 2})
             var c: Int = f(10)
@@ -969,7 +969,7 @@ class LambdaTest {
                 if (g == null) {
                     return x
                 }
-                return g(x)
+                return g!!(x)
             }
             var b: Int = f(10) {x: Int -> x * 2}
             var c: Int = f(10)
@@ -989,7 +989,7 @@ class LambdaTest {
                 if (g == null) {
                     return x
                 }
-                return g(x)
+                return g!!(x)
             }
             var b: Int = f(10) { x: Int ->
                 x * 2
@@ -1012,7 +1012,7 @@ class LambdaTest {
                 if (g == null) {
                     return x
                 }
-                return g(x)
+                return g!!(x)
             }
             var b: Int = f { x: Int ->
                 x * 2
@@ -1034,7 +1034,7 @@ class LambdaTest {
                 if (g == null) {
                     return 1
                 }
-                return g(2, 5, 11, 19)
+                return g!!(2, 5, 11, 19)
             }
             val x = f { x, _, _, y ->
                 x + y

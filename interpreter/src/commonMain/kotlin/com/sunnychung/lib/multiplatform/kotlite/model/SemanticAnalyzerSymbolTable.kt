@@ -67,7 +67,7 @@ class SemanticAnalyzerSymbolTable(
                 )
             }
             getPropertyTypeOrNull(originalName, isThisScopeOnly = true)?.let {
-                if (it.first.type !is FunctionType) {
+                if (it.first.type !is FunctionType || it.first.type.isNullable) {
                     return@let
                 }
                 val transformedName = "$originalName/${this.scopeLevel}"

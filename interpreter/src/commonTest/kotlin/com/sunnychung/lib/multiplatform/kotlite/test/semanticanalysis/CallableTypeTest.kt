@@ -232,4 +232,34 @@ class CallableTypeTest {
             val a: Int = A().f(10)()
         """.trimIndent())
     }
+
+    @Test
+    fun callNullableLambda3() {
+        assertSemanticFail("""
+            fun f(a: Int): (() -> Int)? {
+                return if (a > 0) {
+                    { a }
+                } else {
+                    null
+                }
+            }
+            val a: (() -> Int)? = f(10)
+            val b: Int = a()
+        """.trimIndent())
+    }
+
+    @Test
+    fun callNullableLambdaSuccess() {
+        semanticAnalyzer("""
+            fun f(a: Int): (() -> Int)? {
+                return if (a > 0) {
+                    { a }
+                } else {
+                    null
+                }
+            }
+            val a: (() -> Int)? = f(10)
+            val b: Int = a!!()
+        """.trimIndent()).analyze()
+    }
 }
