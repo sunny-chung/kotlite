@@ -113,7 +113,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     fun TypeNode.toNullable() = if (isNullable) {
         this
     } else {
-        typeRegistry["$name?"]!!
+        typeRegistry["$name?"] ?: this.copy(isNullable = true)
     }
 
     fun DataType.toTypeNode(): TypeNode =
