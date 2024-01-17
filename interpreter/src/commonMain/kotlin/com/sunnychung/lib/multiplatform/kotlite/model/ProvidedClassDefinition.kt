@@ -46,8 +46,15 @@ class ProvidedClassDefinition(
 
     fun copyNullableClassDefinition() = ProvidedClassDefinition(
         fullQualifiedName = "$fullQualifiedName?",
-        isInstanceCreationAllowed = isInstanceCreationAllowed,
-        primaryConstructorParameters = primaryConstructorParameters,
-        constructInstance = constructInstance,
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = {_, _, _ -> throw UnsupportedOperationException()},
+    )
+
+    fun copyCompanionClassDefinition() = ProvidedClassDefinition(
+        fullQualifiedName = "$fullQualifiedName.Companion",
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = {_, _, _ -> throw UnsupportedOperationException()},
     )
 }

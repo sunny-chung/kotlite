@@ -405,6 +405,8 @@ class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: L
     }
 }
 
+class ClassTypeNode(val clazz: TypeNode): TypeNode("Class", listOf(clazz), false)
+
 class CharNode(val value: Char): ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Char Node `$value` (${value.code})\"]"
 }

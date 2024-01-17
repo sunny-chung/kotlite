@@ -19,6 +19,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNo
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
@@ -133,6 +134,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     fun TypeNode.toDataType(): DataType {
         return currentScope.typeNodeToPropertyType(this, false)?.type
             ?: throw SemanticException("Unknown type `$name`")
+    }
+
+    fun TypeNode.unboxClassTypeAsCompanion() = if (this is ClassTypeNode) {
+        TypeNode("${this.clazz.name}.Companion", this.clazz.arguments, false)
+    } else {
+        this
     }
 
     protected fun isLocalAndNotCurrentScope(scopeLevel: Int): Boolean {
@@ -358,6 +365,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun VariableReferenceNode.visit(modifier: Modifier = Modifier()) {
+        if (!currentScope.hasProperty(variableName)) {
+            if (currentScope.findClass(variableName) != null) {
+                return
+            }
+        }
         val l = checkPropertyReadAccess(variableName)
         if (variableName != "this" && transformedRefName == null) {
             transformedRefName = "$variableName/$l"
@@ -450,12 +462,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
             valueParameters.forEach { it.visit(modifier = modifier) }
 
-            previousScope.declareExtensionFunction("${typeNode.name}?/$name", this)
-            transformedRefName = "${typeNode.name}?/$name/${++functionDefIndex}"
+            // 1. setting `transformedRefName` must be before `this.copy()`.
+            // 2. `transformedRefName` should be identical among these extension functions, because
+            //    only one implementation would be registered in Interpreter.
+            transformedRefName = "${typeNode.descriptiveName()}/$name/${++functionDefIndex}"
+            previousScope.declareExtensionFunction("${typeNode.name}/$name", this.copy(receiver = receiver.trimEnd('?')))
 
             if (typeNode.isNullable) {
-                previousScope.declareExtensionFunction("${typeNode.name}/$name", this.copy(receiver = receiver.trimEnd('?')))
-//                transformedRefName = "${typeNode.name}/$name/${++functionDefIndex}"
+                previousScope.declareExtensionFunction("${typeNode.name}?/$name", this)
+//                transformedRefName = "${typeNode.name}?/$name/${++functionDefIndex}"
 
                 previousScope.declareExtensionFunction("Nothing/$name", this.copy(receiver = "Nothing"))
 //                transformedRefName = "Nothing/$name/${++functionDefIndex}"
@@ -532,7 +547,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
             is NavigationNode -> {
                 function.visit(modifier = modifier, IdentifierClassifier.Function)
-                val receiverType = function.subject.type().toDataType()
+                val receiverType = function.subject.type().unboxClassTypeAsCompanion().toDataType()
                 val lookupReceiverTypes = if (!receiverType.isNullable || function.operator == ".") {
                     listOf(receiverType)
                 } else { // ?.
@@ -755,7 +770,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         member.visit(modifier = modifier)
 
         // find member
-        val subjectType = subject.type().toDataType()
+        val subjectType = subject.type().unboxClassTypeAsCompanion().toDataType()
         val memberName = member.name
         val clazz = subjectType.nameWithNullable.let { currentScope.findClass(it) ?: throw RuntimeException("Cannot find class `$it`") }.first
         if (lookupType == IdentifierClassifier.Property) {
@@ -801,6 +816,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope = currentScope,
                 name = "$name?",
                 fullQualifiedName = "$fullQualifiedClassName?",
+                isInstanceCreationAllowed = false,
+                orderedInitializersAndPropertyDeclarations = emptyList(),
+                rawMemberProperties = emptyList(),
+                memberFunctions = emptyMap(),
+                primaryConstructor = null,
+            )
+        )
+
+        // Declare companion object
+        currentScope.parentScope!!.declareClass(
+            ClassDefinition(
+                currentScope = currentScope,
+                name = "$name.Companion",
+                fullQualifiedName = "$fullQualifiedClassName.Companion",
                 isInstanceCreationAllowed = false,
                 orderedInitializersAndPropertyDeclarations = emptyList(),
                 rawMemberProperties = emptyList(),
@@ -1063,7 +1092,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     // e.g. `name()`, where name is a VariableReferenceNode
     fun VariableReferenceNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()) = type ?: (
             currentScope.findClass(variableName)
-                ?.let { FunctionTypeNode(parameterTypes = emptyList(), returnType = TypeNode(variableName, null, false), isNullable = false) }
+                ?.let { ClassTypeNode(TypeNode(variableName, null, false)) }
                 ?: currentScope.findFunctionsByOriginalName(variableName).firstOrNull()?.let { FunctionTypeNode(parameterTypes = null, returnType = null, isNullable = false) }
                 ?: currentScope.getPropertyType(variableName).first.type.toTypeNode()!!
             ).also { type = it }
@@ -1072,6 +1101,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         type?.let { return it }
         val subjectType = when(val type = subject.type(modifier = modifier)) {
             is FunctionTypeNode -> type.returnType
+            is ClassTypeNode -> type.unboxClassTypeAsCompanion()
             else -> type
         } ?: return typeRegistry["Any"]!!
         val clazz = currentScope.findClass(subjectType.name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
@@ -1119,6 +1149,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 function.type(modifier = modifier, lookupType = IdentifierClassifier.Function)
             }
             else -> function.type(modifier = modifier)
+        }.also {
+            if (it is ClassTypeNode) {
+                return it.clazz // return directly out to the enclosed function
+            }
         }
         if (functionType !is FunctionTypeNode) {
             throw SemanticException("Cannot invoke non-function expression")

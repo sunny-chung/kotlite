@@ -44,35 +44,45 @@ class ExecutionEnvironment(
 
     internal fun getBuiltinClasses(topmostSymbolTable: SymbolTable): List<ClassDefinition> {
         return listOf("Int", "Double", "Boolean", "String", "Char", "Unit", "Nothing", "Function").flatMap { className ->
-            listOfNotNull(
-                Unit.takeIf { classRegistrationFilter(className) }?.let {
-                    ClassDefinition(
-                        currentScope = topmostSymbolTable,
-                        name = className,
-                        isInstanceCreationAllowed = false,
-                        orderedInitializersAndPropertyDeclarations = emptyList(),
-                        rawMemberProperties = emptyList(),
-                        memberFunctions = emptyMap(),
-                        primaryConstructor = null,
-                    )
-                },
-                Unit.takeIf { classRegistrationFilter("$className?") }?.let {
-                    ClassDefinition(
-                        currentScope = topmostSymbolTable,
-                        name = "$className?",
-                        isInstanceCreationAllowed = false,
-                        orderedInitializersAndPropertyDeclarations = emptyList(),
-                        rawMemberProperties = emptyList(),
-                        memberFunctions = emptyMap(),
-                        primaryConstructor = null,
-                    )
-                }
+            if (!classRegistrationFilter(className)) return@flatMap emptyList()
+            listOf(
+                ClassDefinition(
+                    currentScope = topmostSymbolTable,
+                    name = className,
+                    isInstanceCreationAllowed = false,
+                    orderedInitializersAndPropertyDeclarations = emptyList(),
+                    rawMemberProperties = emptyList(),
+                    memberFunctions = emptyMap(),
+                    primaryConstructor = null,
+                ),
+                ClassDefinition(
+                    currentScope = topmostSymbolTable,
+                    name = "$className?",
+                    isInstanceCreationAllowed = false,
+                    orderedInitializersAndPropertyDeclarations = emptyList(),
+                    rawMemberProperties = emptyList(),
+                    memberFunctions = emptyMap(),
+                    primaryConstructor = null,
+                ),
+                ClassDefinition(
+                    currentScope = topmostSymbolTable,
+                    name = "$className.Companion",
+                    isInstanceCreationAllowed = false,
+                    orderedInitializersAndPropertyDeclarations = emptyList(),
+                    rawMemberProperties = emptyList(),
+                    memberFunctions = emptyMap(),
+                    primaryConstructor = null,
+                ),
             )
         } +
-                providedClasses.filter { classRegistrationFilter(it.fullQualifiedName) } +
-                providedClasses.filter { classRegistrationFilter("${it.fullQualifiedName}?") }.map {
-                    it.copyNullableClassDefinition()
-                }
+                providedClasses.filter { classRegistrationFilter(it.fullQualifiedName) }
+                    .flatMap {
+                        listOf(
+                            it,
+                            it.copyNullableClassDefinition(),
+                            it.copyCompanionClassDefinition(),
+                        )
+                    }
     }
 
     fun install(module: LibraryModule) {

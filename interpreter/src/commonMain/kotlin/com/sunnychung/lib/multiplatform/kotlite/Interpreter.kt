@@ -24,6 +24,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNo
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ComparableRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
@@ -342,6 +343,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 member = ClassMemberReferenceNode(variableName, transformedRefName),
                 transformedRefName = ownerRef!!.extensionPropertyRef,
             ).eval()
+        }
+        if (type is ClassTypeNode) {
+            // TODO return singleton
+            val companionClassName = "${(type as ClassTypeNode).clazz.name}.Companion"
+            return ClassInstance(
+                companionClassName,
+                symbolTable().findClass(companionClassName)!!.first
+            )
         }
         return callStack.currentSymbolTable().read(transformedRefName ?: variableName)
     }
@@ -761,6 +770,19 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             .filterIsInstance<FunctionDeclarationNode>()
             .filter { it.receiver != null }
             .forEach { globalScope.declareExtensionFunction(it.transformedRefName!!, it) }
+
+        // companion object
+        // TODO create only if a companion object is declared
+        callStack.currentSymbolTable().declareClass(ClassDefinition(
+            currentScope = callStack.currentSymbolTable(),
+            name = "$name.Companion",
+            fullQualifiedName = "$fullQualifiedName.Companion",
+            isInstanceCreationAllowed = false,
+            orderedInitializersAndPropertyDeclarations = emptyList(),
+            rawMemberProperties = emptyList(),
+            memberFunctions = emptyMap(),
+            primaryConstructor = null
+        ))
     }
 
     fun NavigationNode.eval(): RuntimeValue {
