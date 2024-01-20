@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
+import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
@@ -195,6 +196,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is StringNode -> this.visit(modifier = modifier)
             is LambdaLiteralNode -> this.visit(modifier = modifier)
             is CharNode -> {}
+            is AsOpNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -1026,6 +1028,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         type()
     }
 
+    fun AsOpNode.visit(modifier: Modifier = Modifier()) {
+        this.expression.visit(modifier = modifier)
+        this.type.visit(modifier = modifier)
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -1034,6 +1041,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     fun ASTNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier())
         = when (this) {
+            is AsOpNode -> this.type.copy(this.type.isNullable || this.isNullable)
             is AssignmentNode -> typeRegistry["Unit"]!!
             is BinaryOpNode -> this.type(modifier = modifier)
             is UnaryOpNode -> this.type(modifier = modifier)
@@ -1221,8 +1229,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             if (type2.name == "Nothing" && type2.name != type1.name) {
                 return type1.toNullable()
             }
-            // TODO return "Any"
-            throw SemanticException("Cannot find super type of ${type1.descriptiveName()} and ${type2.descriptiveName()}")
+            // TODO check object super type
+//            throw SemanticException("Cannot find super type of ${type1.descriptiveName()} and ${type2.descriptiveName()}")
+            return typeRegistry["Any${if (type1.isNullable || type2.isNullable) "?" else ""}"]!!
         }
 
         var type = types.first()

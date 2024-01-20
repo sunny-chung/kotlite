@@ -40,6 +40,13 @@ data object NullType : DataType {
     override val nameWithNullable: String = "Nothing"
     override val isNullable: Boolean = true
 }
+data class AnyType(override val isNullable: Boolean = false) : DataType {
+    override val name: String = "Any"
+
+    override fun isAssignableFrom(other: DataType): Boolean {
+        return isNullable || !other.isNullable
+    }
+}
 data class ObjectType(val clazz: ClassDefinition, override val isNullable: Boolean = false) : DataType {
     override val name: String = clazz.fullQualifiedName
 }
@@ -87,6 +94,7 @@ fun TypeNode.toPrimitiveDataType() = when(this.name) {
     "String" -> StringType(isNullable = isNullable)
     "Char" -> CharType(isNullable = isNullable)
     "Unit" -> UnitType(isNullable = isNullable)
+    "Any" -> AnyType(isNullable = isNullable)
     "Nothing" -> NullType
     else -> null //ObjectType(clazz = clazz!!, isNullable = isNullable)
 }

@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite
 
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
+import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
@@ -89,6 +90,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is StringLiteralNode -> this.generate()
             is StringNode -> this.generate()
             is LambdaLiteralNode -> this.generate()
+            is AsOpNode -> this.generate()
         }
 
     protected fun AssignmentNode.generate()
@@ -207,5 +209,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
                 s
             } +
             "${indent()}}"
+
+    protected fun AsOpNode.generate() = "(${expression.generate()} as${if (isNullable) "?" else ""} ${type.generate()})"
 
 }

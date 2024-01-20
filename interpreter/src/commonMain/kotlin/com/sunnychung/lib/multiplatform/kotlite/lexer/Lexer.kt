@@ -86,6 +86,10 @@ class Lexer(val code: String) {
             sb.append(currentChar()!!)
             advanceChar()
         }
+        if (sb.toString() == "as" && currentChar() == '?') {
+            sb.append(currentChar()!!)
+            advanceChar()
+        }
         backward()
         return sb.toString()
     }

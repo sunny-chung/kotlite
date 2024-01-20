@@ -586,4 +586,37 @@ class SemanticAnalyzerTest {
             a.happyNumber()
         """.trimIndent())
     }
+
+    @Test
+    fun nullableAsProducesNullableType1() {
+        assertSemanticFail("""
+            fun f(x: Int): Any {
+                return if (x > 0)
+                    x
+                else
+                    "abc"
+            }
+            var x: Int = f(-12) as? Int
+        """.trimIndent())
+    }
+
+    @Test
+    fun nullableAsProducesNullableType2() {
+        assertSemanticFail("""
+            fun f(x: Int): Any {
+                return if (x > 0)
+                    x
+                else
+                    "abc"
+            }
+            var x: Int? = (f(-12) as? Int) + 34
+        """.trimIndent())
+    }
+
+    @Test
+    fun asNullableType() {
+        assertSemanticFail("""
+            var x: Int = 123 as Int?
+        """.trimIndent())
+    }
 }

@@ -7,6 +7,7 @@ import com.sunnychung.lib.multiplatform.kotlite.extension.removeAfterIndex
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
+import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
@@ -799,7 +800,26 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun asExpression(): ASTNode {
-        return prefixUnaryExpression()
+        fun isCurrentTokenExcludingNLAnAsOperator(): Boolean {
+            val token = currentTokenExcludingNL()
+            return token.`is`(TokenType.Identifier, "as") || token.`is`(TokenType.Identifier, "as?")
+        }
+
+        var node = prefixUnaryExpression()
+        while (isCurrentTokenExcludingNLAnAsOperator()) {
+            repeatedNL()
+            val isNullable = if (isCurrentToken(TokenType.Identifier, "as?")) {
+                eat(TokenType.Identifier, "as?")
+                true
+            } else {
+                eat(TokenType.Identifier, "as")
+                false
+            }
+            repeatedNL()
+            val type = type()
+            node = AsOpNode(isNullable = isNullable, expression = node, type = type)
+        }
+        return node
     }
 
     /**
@@ -1691,3 +1711,5 @@ class Parser(protected val lexer: Lexer) {
 
 
 }
+
+fun Token.`is`(type: TokenType, value: Any) = this.type == type && this.value == value

@@ -422,3 +422,11 @@ class ClassTypeNode(val clazz: TypeNode): TypeNode("Class", listOf(clazz), false
 class CharNode(val value: Char): ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Char Node `$value` (${value.code})\"]"
 }
+
+class AsOpNode(val isNullable: Boolean, val expression: ASTNode, val type: TypeNode): ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"As${if (isNullable) "?" else ""} Node\"]"
+        return "$self-- expr -->${expression.toMermaid()}\n" +
+                "$self-- type -->${type.toMermaid()}"
+    }
+}

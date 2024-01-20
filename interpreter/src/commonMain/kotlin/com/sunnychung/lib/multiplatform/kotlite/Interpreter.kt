@@ -2,10 +2,12 @@ package com.sunnychung.lib.multiplatform.kotlite
 
 import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateNullPointerException
 import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateRuntimeException
+import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateTypeCastException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalBreakException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalContinueException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnException
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
+import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
@@ -125,6 +127,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is StringNode -> this.eval()
             is LambdaLiteralNode -> this.eval()
             is CharNode -> this.eval()
+            is AsOpNode -> this.eval()
         }
     }
 
@@ -813,6 +816,18 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 ).evalClassMemberAnyFunctionCall(obj, r)
             } // TODO remove */
             else -> throw UnsupportedOperationException()
+        }
+    }
+
+    fun AsOpNode.eval(): RuntimeValue {
+        val value = expression.eval() as RuntimeValue
+        val targetType = symbolTable().typeNodeToDataType(type) ?: throw RuntimeException("Unknown type `$type`")
+        return if (value.type().isAssignableTo(targetType)) {
+            value
+        } else if (isNullable) {
+            NullValue
+        } else {
+            throw EvaluateTypeCastException(value.type().nameWithNullable, targetType.nameWithNullable)
         }
     }
 
