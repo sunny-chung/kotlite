@@ -37,6 +37,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LongType
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullType
@@ -61,6 +63,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
+import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
 
@@ -71,9 +74,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     var functionDefIndex = 0
     val symbolRecorders = mutableListOf<SymbolReferenceSet>()
 
+    // a cache of common types for optimization. not a must to use them
     val typeRegistry = listOf(
         TypeNode("Any", null, false),
         TypeNode("Int", null, false),
+        TypeNode("Long", null, false),
         TypeNode("Double", null, false),
         TypeNode("Boolean", null, false),
         TypeNode("String", null, false),
@@ -161,6 +166,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is FunctionDeclarationNode -> this.visit(modifier = modifier)
             is FunctionValueParameterNode -> this.visit(modifier = modifier)
             is IntegerNode -> {}
+            is LongNode -> {}
             is DoubleNode -> {}
             is BooleanNode -> {}
             is NullNode -> {}
@@ -292,6 +298,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 throw TypeMismatchException("non-null number type", valueType.nameWithNullable)
             }
             if (subjectType is DoubleType) {
+                return // ok
+            }
+            if (subjectType is LongType && valueType.isNonNullIntegralType()) {
                 return // ok
             }
         }
@@ -1052,6 +1061,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is WhileNode -> typeRegistry["Unit"]!!
 
             is IntegerNode -> typeRegistry["Int"]!!
+            is LongNode -> typeRegistry["Long"]!!
             is DoubleNode -> typeRegistry["Double"]!!
             is BooleanNode -> typeRegistry["Boolean"]!!
             NullNode -> typeRegistry["Null"]!!
@@ -1071,6 +1081,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
             ) {
                 typeRegistry["Double"]!!
+            } else if ((t1 == LongType(isNullable = false) && t2.isNonNullIntegralType())
+                || (t2 == LongType(isNullable = false) && t2.isNonNullIntegralType())
+            ) {
+                typeRegistry["Long"]!!
             } else if (t1 == IntType(isNullable = false) && t2 == IntType(isNullable = false)) {
                 typeRegistry["Int"]!!
             } else if (operator == "+" && t1 is CharType && t2 is IntType) {

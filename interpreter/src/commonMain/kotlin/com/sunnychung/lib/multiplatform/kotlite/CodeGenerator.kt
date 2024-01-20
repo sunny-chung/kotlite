@@ -22,6 +22,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
@@ -72,6 +73,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is FunctionValueParameterNode -> this.generate()
             is IfNode -> this.generate()
             is IntegerNode -> this.generate()
+            is LongNode -> this.generate()
             is NavigationNode -> this.generate()
             is NullNode -> this.generate()
             is PropertyDeclarationNode -> this.generate()
@@ -150,6 +152,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "if (${condition.generate()}) ${trueBlock?.let { it.generate() } ?: ";"}${falseBlock?.let { " else ${it.generate()}" } ?: ""}"
 
     protected fun IntegerNode.generate() = "$value"
+    protected fun LongNode.generate() = "${value}L"
 
     protected fun NavigationNode.generate() = "${subject.generate()}$operator${member.generate()}"
 

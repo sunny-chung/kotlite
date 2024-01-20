@@ -42,6 +42,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
+import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
@@ -92,6 +94,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is AssignmentNode -> this.eval()
             is BinaryOpNode -> this.eval()
             is IntegerNode -> this.eval()
+            is LongNode -> this.eval()
             is DoubleNode -> this.eval()
             is BooleanNode -> this.eval()
             is NullNode -> this.eval()
@@ -836,6 +839,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     fun StringLiteralNode.eval() = StringValue(content)
 
     fun IntegerNode.eval() = IntValue(value)
+    fun LongNode.eval() = LongValue(value)
     fun DoubleNode.eval() = DoubleValue(value)
     fun BooleanNode.eval() = BooleanValue(value)
     fun CharNode.eval() = CharValue(value)

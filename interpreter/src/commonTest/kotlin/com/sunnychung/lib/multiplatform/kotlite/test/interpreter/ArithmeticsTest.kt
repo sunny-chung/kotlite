@@ -2,7 +2,9 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
+import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -275,5 +277,261 @@ class ArithmeticsTest {
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
         compareNumber(2.435, symbolTable.findPropertyByDeclaredName("x") as DoubleValue)
+    }
+
+    @Test
+    fun longAddLong() {
+        val interpreter = interpreter("""
+            val a = 123L
+            val b = 45L
+            var x = 20L + 3000000000
+            val y = 12L + 15
+            val z = a + b
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(3000000020L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(27L, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+        assertEquals(168L, (symbolTable.findPropertyByDeclaredName("z") as LongValue).value)
+    }
+
+    @Test
+    fun intAddLong() {
+        val interpreter = interpreter("""
+            val a = 123
+            val b = 45L
+            var x = 20 + 3000000000
+            val y = 12L + 15
+            val z = a + b
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(3000000020L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(27L, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+        assertEquals(168L, (symbolTable.findPropertyByDeclaredName("z") as LongValue).value)
+    }
+
+    @Test
+    fun intMinusLong() {
+        val interpreter = interpreter("""
+            val a = 123
+            val b = 45L
+            var x = 20 - 3000000000
+            val y = 12L - 15
+            val z = a - b
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(-2999999980L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(-3L, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+        assertEquals(78L, (symbolTable.findPropertyByDeclaredName("z") as LongValue).value)
+    }
+
+    @Test
+    fun intTimesLong() {
+        val interpreter = interpreter("""
+            val a = 123
+            val b = 45L
+            var x = 20 * 3000000000
+            val y = 12L * 15
+            val z = a * b
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(60000000000L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(180L, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+        assertEquals(5535L, (symbolTable.findPropertyByDeclaredName("z") as LongValue).value)
+    }
+
+    @Test
+    fun intDivLong() {
+        val interpreter = interpreter("""
+            val a = 123
+            val b = 45L
+            var x = 3000000000 / 20
+            val y = 12 / 15L
+            val z = a / b
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(150000000L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(0L, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+        assertEquals(2L, (symbolTable.findPropertyByDeclaredName("z") as LongValue).value)
+    }
+
+    @Test
+    fun intModLong() {
+        val interpreter = interpreter("""
+            val a = 123
+            val b = 45L
+            var x = 3000000000 % 20
+            val y = 12 % 15L
+            val z = a % b
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(0L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(12L, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+        assertEquals(33L, (symbolTable.findPropertyByDeclaredName("z") as LongValue).value)
+    }
+
+    @Test
+    fun longPlusAssignLong() {
+        val interpreter = interpreter("""
+            var x = 3000000000L
+            x += 1234567890123456L
+            x += 2L
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(1234570890123458L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+    }
+
+    @Test
+    fun intPlusAssignLongShouldFail() {
+        assertSemanticFail("""
+            var a = 123
+            a += 10L
+        """.trimIndent())
+    }
+
+    @Test
+    fun longPlusAssignInt() {
+        val interpreter = interpreter("""
+            var x = 3000000000L
+            x += 10
+            x += 2
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(3000000012L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+    }
+
+    @Test
+    fun longMinusAssignInt() {
+        val interpreter = interpreter("""
+            var x = 3000000000L
+            x -= 10
+            x -= 2
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(2999999988L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+    }
+
+    @Test
+    fun longTimesAssignInt() {
+        val interpreter = interpreter("""
+            var x = 3000000000L
+            x *= 10
+            x *= 2
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(60000000000L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+    }
+
+    @Test
+    fun longDivAssignInt() {
+        val interpreter = interpreter("""
+            var x = 3000000000L
+            x /= 10
+            x /= 2
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(150000000L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+    }
+
+    @Test
+    fun longModAssignInt() {
+        val interpreter = interpreter("""
+            var x = 3000000000L
+            x %= 11
+            x %= 3
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(2L, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+    }
+
+    @Test
+    fun prePlusPlusLong() {
+        val interpreter = interpreter("""
+            var x: Long = 20L
+            val y: Long = ++x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+    }
+
+    @Test
+    fun postPlusPlusLong() {
+        val interpreter = interpreter("""
+            var x: Long = 20L
+            val y: Long = x++
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+    }
+
+    @Test
+    fun preMinusMinusLong() {
+        val interpreter = interpreter("""
+            var x: Long = 20L
+            val y: Long = --x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(19, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(19, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
+    }
+
+    @Test
+    fun postMinusMinusLong() {
+        val interpreter = interpreter("""
+            var x: Long = 20L
+            val y: Long = x--
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(19, (symbolTable.findPropertyByDeclaredName("x") as LongValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("y") as LongValue).value)
     }
 }

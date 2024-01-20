@@ -26,6 +26,12 @@ data class BooleanValue(val value: Boolean) : RuntimeValue {
     override fun convertToString() = value.toString()
 }
 
+data class LongValue(override val value: Long) : NumberValue<Long> {
+    override fun type() = LongType()
+
+    override fun convertToString() = value.toString()
+}
+
 data class StringValue(override val value: String) : ComparableRuntimeValue<String> {
     override fun type() = StringType()
 

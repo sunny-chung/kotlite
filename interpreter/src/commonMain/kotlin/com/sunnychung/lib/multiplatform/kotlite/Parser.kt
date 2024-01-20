@@ -28,6 +28,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
@@ -651,6 +652,10 @@ class Parser(protected val lexer: Lexer) {
             TokenType.Integer -> {
                 eat(TokenType.Integer)
                 return IntegerNode(currentToken.value as Int)
+            }
+            TokenType.Long -> {
+                eat(TokenType.Long)
+                return LongNode(currentToken.value as Long)
             }
             TokenType.Double -> {
                 eat(TokenType.Double)

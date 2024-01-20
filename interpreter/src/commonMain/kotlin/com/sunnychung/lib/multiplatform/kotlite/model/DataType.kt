@@ -29,6 +29,7 @@ sealed interface DataType {
 }
 
 data class IntType(override val isNullable: Boolean = false) : DataType { override val name: String = "Int" }
+data class LongType(override val isNullable: Boolean = false) : DataType { override val name: String = "Long" }
 data class DoubleType(override val isNullable: Boolean = false) : DataType { override val name: String = "Double" }
 data class BooleanType(override val isNullable: Boolean = false) : DataType { override val name: String = "Boolean" }
 data class StringType(override val isNullable: Boolean = false) : DataType { override val name: String = "String" }
@@ -80,6 +81,7 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
 
 fun TypeNode.toPrimitiveDataType() = when(this.name) {
     "Int" -> IntType(isNullable = isNullable)
+    "Long" -> LongType(isNullable = isNullable)
     "Double" -> DoubleType(isNullable = isNullable)
     "Boolean" -> BooleanType(isNullable = isNullable)
     "String" -> StringType(isNullable = isNullable)
@@ -92,5 +94,12 @@ fun TypeNode.toPrimitiveDataType() = when(this.name) {
 fun DataType.isNonNullNumberType() = when (this) {
     is DoubleType -> !isNullable
     is IntType -> !isNullable
+    is LongType -> !isNullable
+    else -> false
+}
+
+fun DataType.isNonNullIntegralType() = when (this) {
+    is IntType -> !isNullable
+    is LongType -> !isNullable
     else -> false
 }

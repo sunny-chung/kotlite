@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.lexer
 
+import com.sunnychung.lib.multiplatform.kotlite.extension.compareString
 import com.sunnychung.lib.multiplatform.kotlite.extension.removeAfterIndex
 import com.sunnychung.lib.multiplatform.kotlite.log
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
@@ -72,6 +73,10 @@ class Lexer(val code: String) {
             sb.append(currentChar()!!)
             advanceChar() // TODO better structure
         }
+        if (currentChar() == 'L') {
+            sb.append(currentChar()!!)
+            advanceChar()
+        }
         return sb.toString()
     }
 
@@ -125,10 +130,15 @@ class Lexer(val code: String) {
                 // TODO throw error if not followed by whitespaces, symbols or EOF
                 false
             }
-            if (!hasDot || !nextChar()!!.isDigit()) { // is an integer
-                if (number.length > 10) throw RuntimeException("Integer `$number` is too big.")
-                val value = number.toIntOrNull() ?: throw RuntimeException("Integer `$number` is invalid.")
-                return Token(TokenType.Integer, value, position)
+            if (!hasDot || !nextChar()!!.isDigit()) { // is an integral number
+                if (number.removeSuffix("L").length > 19) throw RuntimeException("Number `$number` is too big.")
+                if (number.endsWith("L") || compareString(number, "2147483647") > 0) { // FIXME -2147483648 should not be casted to Long
+                    val value = number.removeSuffix("L").toLongOrNull() ?: throw RuntimeException("Long `$number` is invalid.")
+                    return Token(TokenType.Long, value, position)
+                } else {
+                    val value = number.toIntOrNull() ?: throw RuntimeException("Integer `$number` is invalid.")
+                    return Token(TokenType.Integer, value, position)
+                }
             }
             advanceChar() // eat the '.'
             val decimal = readInteger()
