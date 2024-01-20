@@ -38,7 +38,7 @@ abstract class KotliteCommonKotlinCodeGenerateTask : DefaultTask() {
                 outputPackage = outputPackage.get(),
                 config = config
             ).generate()
-            File(outputDirObj, "${name}LibModule.kt").writeText(output)
+            File(outputDirObj, "Abstract${name}LibModule.kt").writeText(output)
         }
     }
 }

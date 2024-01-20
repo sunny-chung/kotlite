@@ -42,6 +42,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
+import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
@@ -69,7 +70,7 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
     parameterTypes = listOf(${if (valueParameters.isNotEmpty()) "\n${valueParameters.joinToString("") { "${it.generate(indent(8))},\n" }}${indent(4)}" else ""}),
     executable = { receiver, args ->
         ${
-            if (receiver != null) {
+            if (receiver != null && !receiver!!.endsWith(".Companion")) {
                 val isReceiverNullable = receiver!!.endsWith('?')
                 val question = if (isReceiverNullable) "?" else ""
                 "val unwrappedReceiver = (receiver as$question ${receiver!!.trimEnd('?')}Value)$question.value"
@@ -78,7 +79,15 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
     ${valueParameters.mapIndexed { i, it ->
             "${indent(4)}val ${it.name}_ = ${unwrap("args[$i]", it.type)}\n"
         }.joinToString("")}
-        val result = ${if (receiver != null) "unwrappedReceiver." else ""}$name(${valueParameters.joinToString(", ") {it.name + "_"}})
+        val result = ${
+            if (receiver != null) {
+                if (receiver!!.endsWith(".Companion")) {
+                    "$receiver."
+                } else {
+                    "unwrappedReceiver."
+                }
+            } else ""
+        }$name(${valueParameters.joinToString(", ") {it.name + "_"}})
         ${wrap("result", returnType)}
     }
 )""".prependIndent(indent)
@@ -127,14 +136,22 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
     receiver = "${receiver!!.escape()}",
     type = "${type.descriptiveName().escape()}",
     getter = ${accessors?.getter?.let { """{ receiver ->
-        val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value
-        val result = unwrappedReceiver.$name
+        ${
+            if (!receiver!!.endsWith(".Companion")) {
+                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value"
+            } else ""
+        }
+        val result = ${if (receiver!!.endsWith(".Companion")) "$receiver" else "unwrappedReceiver"}.$name
         ${wrap("result", type)}
     }""" } ?: "null"},
     setter = ${accessors?.setter?.let { """{ receiver, value ->
-        val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value
+        ${
+            if (!receiver!!.endsWith(".Companion")) {
+                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value"
+            } else ""
+        }
         val unwrappedValue = ${unwrap("value", type)}
-        unwrappedReceiver.$name = unwrappedValue
+        ${if (receiver!!.endsWith(".Companion")) "$receiver" else "unwrappedReceiver"}.$name = unwrappedValue
     }""" } ?: "null"},
 )""".prependIndent(indent)
     }
