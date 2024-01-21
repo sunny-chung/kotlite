@@ -34,6 +34,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringFieldIdentifierNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
@@ -82,6 +83,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is ScriptNode -> this.generate()
             is FunctionTypeNode -> this.generate()
             is TypeNode -> this.generate()
+            is TypeParameterNode -> this.generate()
             is UnaryOpNode -> this.generate()
             is VariableReferenceNode -> this.generate()
             is WhileNode -> this.generate()
@@ -145,7 +147,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "${function.generate()}${debug("<f:$functionRefName>")}(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
-        = "fun ${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
+        = "fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
 
     protected fun FunctionValueParameterNode.generate()
         = "$name<$transformedRefName>: ${type.generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"
@@ -176,6 +178,9 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
 
     protected fun TypeNode.generate(): String
         = "$name${arguments?.let { "<${it.joinToString(", ") { (it as ASTNode).generate() }}>" } ?: ""}${if (isNullable) "?" else ""}"
+
+    protected fun TypeParameterNode.generate(): String
+        = "$name${typeUpperBound?.let { " : ${it.generate()}" } ?: ""}"
 
     protected fun UnaryOpNode.generate()
         = "$operator(${node?.let { it.generate() } ?: " "})"

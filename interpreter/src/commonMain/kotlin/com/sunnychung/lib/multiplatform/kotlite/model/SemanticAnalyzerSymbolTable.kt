@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.log
 
 class SemanticAnalyzerSymbolTable(
@@ -50,6 +51,7 @@ class SemanticAnalyzerSymbolTable(
                     owner = owner,
                     type = if (owner == null) CallableType.Function else CallableType.ClassMemberFunction,
                     arguments = it.first.valueParameters,
+                    typeParameters = it.first.typeParameters,
                     returnType = it.first.returnType,
                     definition = it.first,
                     scope = this
@@ -61,6 +63,7 @@ class SemanticAnalyzerSymbolTable(
                     owner = null,
                     type = CallableType.Constructor,
                     arguments = it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList(),
+                    typeParameters = emptyList(),
                     returnType = TypeNode(it.first.fullQualifiedName, null, false),
                     definition = it.first,
                     scope = this
@@ -76,6 +79,7 @@ class SemanticAnalyzerSymbolTable(
                     owner = findPropertyOwner(transformedName)?.ownerRefName,
                     type = CallableType.Property,
                     arguments = (it.first.type as FunctionType).arguments,
+                    typeParameters = emptyList(),
                     returnType = (it.first.type as FunctionType).returnType.toTypeNode(),
                     definition = it.first,
                     scope = this
@@ -89,6 +93,7 @@ class SemanticAnalyzerSymbolTable(
                     owner = null,
                     type = CallableType.ClassMemberFunction,
                     arguments = it.valueParameters,
+                    typeParameters = it.typeParameters,
                     returnType = it.returnType,
                     definition = it,
                     scope = this
@@ -100,6 +105,7 @@ class SemanticAnalyzerSymbolTable(
                     owner = null,
                     type = CallableType.ExtensionFunction,
                     arguments = it.first.valueParameters,
+                    typeParameters = it.first.typeParameters,
                     returnType = it.first.returnType,
                     definition = it.first,
                     scope = this
@@ -117,6 +123,7 @@ class SemanticAnalyzerSymbolTable(
                 is FunctionValueParameterNode -> {
                     if (arguments.size > callable.arguments.size) return@filter false
                     val argumentsReordered = arrayOfNulls<FunctionCallArgumentInfo>(callable.arguments.size)
+                    val typeParameterMapping = mutableMapOf<String, DataType>()
                     arguments.forEachIndexed { i, arg ->
                         if (arg.name == null) {
                             argumentsReordered[i] = arg
@@ -134,7 +141,8 @@ class SemanticAnalyzerSymbolTable(
                         acc && if (callArg == null) {
                             functionArg.defaultValue != null
                         } else {
-                            currentSymbolTable.typeNodeToDataType(functionArg.type)!!.isAssignableFrom(callArg.type)
+                            currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterType(callable.typeParameters))!!.isAssignableFrom(callArg.type)
+                            // TODO filter whether same type parameter always map to same argument
                         }
                     }
                 }
@@ -171,8 +179,14 @@ class SemanticAnalyzerSymbolTable(
 
 fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable): String {
     with (symbolTable) {
+        val typeParameters = typeParameters.associateBy { it.name }
         return (receiver?.let { "$it/" } ?: "") + name + "//" + valueParameters.joinToString("/") {
-            it.type.toClass().fullQualifiedName
+            if (typeParameters.containsKey(it.type.name)) {
+                val typeUpperBound = typeParameters[it.type.name]!!.typeUpperBound
+                typeUpperBound?.toClass()?.fullQualifiedName ?: "Any?"
+            } else {
+                it.type.toClass().fullQualifiedName
+            }
         }
     }
 }

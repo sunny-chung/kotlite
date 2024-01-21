@@ -106,7 +106,7 @@ open class SymbolTable(
 //                throw RuntimeException("val cannot be reassigned")
 //            }
             if (!type.type.isAssignableFrom(value.type())) {
-                throw RuntimeException("Type ${value.type().name} cannot be casted to ${type.type.name}")
+                throw RuntimeException("Type ${value.type().nameWithNullable} cannot be casted to ${type.type.nameWithNullable}")
             }
             propertyValues.getOrPut(name) { RuntimeValueHolder(type.type, type.isMutable, null) }.assign(value = value)
             return true

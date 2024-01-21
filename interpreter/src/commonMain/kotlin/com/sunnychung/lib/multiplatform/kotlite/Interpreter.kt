@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateTypeCastException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalBreakException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalContinueException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnException
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
@@ -63,6 +64,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
@@ -128,6 +130,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is LambdaLiteralNode -> this.eval()
             is CharNode -> this.eval()
             is AsOpNode -> this.eval()
+            is TypeParameterNode -> TODO()
         }
     }
 
@@ -469,11 +472,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             callArguments[index] = a.value.eval() as RuntimeValue
         }
 
-        return evalFunctionCall(callArguments, callNode.position, functionNode, extraScopeParameters, extraSymbols, subject)
+        return evalFunctionCall(callArguments, callNode.typeArguments.toTypedArray(), callNode.position, functionNode, extraScopeParameters, extraSymbols, subject)
     }
 
     fun evalFunctionCall(
         arguments: Array<RuntimeValue?>,
+        typeArguments: Array<TypeNode>,
         callPosition: SourcePosition,
         functionNode: CallableNode,
         extraScopeParameters: Map<String, RuntimeValue>,
@@ -491,8 +495,15 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
         }
 
+        val typeParametersReplacedWithArguments = functionNode.typeParameters.mapIndexed { index, tp ->
+            TypeParameterNode(tp.name, typeArguments[index])
+        }
+
         val scopeType = if (functionNode is FunctionDeclarationNode) ScopeType.Function else ScopeType.Closure
-        val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(functionNode.returnType, false)!!.type
+        val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(
+            type = functionNode.returnType.resolveGenericParameterType(typeParametersReplacedWithArguments),
+            isMutable = false
+        )!!.type
 
         callStack.push(
             functionFullQualifiedName = functionNode.name,
@@ -510,7 +521,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
             functionNode.valueParameters.forEachIndexed { index, it ->
                 if (functionNode is LambdaLiteralNode && it.name == "_") else {
-                    symbolTable.declareProperty(it.transformedRefName!!, it.type, false)
+                    val argumentType = it.type.resolveGenericParameterType(typeParametersReplacedWithArguments)
+                    symbolTable.declareProperty(it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
                         it.transformedRefName!!,
                         arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue).also { arguments[index] = it }
@@ -643,6 +655,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                             callNode = FunctionCallNode(
                                 function = init, /* not used */
                                 arguments = emptyList(),
+                                declaredTypeArguments = emptyList(),
                                 position = callPosition,
                             ),
                             functionNode = init,

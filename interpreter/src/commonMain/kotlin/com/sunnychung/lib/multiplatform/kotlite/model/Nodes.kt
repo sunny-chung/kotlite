@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.annotation.ModifyByAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import kotlin.random.Random
 
 fun generateId() = Random.nextInt()
@@ -165,6 +166,7 @@ data class BlockNode(
 
 interface CallableNode {
     val valueParameters: List<FunctionValueParameterNode>
+    val typeParameters: List<TypeParameterNode>
     val returnType: TypeNode
     val name: String?
 
@@ -177,6 +179,7 @@ open class FunctionDeclarationNode(
     val declaredReturnType: TypeNode?,
     override val valueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
+    override val typeParameters: List<TypeParameterNode> = emptyList(),
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,
 ) : ASTNode, CallableNode {
@@ -187,6 +190,10 @@ open class FunctionDeclarationNode(
         val self = "${generateId()}[\"Function Node `$name`\"]"
         return (declaredReturnType?.let { "$self-- type -->${it.toMermaid()}\n" } ?: "") +
                 "$self-->${body.toMermaid()}\n"
+    }
+
+    fun resolveGenericParameterType(parameter: FunctionValueParameterNode): TypeNode {
+        return parameter.type.resolveGenericParameterType(typeParameters)
     }
 
     override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>): RuntimeValue {
@@ -231,11 +238,14 @@ data class FunctionCallArgumentNode(val index: Int, val name: String? = null, va
 data class FunctionCallNode(
     val function: ASTNode,
     val arguments: List<FunctionCallArgumentNode>,
+    val declaredTypeArguments: List<TypeNode>,
     val position: SourcePosition,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
     @ModifyByAnalyzer var callableType: CallableType? = null,
 ) : ASTNode {
+    val typeArguments: List<TypeNode>
+        get() = declaredTypeArguments
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"
         return "$self-- function -->${function.toMermaid()}\n" +
@@ -371,6 +381,8 @@ data class LambdaLiteralNode(
     @ModifyByAnalyzer var parameterTypesUpperBound: List<TypeNode>? = null,
     @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
 ) : ASTNode, CallableNode {
+    override val typeParameters: List<TypeParameterNode> = emptyList()
+
     override val returnType: TypeNode
         get() = type!!.returnType!!
 
@@ -417,16 +429,21 @@ class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: L
     }
 }
 
-class ClassTypeNode(val clazz: TypeNode): TypeNode("Class", listOf(clazz), false)
+class ClassTypeNode(val clazz: TypeNode) : TypeNode("Class", listOf(clazz), false)
 
-class CharNode(val value: Char): ASTNode {
+class CharNode(val value: Char) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Char Node `$value` (${value.code})\"]"
 }
 
-class AsOpNode(val isNullable: Boolean, val expression: ASTNode, val type: TypeNode): ASTNode {
+class AsOpNode(val isNullable: Boolean, val expression: ASTNode, val type: TypeNode) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"As${if (isNullable) "?" else ""} Node\"]"
         return "$self-- expr -->${expression.toMermaid()}\n" +
                 "$self-- type -->${type.toMermaid()}"
     }
+}
+
+class TypeParameterNode(val name: String, val typeUpperBound: TypeNode?): ASTNode {
+    override fun toMermaid(): String = "${generateId()}[\"Type Parameter Node `$name`\"]" +
+        (typeUpperBound?.let { "--type upper bound -->${it.toMermaid()}" } ?: "")
 }

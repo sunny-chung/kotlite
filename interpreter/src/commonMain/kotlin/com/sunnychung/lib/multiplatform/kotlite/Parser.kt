@@ -44,6 +44,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
@@ -306,8 +307,13 @@ class Parser(protected val lexer: Lexer) {
      *     | navigationSuffix
      */
     fun postfixUnarySuffix(subject: ASTNode): ASTNode {
+        val originalTokenIndex = tokenIndex
         when (val op = currentToken.value as? String) { // TODO complete
-            "(", "{" -> return callSuffix(subject)
+            "(", "{", "<" -> try {
+                return callSuffix(subject)
+            } catch (_: ParseException) {
+                resetTokenToIndex(originalTokenIndex)
+            }
             "++", "--" -> { eat(TokenType.Operator, op); return UnaryOpNode(subject, "post$op") }
             "!" -> { // this rule prevents conflict with consecutive boolean "Not" operators
                 val nextToken = peekNextToken()
@@ -331,6 +337,9 @@ class Parser(protected val lexer: Lexer) {
     fun callSuffix(subject: ASTNode): FunctionCallNode {
         val position = currentToken.position
         val arguments = mutableListOf<FunctionCallArgumentNode>()
+        val typeArguments = if (isCurrentToken(TokenType.Operator, "<")) {
+            typeArguments()
+        } else emptyList()
         if (isCurrentToken(TokenType.Operator, "(")) {
             arguments += valueArguments()
         }
@@ -344,6 +353,7 @@ class Parser(protected val lexer: Lexer) {
         return FunctionCallNode(
             function = subject,
             arguments = arguments,
+            declaredTypeArguments = typeArguments,
             position = position
         )
     }
@@ -889,6 +899,88 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * typeArguments:
+     *     '<'
+     *     {NL}
+     *     typeProjection
+     *     {{NL} ',' {NL} typeProjection}
+     *     [{NL} ',']
+     *     {NL}
+     *     '>'
+     *
+     * typeProjection:
+     *     ([typeProjectionModifiers] type)
+     *     | '*'
+     */
+    fun typeArguments(): List<TypeNode> {
+        val arguments = mutableListOf<TypeNode>()
+        eat(TokenType.Operator, "<")
+        repeatedNL()
+        arguments += type()
+        repeatedNL()
+        while (!isCurrentToken(TokenType.Operator, ">")) {
+            eat(TokenType.Symbol, ",")
+            repeatedNL()
+            arguments += type()
+            repeatedNL()
+        }
+        if (isCurrentToken(TokenType.Symbol, ",")) {
+            eat(TokenType.Symbol, ",")
+            repeatedNL()
+        }
+        eat(TokenType.Operator, ">")
+        return arguments
+    }
+
+    /**
+     * typeParameter:
+     *     [typeParameterModifiers] {NL} simpleIdentifier [{NL} ':' {NL} type]
+     *
+     */
+    fun typeParameter(): TypeParameterNode {
+        repeatedNL()
+        val name = userDefinedIdentifier()
+        val typeUpperBound = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
+            repeatedNL()
+            eat(TokenType.Symbol, ":")
+            repeatedNL()
+            type()
+        } else null
+        return TypeParameterNode(name = name, typeUpperBound = typeUpperBound)
+    }
+
+    /**
+     * typeParameters:
+     *     '<'
+     *     {NL}
+     *     typeParameter
+     *     {{NL} ',' {NL} typeParameter}
+     *     [{NL} ',']
+     *     {NL}
+     *     '>'
+     *
+     */
+    fun typeParameters(): List<TypeParameterNode> {
+        val parameters = mutableListOf<TypeParameterNode>()
+        eat(TokenType.Operator, "<")
+        repeatedNL()
+        parameters += typeParameter()
+        repeatedNL()
+        while (!isCurrentToken(TokenType.Operator, ">")) {
+            eat(TokenType.Symbol, ",")
+            repeatedNL()
+            parameters += typeParameter()
+            repeatedNL()
+        }
+        if (isCurrentToken(TokenType.Symbol, ",")) {
+            eat(TokenType.Symbol, ",")
+            repeatedNL()
+        }
+        eat(TokenType.Operator, ">")
+        return parameters
+    }
+
+    /**
      * nullableType:
      *     (typeReference | parenthesizedType) {NL} (quest {quest})
      *
@@ -906,29 +998,11 @@ class Parser(protected val lexer: Lexer) {
      * simpleUserType:
      *     simpleIdentifier [{NL} typeArguments]
      *
-     * typeArguments:
-     *     '<'
-     *     {NL}
-     *     typeProjection
-     *     {{NL} ',' {NL} typeProjection}
-     *     [{NL} ',']
-     *     {NL}
-     *     '>'
-     *
-     * typeProjection:
-     *     ([typeProjectionModifiers] type)
-     *     | '*'
      */
     fun typeReference(): TypeNode {
         val name = eat(TokenType.Identifier).value as String
-        val argument = if (currentToken.type == TokenType.Symbol && currentToken.value == "<") {
-            eat(TokenType.Symbol, "<")
-            repeatedNL()
-            // only deal with 1-depth argument atm
-            val argument = type()
-            repeatedNL()
-            eat(TokenType.Symbol, ">")
-            listOf(argument)
+        val argument = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
+            typeArguments()
         } else null
         val isNullable = if (isCurrentTokenExcludingNL(TokenType.Symbol, "?")) {
             repeatedNL()
@@ -1335,6 +1409,9 @@ class Parser(protected val lexer: Lexer) {
             if (it.value !in setOf("fun")) throw UnexpectedTokenException(it)
         }
         repeatedNL()
+        val typeParameters = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
+            typeParameters()
+        } else emptyList()
         val (receiver, name) = receiverTypeAndIdentifier()
         val valueParameters = functionValueParameters()
         repeatedNL()
@@ -1363,7 +1440,8 @@ class Parser(protected val lexer: Lexer) {
             receiver = receiver,
             declaredReturnType = type ?: TypeNode("Unit", null, false).takeIf { body.format == FunctionBodyFormat.Block },
             valueParameters = valueParameters,
-            body = body
+            body = body,
+            typeParameters = typeParameters,
         )
     }
 
