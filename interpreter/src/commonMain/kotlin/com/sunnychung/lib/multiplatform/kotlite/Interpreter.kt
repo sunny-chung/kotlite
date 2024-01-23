@@ -615,6 +615,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //            }
 
         // variable "this" is available after primary constructor
+        symbolTable.declareProperty("this", TypeNode(instance.clazz!!.name, null, false), false)
+        symbolTable.assign("this", instance)
         symbolTable.declareProperty("this/${instance.clazz!!.fullQualifiedName}", TypeNode(instance.clazz!!.name, null, false), false)
         symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
 //            instance.memberPropertyValues.forEach {
