@@ -10,6 +10,7 @@ class KZonedInstantValue(value: KZonedInstant) : DelegatedValue<KZonedInstant>(v
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KZonedInstant",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = true,
             primaryConstructorParameters = listOf(
                 CustomFunctionParameter(name = "timestampMs", type = "Long"),

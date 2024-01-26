@@ -6,6 +6,17 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 
 fun TypeNode.resolveGenericParameterType(typeParameters: List<TypeParameterNode>): TypeNode {
     if (typeParameters.isEmpty()) return this
+    return this
+}
+
+fun TypeNode.resolveGenericParameterTypeArguments(typeArguments: Map<String, TypeNode>): TypeNode {
+    return resolveGenericParameterTypeToUpperBound(typeArguments.map {
+        TypeParameterNode(it.key, it.value)
+    })
+}
+
+fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypeParameterNode>): TypeNode {
+    if (typeParameters.isEmpty()) return this
 
     fun resolve(type: TypeNode): TypeNode {
         return if (type is FunctionTypeNode) {
@@ -16,15 +27,25 @@ fun TypeNode.resolveGenericParameterType(typeParameters: List<TypeParameterNode>
                 type.isNullable
             )
         } else {
+            // Cases:
+            // 1. A => MyPair<B, C> (use `genericResolvedType.arguments`)
+            // 2. MyPair<A, B> => MyPair<MyPair<C, D>, B> (use `type.arguments`)
+            // 3. A<B, C> => (Kotlin: Type arguments are not allowed for type parameter)
             val genericParameter = typeParameters.firstOrNull { it.name == type.name }
-            val genericResolvedType = if (genericParameter != null) {
-                genericParameter.typeUpperBound ?: TypeNode("Any", null, isNullable = true)
-            } else null
-            TypeNode(
-                genericResolvedType?.name ?: type.name,
-                type.arguments?.map { resolve(it) },
-                (genericResolvedType?.isNullable ?: false) || type.isNullable
-            )
+            if (genericParameter != null) { // case 1
+                val genericResolvedType = genericParameter.typeUpperBound ?: TypeNode("Any", null, isNullable = true)
+                TypeNode(
+                    genericResolvedType.name,
+                    genericResolvedType.arguments/*?.map { resolve(it) }*/, // resolving generic type's argument may cause infinite loop, but it is not needed as there is no case 3
+                    genericResolvedType.isNullable || type.isNullable
+                )
+            } else { // case 2
+                TypeNode(
+                    type.name,
+                    type.arguments?.map { resolve(it) },
+                    type.isNullable
+                )
+            }
         }
     }
     return resolve(this)

@@ -10,6 +10,7 @@ class KDateValue(value: KDate) : DelegatedValue<KDate>(value, clazz) {
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KDate",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = true,
             primaryConstructorParameters = listOf(
                 CustomFunctionParameter(name = "year", type = "Int"),

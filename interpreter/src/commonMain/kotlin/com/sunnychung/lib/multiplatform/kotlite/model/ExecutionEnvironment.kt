@@ -45,10 +45,17 @@ class ExecutionEnvironment(
     internal fun getBuiltinClasses(topmostSymbolTable: SymbolTable): List<ClassDefinition> {
         return listOf("Int", "Double", "Long", "Boolean", "String", "Char", "Unit", "Nothing", "Function", "Class", "Any").flatMap { className ->
             if (!classRegistrationFilter(className)) return@flatMap emptyList()
+            fun createTypeParameters(typeName: String): List<TypeParameterNode> {
+                return when (typeName) {
+                    "Class" -> listOf(TypeParameterNode("T", TypeNode("Any", null, false)))
+                    else -> emptyList()
+                }
+            }
             listOf(
                 ClassDefinition(
                     currentScope = topmostSymbolTable,
                     name = className,
+                    typeParameters = createTypeParameters(className),
                     isInstanceCreationAllowed = false,
                     orderedInitializersAndPropertyDeclarations = emptyList(),
                     rawMemberProperties = emptyList(),
@@ -58,6 +65,7 @@ class ExecutionEnvironment(
                 ClassDefinition(
                     currentScope = topmostSymbolTable,
                     name = "$className?",
+                    typeParameters = createTypeParameters(className),
                     isInstanceCreationAllowed = false,
                     orderedInitializersAndPropertyDeclarations = emptyList(),
                     rawMemberProperties = emptyList(),
@@ -67,6 +75,7 @@ class ExecutionEnvironment(
                 ClassDefinition(
                     currentScope = topmostSymbolTable,
                     name = "$className.Companion",
+                    typeParameters = createTypeParameters(className),
                     isInstanceCreationAllowed = false,
                     orderedInitializersAndPropertyDeclarations = emptyList(),
                     rawMemberProperties = emptyList(),

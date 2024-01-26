@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 
 class ProvidedClassDefinition(
     fullQualifiedName: String,
+    typeParameters: List<TypeParameterNode>,
     isInstanceCreationAllowed: Boolean,
     private val primaryConstructorParameters: List<CustomFunctionParameter>,
     private val constructInstance: (interpreter: Interpreter, callArguments: Array<RuntimeValue>, callPosition: SourcePosition) -> ClassInstance,
@@ -13,6 +14,7 @@ class ProvidedClassDefinition(
     currentScope = null,
     name = fullQualifiedName.substringAfterLast('.'),
     fullQualifiedName = fullQualifiedName,
+    typeParameters = typeParameters,
     isInstanceCreationAllowed = isInstanceCreationAllowed,
     orderedInitializersAndPropertyDeclarations = emptyList(),
     rawMemberProperties = emptyList(),
@@ -35,6 +37,7 @@ class ProvidedClassDefinition(
     override fun construct(
         interpreter: Interpreter,
         callArguments: Array<RuntimeValue>,
+        typeArguments: Array<DataType>,
         callPosition: SourcePosition
     ): ClassInstance {
         return constructInstance(interpreter, callArguments, callPosition).also {
@@ -46,6 +49,7 @@ class ProvidedClassDefinition(
 
     fun copyNullableClassDefinition() = ProvidedClassDefinition(
         fullQualifiedName = "$fullQualifiedName?",
+        typeParameters = typeParameters,
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = {_, _, _ -> throw UnsupportedOperationException()},
@@ -53,6 +57,7 @@ class ProvidedClassDefinition(
 
     fun copyCompanionClassDefinition() = ProvidedClassDefinition(
         fullQualifiedName = "$fullQualifiedName.Companion",
+        typeParameters = emptyList(),
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = {_, _, _ -> throw UnsupportedOperationException()},

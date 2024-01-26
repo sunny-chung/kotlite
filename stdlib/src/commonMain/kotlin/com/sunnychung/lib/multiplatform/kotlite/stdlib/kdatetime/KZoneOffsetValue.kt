@@ -10,6 +10,7 @@ class KZoneOffsetValue(value: KZoneOffset) : DelegatedValue<KZoneOffset>(value, 
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KZoneOffset",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = true,
             primaryConstructorParameters = listOf(
                 CustomFunctionParameter(name = "hours", type = "Int"),

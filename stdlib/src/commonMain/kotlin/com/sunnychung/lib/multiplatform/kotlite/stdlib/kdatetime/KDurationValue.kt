@@ -8,6 +8,7 @@ class KDurationValue(value: KDuration) : DelegatedValue<KDuration>(value, clazz)
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KDuration",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { interpreter, callArguments, callPosition ->

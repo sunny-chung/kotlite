@@ -3,10 +3,13 @@ package com.sunnychung.lib.multiplatform.kotlite
 import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateNullPointerException
 import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateRuntimeException
 import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateTypeCastException
+import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalBreakException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalContinueException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnException
+import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
@@ -51,6 +54,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
@@ -65,6 +69,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
@@ -90,8 +95,6 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun symbolTable() = callStack.currentSymbolTable()
-
-    fun DataType.toTypeNode() = TypeNode(name, null, isNullable)
 
     fun ASTNode.eval(): Any {
         return when (this) {
@@ -358,7 +361,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             val companionClassName = "${(type as ClassTypeNode).clazz.name}.Companion"
             return ClassInstance(
                 companionClassName,
-                symbolTable().findClass(companionClassName)!!.first
+                symbolTable().findClass(companionClassName)!!.first,
+                emptyList(),
             )
         }
         return callStack.currentSymbolTable().read(transformedRefName ?: variableName)
@@ -399,7 +403,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     CallableType.Constructor -> {
                         val classDefinition = callStack.currentSymbolTable().findClass(functionRefName!!)?.first
                         if (classDefinition != null) {
-                            return evalCreateClassInstance(classDefinition)
+                            return evalCreateClassInstance(classDefinition, typeArguments)
                         }
                     }
                     CallableType.Property -> {
@@ -456,10 +460,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun FunctionCallNode.evalFunctionCall(functionNode: CallableNode, extraSymbols: SymbolTable? = null): RuntimeValue {
-        return evalFunctionCall(this, functionNode, emptyMap(), extraSymbols).result
+        return evalFunctionCall(this, functionNode, emptyMap(), emptyList(), extraSymbols).result
     }
 
-    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>, extraSymbols: SymbolTable? = null, subject: RuntimeValue? = null): FunctionCallResult {
+    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>, extraTypeResolutions: List<TypeParameterNode>, extraSymbols: SymbolTable? = null, subject: RuntimeValue? = null): FunctionCallResult {
         // TODO optimize to remove most loops
         val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
         callNode.arguments.forEach { a ->
@@ -472,7 +476,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             callArguments[index] = a.value.eval() as RuntimeValue
         }
 
-        return evalFunctionCall(callArguments, callNode.typeArguments.toTypedArray(), callNode.position, functionNode, extraScopeParameters, extraSymbols, subject)
+        return evalFunctionCall(callArguments, callNode.typeArguments.toTypedArray(), callNode.position, functionNode, extraScopeParameters, extraTypeResolutions, extraSymbols, subject)
     }
 
     fun evalFunctionCall(
@@ -481,6 +485,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         callPosition: SourcePosition,
         functionNode: CallableNode,
         extraScopeParameters: Map<String, RuntimeValue>,
+        extraTypeResolutions: List<TypeParameterNode>,
         extraSymbols: SymbolTable? = null,
         subject: RuntimeValue? = null
     ): FunctionCallResult {
@@ -495,13 +500,26 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
         }
 
-        val typeParametersReplacedWithArguments = functionNode.typeParameters.mapIndexed { index, tp ->
+        val typeParametersReplacedWithArguments = (functionNode.typeParameters.mapIndexed { index, tp ->
             TypeParameterNode(tp.name, typeArguments[index])
+        } + extraTypeResolutions) // add `extraTypeResolutions` at last because class type arguments have a lower precedence
+            .associate { it.name to it.typeUpperBound!! }
+
+        // resolve type arguments to DataType first, so that
+        // class with same name of function type parameter name is resolved before function type parameter declarations
+        val typeArgumentsInDataType = typeParametersReplacedWithArguments.mapValues {
+            symbolTable().typeNodeToDataType(it.value)
         }
 
         val scopeType = if (functionNode is FunctionDeclarationNode) ScopeType.Function else ScopeType.Closure
         val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(
-            type = functionNode.returnType.resolveGenericParameterType(typeParametersReplacedWithArguments),
+            type = functionNode.returnType.resolveGenericParameterTypeArguments(
+//                (extraSymbols?.listTypeAliasInThisScope() ?: emptyList()) +
+                typeParametersReplacedWithArguments + // typeParametersReplacedWithArguments has higher precedence
+                (extraSymbols?.listTypeAliasResolutionInThisScope() ?: emptyMap()).mapValues {
+                    it.value.toTypeNode()
+                }
+            ),
             isMutable = false
         )!!.type
 
@@ -519,9 +537,21 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 symbolTable.declareProperty(it.key, TypeNode(it.value.type().name, null, false), false) // TODO change to use DataType directly
                 symbolTable.assign(it.key, it.value)
             }
+//            typeParametersReplacedWithArguments.forEach {
+//                symbolTable.declareTypeAlias(it.key, it.value)
+//            }
+            functionNode.typeParameters.forEach {
+                symbolTable.declareTypeAlias(it.name, it.typeUpperBound)
+            }
+            typeParametersReplacedWithArguments.forEach {
+                if (symbolTable.findTypeAlias(it.key) == null) {
+                    symbolTable.declareTypeAlias(it.key, it.value) // TODO declare the original upper bound
+                }
+                symbolTable.declareTypeAliasResolution(it.key, typeArgumentsInDataType[it.key]!!)
+            }
             functionNode.valueParameters.forEachIndexed { index, it ->
-                if (functionNode is LambdaLiteralNode && it.name == "_") else {
-                    val argumentType = it.type.resolveGenericParameterType(typeParametersReplacedWithArguments)
+                if (!(functionNode is LambdaLiteralNode && it.name == "_")) {
+                    val argumentType = it.type //.resolveGenericParameterTypeArguments(typeParametersReplacedWithArguments)
                     symbolTable.declareProperty(it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
                         it.transformedRefName!!,
@@ -544,7 +574,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
             if (!returnType.isAssignableFrom(returnValue.type())) {
-                throw RuntimeException("Type ${returnValue.type().name} cannot be casted to ${returnType.name}")
+                throw RuntimeException("Type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName}")
             }
 
             return FunctionCallResult(returnValue, symbolTable)
@@ -553,7 +583,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         }
     }
 
-    fun FunctionCallNode.evalCreateClassInstance(clazz: ClassDefinition): ClassInstance {
+    fun FunctionCallNode.evalCreateClassInstance(clazz: ClassDefinition, typeArguments: List<TypeNode>): ClassInstance {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassInitializer, callPosition = this.position)
         try {
             // TODO generalize duplicated code
@@ -575,23 +605,27 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 }
             }
 
+            val typeArgumentByName = clazz.typeParameters.mapIndexed { index, tp ->
+                tp.name to typeArguments[index]
+            }.toMap()
+
             val symbolTable = callStack.currentSymbolTable()
             clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
                 // no need to use transformedRefName as duplicated declarations are not possible here
                 val value = callArguments[index] ?: (it.parameter.defaultValue!!.eval() as RuntimeValue)
-                symbolTable.declareProperty(it.parameter.transformedRefName!!, it.parameter.type, false)
+                symbolTable.declareProperty(it.parameter.transformedRefName!!, it.parameter.type.resolveGenericParameterTypeArguments(typeArgumentByName), false)
                 symbolTable.assign(it.parameter.transformedRefName!!, value)
                 callArguments[index] = value
             }
 
-            return clazz.construct(this@Interpreter, callArguments as Array<RuntimeValue>, position)
+            return clazz.construct(this@Interpreter, callArguments as Array<RuntimeValue>, typeArguments.map { symbolTable().typeNodeToDataType(it)!! }.toTypedArray(), position)
         } finally {
             callStack.pop(ScopeType.ClassInitializer)
         }
     }
 
-    fun constructClassInstance(callArguments: Array<RuntimeValue>, callPosition: SourcePosition, clazz: ClassDefinition): ClassInstance {
-        val instance = ClassInstance(clazz.fullQualifiedName, clazz)
+    fun constructClassInstance(callArguments: Array<RuntimeValue>, callPosition: SourcePosition, typeArguments: Array<DataType>, clazz: ClassDefinition): ClassInstance {
+        val instance = ClassInstance(clazz.fullQualifiedName, clazz, typeArguments.toList())
         val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
 
         val symbolTable = callStack.currentSymbolTable()
@@ -615,13 +649,22 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //            }
 
         // variable "this" is available after primary constructor
-        symbolTable.declareProperty("this", TypeNode(instance.clazz!!.name, null, false), false)
+        symbolTable.declareProperty("this", TypeNode(instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this", instance)
-        symbolTable.declareProperty("this/${instance.clazz!!.fullQualifiedName}", TypeNode(instance.clazz!!.name, null, false), false)
+        symbolTable.declareProperty("this/${instance.clazz!!.fullQualifiedName}", TypeNode(instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
+        symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
+        symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this/${instance.clazz!!.fullQualifiedName}", "this")
 //            instance.memberPropertyValues.forEach {
 //                symbolTable.putPropertyHolder(instance.clazz!!.memberPropertyNameToTransformedName[it.key]!!, it.value)
 //            }
+
+        val typeParametersAndArguments = clazz.typeParameters.mapIndexed { index, tp ->
+            TypeParameterNode(tp.name, typeArguments[index].toTypeNode())
+        }
+        val typeArgumentByName = typeParametersAndArguments.associate {
+            it.name to it.typeUpperBound!!
+        }
 
         clazz!!.orderedInitializersAndPropertyDeclarations.forEach {
             callStack.push(
@@ -634,7 +677,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 nonPropertyArguments.forEach {
                     val keyWithIncreasedScope = it.key.replaceAfterLast("/", innerSymbolTable.scopeLevel.toString())
                     log.v("keyWithIncreasedScope = $keyWithIncreasedScope")
-                    innerSymbolTable.declareProperty(keyWithIncreasedScope, it.value.first, false)
+                    innerSymbolTable.declareProperty(keyWithIncreasedScope, it.value.first.resolveGenericParameterTypeArguments(typeArgumentByName), false)
                     innerSymbolTable.assign(keyWithIncreasedScope, it.value.second)
                 }
                 when (it) {
@@ -662,6 +705,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                             ),
                             functionNode = init,
                             extraScopeParameters = emptyMap(),
+                            extraTypeResolutions = typeParametersAndArguments /* type arguments */,
                         )
                     }
 
@@ -687,6 +731,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             symbolTable.assign("this/${subject.type().name}", subject)
             symbolTable.declareProperty("this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
+            symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
+            symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this/${subject.type().name}", "this")
 
 //            // TODO optimize to only copy needed members
 //            if (subject is ClassInstance) {
@@ -695,10 +741,17 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //                }
 //            }
 
+            val instanceGenericTypeResolutions = if (subject is ClassInstance) {
+                subject.clazz!!.typeParameters.mapIndexed { index, it ->
+                    TypeParameterNode(it.name, subject.typeArguments[index].toTypeNode())
+                }
+            } else emptyList()
+
             val result = evalFunctionCall(
                 callNode = this.copy(function = function),
                 functionNode = function,
                 extraScopeParameters = emptyMap(),
+                extraTypeResolutions = instanceGenericTypeResolutions /* type arguments */,
                 subject = subject,
             )
 
@@ -759,38 +812,50 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun ClassDeclarationNode.eval() {
-        callStack.currentSymbolTable().declareClass(ClassDefinition(
-            currentScope = callStack.currentSymbolTable(),
-            name = name,
-            fullQualifiedName = fullQualifiedName,
-            isInstanceCreationAllowed = true,
-            primaryConstructor = primaryConstructor,
-            rawMemberProperties = ((primaryConstructor?.parameters
-                ?.filter { it.isProperty }
-                ?.map {
-                    val p = it.parameter
-                    PropertyDeclarationNode(
-                        name = p.name,
-                        receiver = fullQualifiedName,
-                        declaredType = p.type,
-                        isMutable = it.isMutable,
-                        initialValue = p.defaultValue,
-                        transformedRefName = p.transformedRefName,
-                    )
-                } ?: emptyList()) +
-                    declarations.filterIsInstance<PropertyDeclarationNode>()),
-            memberFunctions = declarations
+        val declarationScope = callStack.currentSymbolTable()
+
+        callStack.push(fullQualifiedName, ScopeType.Class, SourcePosition(1, 1))
+        try {
+            typeParameters.forEach {
+                callStack.currentSymbolTable().declareTypeAlias(it.name, it.typeUpperBound)
+            }
+
+            declarationScope.declareClass(ClassDefinition(
+                currentScope = callStack.currentSymbolTable(),
+                name = name,
+                fullQualifiedName = fullQualifiedName,
+                typeParameters = typeParameters,
+                isInstanceCreationAllowed = true,
+                primaryConstructor = primaryConstructor,
+                rawMemberProperties = ((primaryConstructor?.parameters
+                    ?.filter { it.isProperty }
+                    ?.map {
+                        val p = it.parameter
+                        PropertyDeclarationNode(
+                            name = p.name,
+                            receiver = fullQualifiedName,
+                            declaredType = p.type,
+                            isMutable = it.isMutable,
+                            initialValue = p.defaultValue,
+                            transformedRefName = p.transformedRefName,
+                        )
+                    } ?: emptyList()) +
+                        declarations.filterIsInstance<PropertyDeclarationNode>()),
+                memberFunctions = declarations
+                    .filterIsInstance<FunctionDeclarationNode>()
+                    .filter { it.receiver == null }
+                    .associateBy { it.transformedRefName!! },
+                orderedInitializersAndPropertyDeclarations = declarations
+                    .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
+            ))
+            // register extension functions in global scope
+            declarations
                 .filterIsInstance<FunctionDeclarationNode>()
-                .filter { it.receiver == null }
-                .associateBy { it.transformedRefName!! },
-            orderedInitializersAndPropertyDeclarations = declarations
-                .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
-        ))
-        // register extension functions in global scope
-        declarations
-            .filterIsInstance<FunctionDeclarationNode>()
-            .filter { it.receiver != null }
-            .forEach { globalScope.declareExtensionFunction(it.transformedRefName!!, it) }
+                .filter { it.receiver != null }
+                .forEach { globalScope.declareExtensionFunction(it.transformedRefName!!, it) }
+        } finally {
+            callStack.pop(ScopeType.Class)
+        }
 
         // companion object
         // TODO create only if a companion object is declared
@@ -798,6 +863,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             currentScope = callStack.currentSymbolTable(),
             name = "$name.Companion",
             fullQualifiedName = "$fullQualifiedName.Companion",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = false,
             orderedInitializersAndPropertyDeclarations = emptyList(),
             rawMemberProperties = emptyList(),
@@ -859,7 +925,32 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         refs.classes.forEach {
             runtimeRefs.declareClass(currentSymbolTable.findClass(it)!!.first)
         }
-        return LambdaValue(this, callStack.currentSymbolTable().typeNodeToDataType(type!!) as FunctionType, runtimeRefs, this@Interpreter)
+        refs.typeAlias.forEach {
+//            runtimeRefs.declareTypeAlias(it, currentSymbolTable.findTypeAlias(it)!!.first.toTypeNode(), currentSymbolTable)
+            val resolution = currentSymbolTable.findTypeAliasResolution(it)!!.toTypeNode()
+            runtimeRefs.declareTypeAlias(it, currentSymbolTable.findTypeAlias(it)!!.first.toTypeNode(), currentSymbolTable)
+            runtimeRefs.declareTypeAliasResolution(it, resolution, currentSymbolTable)
+        }
+
+//        fun processTypeParameter(dataType: DataType) {
+//            when (dataType) {
+//                is TypeParameterType -> {
+//                    runtimeRefs.declareTypeAlias(dataType.name, dataType.upperBound.toTypeNode())
+//                }
+//                is FunctionType -> {
+//                    dataType.arguments.forEach { processTypeParameter(it) }
+//                    processTypeParameter(dataType.returnType)
+//                }
+//                is ObjectType -> {
+//                    dataType.arguments.forEach { processTypeParameter(it) }
+//                }
+//                else -> {}
+//            }
+//        }
+        val lambdaType = callStack.currentSymbolTable().typeNodeToDataType(type!!) as FunctionType
+//        processTypeParameter(lambdaType)
+
+        return LambdaValue(this, lambdaType, runtimeRefs, this@Interpreter)
     }
 
     fun StringNode.eval(): StringValue {

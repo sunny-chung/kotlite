@@ -186,7 +186,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "$operator(${node?.let { it.generate() } ?: " "})"
 
     protected fun VariableReferenceNode.generate()
-        = "${ownerRef?.let { "$ownerRef." } ?: ""}$variableName${debug("<$transformedRefName>")}"
+        = "${ownerRef?.let { "${it.ownerRefName}." } ?: ""}$variableName${debug("<$transformedRefName>")}"
 
     protected fun WhileNode.generate()
         = "while (${condition.generate()})${body?.let { " ${it.generate()}" } ?: ";"}"

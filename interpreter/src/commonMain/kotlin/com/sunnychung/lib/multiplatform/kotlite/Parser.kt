@@ -1590,6 +1590,10 @@ class Parser(protected val lexer: Lexer) {
         repeatedNL()
         val name = userDefinedIdentifier()
         var token = currentTokenExcludingNL()
+        val typeParameters = if (token.`is`(TokenType.Operator, "<")) {
+            repeatedNL()
+            typeParameters().also { token = currentTokenExcludingNL() }
+        } else emptyList()
         val primaryConstructor = if (
             (token.type == TokenType.Identifier && token.value == "constructor")
             || (token.type == TokenType.Operator && token.value == "(")
@@ -1601,7 +1605,12 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             classBody()
         } else listOf()
-        return ClassDeclarationNode(name = name, primaryConstructor = primaryConstructor, declarations = declarations)
+        return ClassDeclarationNode(
+            name = name,
+            typeParameters = typeParameters,
+            primaryConstructor = primaryConstructor,
+            declarations = declarations
+        )
     }
 
     /**

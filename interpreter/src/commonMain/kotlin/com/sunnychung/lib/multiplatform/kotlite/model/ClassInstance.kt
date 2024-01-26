@@ -2,9 +2,10 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 
-open class ClassInstance(protected val fullClassName: String, clazz: ClassDefinition? = null, val memberPropertyValues: MutableMap<String, RuntimeValueAccessor> = mutableMapOf()) : RuntimeValue {
+open class ClassInstance(protected val fullClassName: String, clazz: ClassDefinition? = null, val typeArguments: List<DataType>, val memberPropertyValues: MutableMap<String, RuntimeValueAccessor> = mutableMapOf()) : RuntimeValue {
     internal var clazz: ClassDefinition? = null
     internal var hasInitialized: Boolean = false
+    internal var typeArgumentByName: Map<String, DataType> = emptyMap()
 
     init {
         if (clazz != null) {
@@ -12,20 +13,24 @@ open class ClassInstance(protected val fullClassName: String, clazz: ClassDefini
         }
     }
 
-    final override fun type(): DataType = ObjectType(clazz ?: throw RuntimeException("This object has not been initialized"))
+    final override fun type(): DataType = ObjectType(clazz ?: throw RuntimeException("This object has not been initialized"), typeArguments)
 
     internal fun attach(clazz: ClassDefinition) {
         if (clazz.fullQualifiedName != fullClassName) throw RuntimeException("The class to attach does not match with class name")
         if (this.clazz != null) throw RuntimeException("This object has already been initialized")
         this.clazz = clazz
 
+        typeArgumentByName = clazz.typeParameters.mapIndexed { index, tp ->
+            tp.name to typeArguments[index]
+        }.toMap()
+
         clazz.memberProperties.forEach {
-            memberPropertyValues[it.key] = RuntimeValueHolder(it.value.type, it.value.isMutable, null)
+            memberPropertyValues[it.key] = RuntimeValueHolder(it.value.type.resolveTypeParameter(), it.value.isMutable, null)
         }
 
         clazz.memberPropertyCustomAccessors.forEach {
             memberPropertyValues[it.key] = RuntimeValueDelegate(
-                type = clazz.memberPropertyTypes[it.key]!!.type,
+                type = clazz.memberPropertyTypes[it.key]!!.type.resolveTypeParameter(),
                 reader = { interpreter ->
                     with(interpreter!!) {
                         val function = it.value.getter!!
@@ -71,7 +76,7 @@ open class ClassInstance(protected val fullClassName: String, clazz: ClassDefini
 //        if (!propertyDefinition.isMutable && memberPropertyValues.containsKey(name)) {
 //            throw RuntimeException("val cannot be reassigned")
 //        }
-        if (!propertyDefinition.type.isAssignableFrom(value.type())) {
+        if (!propertyDefinition.type.resolveTypeParameter().isAssignableFrom(value.type())) {
             throw RuntimeException("Type ${value.type().name} cannot be casted to ${propertyDefinition.type.name}")
         }
 
@@ -108,6 +113,11 @@ open class ClassInstance(protected val fullClassName: String, clazz: ClassDefini
 
     fun findPropertyByDeclaredName(declaredName: String, interpreter: Interpreter? = null): RuntimeValue {
         return memberPropertyValues[declaredName]!!.read(interpreter)
+    }
+
+    fun DataType.resolveTypeParameter(): DataType {
+        if (this !is TypeParameterType) return this
+        return typeArgumentByName[name]?.copyOf(isNullable = isNullable) ?: TODO()
     }
 
     override fun convertToString(): String = "${clazz!!.fullQualifiedName}()" // TODO

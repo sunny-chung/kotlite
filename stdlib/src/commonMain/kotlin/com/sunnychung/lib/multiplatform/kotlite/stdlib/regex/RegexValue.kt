@@ -10,6 +10,7 @@ class RegexValue(value: Regex) : DelegatedValue<Regex>(value, "Regex", clazz) {
     internal companion object {
          val clazz = ProvidedClassDefinition(
              fullQualifiedName = "Regex",
+             typeParameters = emptyList(),
              isInstanceCreationAllowed = true,
              primaryConstructorParameters = listOf(CustomFunctionParameter("value", "String")),
              constructInstance = { interpreter, callArguments, callPosition ->

@@ -69,7 +69,7 @@ data class ScriptNode(val nodes: List<ASTNode>) : ASTNode {
     }
 }
 
-open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNullable: Boolean) : ASTNode {
+open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNullable: Boolean, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     init {
         if (arguments?.isEmpty() == true) throw IllegalArgumentException("empty argument")
         if (name == "Function" && this !is FunctionTypeNode) throw IllegalArgumentException("function type node should be a FunctionTypeNode instance")
@@ -314,6 +314,7 @@ data class ClassInstanceInitializerNode(val block: BlockNode) : ASTNode {
 
 data class ClassDeclarationNode(
     val name: String,
+    val typeParameters: List<TypeParameterNode>,
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val declarations: List<ASTNode>,
     @ModifyByAnalyzer var fullQualifiedName: String = name,

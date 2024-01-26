@@ -10,6 +10,7 @@ class KZonedDateTimeValue(value: KZonedDateTime) : DelegatedValue<KZonedDateTime
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KZonedDateTime",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = true,
             primaryConstructorParameters = listOf(
                 CustomFunctionParameter(name = "year", type = "Int"),

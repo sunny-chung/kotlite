@@ -3,7 +3,10 @@ package com.sunnychung.lib.multiplatform.kotlite
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
+import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
@@ -61,6 +64,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SymbolReferenceSet
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
@@ -128,7 +132,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     fun DataType.toTypeNode(): TypeNode =
         if (this is NullType) {
             typeRegistry["Null"]!!
-        } else if (this !is ObjectType && this !is FunctionType) {
+        } else if (this !is ObjectType && this !is FunctionType && this !is TypeParameterType) {
             typeRegistry["$name${if (isNullable) "?" else ""}"]!!
         } else if (this is FunctionType) {
             FunctionTypeNode(
@@ -136,6 +140,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 returnType = returnType.toTypeNode(),
                 isNullable = isNullable,
             )
+        } else if (this is ObjectType) {
+            TypeNode(name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
         } else {
             TypeNode(name, null, isNullable)
         }
@@ -175,7 +181,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is NullNode -> {}
             is PropertyDeclarationNode -> this.visit(modifier = modifier)
             is ScriptNode -> this.visit(modifier = modifier)
-            is TypeNode -> {}
+            is TypeNode -> this.visit(modifier = modifier)
             is TypeParameterNode -> TODO()
             is UnaryOpNode -> this.visit(modifier = modifier)
             is VariableReferenceNode -> this.visit(modifier = modifier)
@@ -248,6 +254,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         nodes.forEach { it.visit(modifier = modifier) }
     }
 
+    fun TypeNode.visit(modifier: Modifier = Modifier()) {
+        currentScope.typeNodeToDataType(this)
+            ?: throw SemanticException("Unknown type `${this.descriptiveName()}`")
+    }
+
     fun UnaryOpNode.visit(modifier: Modifier = Modifier()) {
         node!!.visit(modifier = modifier)
         if (operator in setOf("pre++", "pre--", "post++", "post--") && node is VariableReferenceNode) {
@@ -316,14 +327,23 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun evaluateAndRegisterReturnType(node: ASTNode) {
+        fun setOfAllTypeNodes(type: TypeNode): Set<TypeNode> {
+            return mutableSetOf(type) + (type.arguments?.flatMap { setOfAllTypeNodes(it) } ?: emptyList())
+        }
+
         val type = node.type()
         if (symbolRecorders.isNotEmpty()) {
             val symbols = symbolRecorders.last()
-            val typesToResolve = mutableSetOf(type) + (type.arguments ?: emptyList())
+            val typesToResolve = setOfAllTypeNodes(type)
             typesToResolve.forEach {
                 val find = currentScope.findClass(it.name)
                 if (find != null && isLocalAndNotCurrentScope(find.second.scopeLevel)) {
                     symbols.classes += find.first.fullQualifiedName
+                } else {
+                    val find = currentScope.findTypeAlias(it.name)
+                    if (find != null && isLocalAndNotCurrentScope(find.second.scopeLevel)) {
+                        symbols.typeAlias += it.name
+                    }
                 }
             }
         }
@@ -422,6 +442,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     fun FunctionDeclarationNode.visit(modifier: Modifier = Modifier()) {
         val previousScope = currentScope
         var additionalScopeCount = 0
+        pushScope(
+            scopeName = name,
+            scopeType = ScopeType.ExtraWrap,
+        )
+        ++additionalScopeCount
+
+        typeParameters.forEach {
+            currentScope.declareTypeAlias(it.name, it.typeUpperBound)
+        }
+
         pushScope(
             scopeName = name,
             scopeType = ScopeType.Function,
@@ -536,6 +566,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         class FunctionInfo(val valueParameters: List<Any>, val typeParameters: List<TypeParameterNode>, val returnType: TypeNode)
 
+        var extraTypeResolutions = emptyMap<String, TypeNode>()
+
         val functionArgumentAndReturnTypeDeclarations = when (function) {
             is VariableReferenceNode -> {
                 val resolution = currentScope.findMatchingCallables(
@@ -573,7 +605,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 FunctionInfo(
                     valueParameters = resolution.arguments,
                     typeParameters = resolution.typeParameters,
-                    returnType = resolution.returnType
+                    returnType = resolution.returnType.let {
+                        if (callableType == CallableType.Constructor) {
+                            TypeNode(it.name, typeArguments.emptyToNull(), false)
+                        } else {
+                            it
+                        }
+                    }
                 )
             }
 
@@ -613,11 +651,32 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                  */
 
                 val returnType = resolution.returnType.let {
-                    if (receiverType.isNullable && function.operator == "?.") {
+                    var r = if (receiverType.isNullable && function.operator == "?.") {
                         it.copy(isNullable = true)
                     } else {
                         it
                     }
+                    val subjectType = function.subject.type().toDataType()
+                    log.v { "functionRefName=$functionRefName; subjectType=${subjectType::class.simpleName} ${subjectType.descriptiveName}" }
+                    if (subjectType is ObjectType) {
+                        val classTypeParameters = subjectType.clazz.typeParameters
+                        log.v {
+                            "functionRefName=$functionRefName; subjectType=${subjectType.descriptiveName}; subjectType.clazz.typeParameters=${
+                                subjectType.clazz.typeParameters.joinToString(
+                                    ","
+                                ) { it.name }
+                            }; subjectType.arguments=${subjectType.arguments.joinToString(",") { it.descriptiveName }}; before r=${r.descriptiveName()}"
+                        }
+                        val namedTypeArguments = classTypeParameters.mapIndexed { index, it ->
+                            it.name to subjectType.arguments[index].toTypeNode()
+                        }.toMap()
+                        if (namedTypeArguments.isNotEmpty()) {
+                            extraTypeResolutions = namedTypeArguments
+                            r = r.resolveGenericParameterTypeArguments(namedTypeArguments)
+                        }
+                        log.v { "functionRefName=$functionRefName; r=${r.descriptiveName()}" }
+                    }
+                    r
                 }
 
                 FunctionInfo(
@@ -652,18 +711,18 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //            throw SemanticException("Too much arguments. At most ${functionArgumentDeclarations.size} are accepted.")
 //        }
 
-        if (functionArgumentAndReturnTypeDeclarations.typeParameters.size != typeArguments.size) {
-            throw SemanticException("Number of type arguments does not match with number of type parameters of the matched function")
+        if (/*typeArguments.isNotEmpty() &&*/ functionArgumentAndReturnTypeDeclarations.typeParameters.size != typeArguments.size) {
+            throw SemanticException("Number of type arguments does not match with number of type parameters of the matched callable")
         }
 
-        val typeParameters = functionArgumentAndReturnTypeDeclarations.typeParameters
+        val typeArgumentByName = functionArgumentAndReturnTypeDeclarations.typeParameters
             .let { typeParameters ->
                 if (typeArguments.isNotEmpty()) {
                     typeParameters.mapIndexed { index, tp ->
-                        TypeParameterNode(tp.name, typeArguments[index])
-                    }
+                        tp.name to typeArguments[index]
+                    }.toMap()
                 } else {
-                    typeParameters
+                    emptyMap()
                 }
             }
 
@@ -672,7 +731,19 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             when (it) {
                 is DataType -> ArgumentInfo(it, false, null)
                 is TypeNode -> ArgumentInfo(it.toDataType(), false, null)
-                is FunctionValueParameterNode -> ArgumentInfo(it.type.resolveGenericParameterType(typeParameters).toDataType(), it.defaultValue != null, it.name)
+                is FunctionValueParameterNode -> ArgumentInfo(
+                    type = if (typeArgumentByName.isEmpty()) {
+                        it.type.resolveGenericParameterTypeToUpperBound(
+                            functionArgumentAndReturnTypeDeclarations.typeParameters +
+                                extraTypeResolutions.map { TypeParameterNode(it.key, it.value) }
+                        ) // note the order
+                            .toDataType()
+                    } else {
+                        it.type.resolveGenericParameterTypeArguments(extraTypeResolutions + typeArgumentByName).toDataType() // note the order
+                    },
+                    isOptional = it.defaultValue != null,
+                    name = it.name
+                )
                 else -> throw UnsupportedOperationException("Unknown internal class ${it::class.simpleName}")
             }
         }
@@ -715,11 +786,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         arguments.forEachIndexed { i, callArgument ->
             val functionArgumentType = argumentInfos[callArgumentMappedIndexes[i]].type
             if (!functionArgumentType.isAssignableFrom(callArgument.type().toDataType())) {
-                throw SemanticException("Argument type ${callArgument.type().descriptiveName()} cannot be mapped to ${argumentInfos[callArgumentMappedIndexes[i]].type.nameWithNullable}")
+                throw SemanticException("Call argument's type ${callArgument.type().descriptiveName()} cannot be mapped to type ${argumentInfos[callArgumentMappedIndexes[i]].type.nameWithNullable}")
             }
         }
 
-        returnType = functionArgumentAndReturnTypeDeclarations.returnType!!.resolveGenericParameterType(typeParameters)
+        returnType = functionArgumentAndReturnTypeDeclarations.returnType!!.let {
+            if (callableType != CallableType.Constructor) {
+                it.resolveGenericParameterTypeArguments(typeArgumentByName)
+            } else {
+                it
+            }
+        }
 
         // record types if there is any enclosing lambda
         evaluateAndRegisterReturnType(this)
@@ -876,6 +953,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope = currentScope,
                 name = "$name?",
                 fullQualifiedName = "$fullQualifiedClassName?",
+                typeParameters = typeParameters,
                 isInstanceCreationAllowed = false,
                 orderedInitializersAndPropertyDeclarations = emptyList(),
                 rawMemberProperties = emptyList(),
@@ -890,6 +968,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope = currentScope,
                 name = "$name.Companion",
                 fullQualifiedName = "$fullQualifiedClassName.Companion",
+                typeParameters = emptyList(),
                 isInstanceCreationAllowed = false,
                 orderedInitializersAndPropertyDeclarations = emptyList(),
                 rawMemberProperties = emptyList(),
@@ -900,6 +979,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         pushScope(name, ScopeType.Class)
         run {
+            typeParameters.forEach {
+                currentScope.declareTypeAlias(it.name, it.typeUpperBound)
+            }
             primaryConstructor?.visit(modifier = modifier)
             val nonPropertyArguments = primaryConstructor?.parameters
                 ?.filter { !it.isProperty }
@@ -918,9 +1000,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
             currentScope.parentScope!!.declareClass(
                 ClassDefinition(
-                    currentScope = currentScope.parentScope!!,
+                    currentScope = currentScope!!,
                     name = name,
                     fullQualifiedName = fullQualifiedName,
+                    typeParameters = typeParameters,
                     isInstanceCreationAllowed = true,
                     primaryConstructor = primaryConstructor,
                     rawMemberProperties = ((primaryConstructor?.parameters
@@ -945,8 +1028,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 )
             )
 
-            currentScope.declareProperty("this", TypeNode(name, null, false), false)
+            // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()
+            val pseudoTypeArguments = typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull()
+            currentScope.declareProperty("this", TypeNode(name, pseudoTypeArguments, false), false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
+            currentScope.declareProperty("this/${fullQualifiedClassName}", TypeNode(name, pseudoTypeArguments, false), false)
+            currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this/${fullQualifiedClassName}", "this")
             primaryConstructor?.parameters
                 ?.filter { it.isProperty }
                 ?.map { it.parameter }
@@ -1064,6 +1151,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     } ?: false
                 }
             symbols.classes += this.accessedRefs!!.classes
+            symbols.typeAlias += this.accessedRefs!!.typeAlias
         }
         type()
     }
@@ -1178,17 +1266,34 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         } ?: return typeRegistry["Any"]!!
         val clazz = currentScope.findClass(subjectType.name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
+
+        fun TypeNode.resolveMemberType(): TypeNode {
+            if (subjectType.arguments.isNullOrEmpty()) { // within class declaration
+                return this
+            }
+            return this.resolveGenericParameterTypeArguments(clazz.typeParameters.mapIndexed { index, it ->
+                it.name to subjectType.arguments!![index]
+            }.toMap())
+            // TODO find alias by class name
+            // TODO resolve nested type parameters
+//            val typeParameterType = currentScope.findTypeAlias(this.name) ?: return this
+//            val typeParameterIndex = clazz.typeParameters.indexOfFirst { it.name == this.name }
+//            if (typeParameterIndex < 0) throw RuntimeException("Cannot find type parameter $name")
+//            val subjectArguments = subjectType.arguments ?: return this //throw RuntimeException("Missing type arguments")
+//            return subjectArguments[typeParameterIndex]
+        }
+
         if (lookupType == IdentifierClassifier.Property) {
             clazz.memberPropertyCustomAccessors[memberName]?.let {
-                return it.type(modifier = modifier).also { type = it }
+                return it.type(modifier = modifier).resolveMemberType().also { type = it }
             }
             clazz.memberProperties[memberName]?.let {
-                return it.type.toTypeNode().also { type = it }
+                return it.type.toTypeNode().resolveMemberType().also { type = it }
             }
             transformedRefName?.let {
                 currentScope.findExtensionProperty(it)
             }?.let {
-                return it.typeNode!!
+                return it.typeNode!!.resolveMemberType()
             }
         } else {
             clazz.memberFunctions[memberName]?.let {
@@ -1196,14 +1301,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     parameterTypes = emptyList(),
                     returnType = it.returnType,
                     isNullable = false
-                ).also { type = it }
+                ).resolveMemberType().also { type = it }
             }
             findExtensionFunction(subjectType.toDataType(), memberName)?.let {
                 return FunctionTypeNode(
                     parameterTypes = emptyList(),
                     returnType = it.returnType,
                     isNullable = false
-                ).also { type = it }
+                ).resolveMemberType().also { type = it }
             }
         }
 

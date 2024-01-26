@@ -23,6 +23,8 @@ open class SymbolTable(
     protected val extensionProperties = mutableMapOf<String, ExtensionProperty>()
 
     private val classDeclarations = mutableMapOf<String, ClassDefinition>()
+    private val typeAlias = mutableMapOf<String, DataType>()
+    private val typeAliasResolution = mutableMapOf<String, DataType>()
 
     fun declareProperty(name: String, type: TypeNode, isMutable: Boolean) {
         if (hasProperty(name = name, true)) {
@@ -32,16 +34,83 @@ open class SymbolTable(
             ?: throw RuntimeException("Unknown type ${type.name}")
     }
 
+    fun findTypeAlias(name: String): Pair<DataType, SymbolTable>? {
+        return typeAlias[name]?.let { it to this } ?: parentScope?.findTypeAlias(name)
+    }
+
+    fun declareTypeAlias(name: String, typeUpperBound: TypeNode?, referenceSymbolTable: SymbolTable = this) {
+        if (typeAlias.containsKey(name) || typeAlias.containsKey("$name?")) {
+            throw DuplicateIdentifierException(name, IdentifierClassifier.TypeAlias)
+        }
+        val typeUpperBound = typeUpperBound ?: TypeNode("Any", null, true)
+        typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound)!!
+        typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true))!!
+    }
+
+    fun declareTypeAliasResolution(name: String, type: TypeNode, referenceSymbolTable: SymbolTable = this) {
+        if (findTypeAlias(name) == null || findTypeAlias("$name?") == null) {
+            throw RuntimeException("Type alias $name not found")
+        }
+        if (typeAliasResolution.containsKey(name) || typeAliasResolution.containsKey("$name?")) {
+            throw DuplicateIdentifierException(name, IdentifierClassifier.TypeResolution)
+        }
+        typeAliasResolution[name] = referenceSymbolTable.typeNodeToDataType(type)!!
+        typeAliasResolution["$name?"] = referenceSymbolTable.typeNodeToDataType(type.copy(isNullable = true))!!
+    }
+
+    fun declareTypeAliasResolution(name: String, type: DataType) {
+        if (findTypeAlias(name) == null || findTypeAlias("$name?") == null) {
+            throw RuntimeException("Type alias $name not found")
+        }
+        if (typeAliasResolution.containsKey(name) || typeAliasResolution.containsKey("$name?")) {
+            throw DuplicateIdentifierException(name, IdentifierClassifier.TypeResolution)
+        }
+        typeAliasResolution[name] = type
+        typeAliasResolution["$name?"] = type.copyOf(isNullable = true)
+    }
+
+    fun findTypeAliasResolution(name: String): DataType? {
+        return typeAliasResolution[name] ?: parentScope?.findTypeAliasResolution(name)
+    }
+
+    fun assertToDataType(type: TypeNode): DataType {
+        return typeNodeToDataType(type) ?: throw RuntimeException("Cannot resolve type ${type.descriptiveName()}")
+    }
+
     fun typeNodeToDataType(type: TypeNode): DataType? {
+        val alias = findTypeAlias("${type.name}${if (type.isNullable) "?" else ""}")
+        if (alias != null) {
+            return findTypeAliasResolution("${type.name}${if (type.isNullable) "?" else ""}")
+                ?: TypeParameterType(type.name, type.isNullable, alias.first)
+        }
         if (type is FunctionTypeNode) {
             return FunctionType(
-                arguments = type.parameterTypes?.map { typeNodeToDataType(it)!! } ?: listOf(UnresolvedType),
-                returnType = type.returnType?.let { typeNodeToDataType(it)!! } ?: UnresolvedType,
+                arguments = type.parameterTypes?.map { assertToDataType(it) } ?: listOf(UnresolvedType),
+                returnType = type.returnType?.let { assertToDataType(it) } ?: UnresolvedType,
                 isNullable = type.isNullable,
             )
         }
-        val primitiveType = type.toPrimitiveDataType()
-        return primitiveType ?: ObjectType(clazz = findClass(type.name)?.first ?: return null, isNullable = type.isNullable)
+        type.toPrimitiveDataType()?.let { return it }
+
+        val clazz = findClass(type.name)?.first ?: return null
+        // validate type arguments
+        // TODO optimize so that we don't have to validate every time
+        if (clazz.typeParameters.size != (type.arguments?.size ?: 0)) {
+            throw RuntimeException("Number of type arguments (${type.arguments?.size ?: 0}) does not match with number of type parameters ${clazz.typeParameters.size} of class ${clazz.fullQualifiedName}")
+        }
+        type.arguments?.forEachIndexed { index, it ->
+            // TODO refactor this repeated logic
+            val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode("Any", null, true)
+            if (!typeNodeToDataType(upperBound)!!.isAssignableFrom(typeNodeToDataType(it)!!)) {
+                throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
+            }
+        }
+
+        return ObjectType(
+            clazz = clazz,
+            arguments = type.arguments?.map { typeNodeToDataType(it)!! } ?: emptyList(),
+            isNullable = type.isNullable
+        )
     }
 
     fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
@@ -106,7 +175,7 @@ open class SymbolTable(
 //                throw RuntimeException("val cannot be reassigned")
 //            }
             if (!type.type.isAssignableFrom(value.type())) {
-                throw RuntimeException("Type ${value.type().nameWithNullable} cannot be casted to ${type.type.nameWithNullable}")
+                throw RuntimeException("Expected type ${type.type.nameWithNullable} but actual type is ${value.type().nameWithNullable}")
             }
             propertyValues.getOrPut(name) { RuntimeValueHolder(type.type, type.isMutable, null) }.assign(value = value)
             return true
@@ -273,6 +342,16 @@ open class SymbolTable(
             ?: parentScope?.findTransformedSymbol(identifierClassifier, transformedName) // TODO optimize to pass key directly
     }
 
+    fun listTypeAliasInThisScope(): List<TypeParameterNode> {
+        return typeAlias.map {
+            TypeParameterNode(it.key, it.value.toTypeNode())
+        }
+    }
+
+    fun listTypeAliasResolutionInThisScope(): Map<String, DataType> {
+        return typeAliasResolution
+    }
+
     fun mergeFrom(other: SymbolTable) { // this is only involved in runtime
         log.d { "Merge from other SymbolTable" }
         other.propertyValues.forEach {
@@ -284,6 +363,18 @@ open class SymbolTable(
         other.classDeclarations.forEach {
             declareClass(it.value)
         }
+        other.typeAlias
+            .filterKeys { !it.endsWith('?') }
+            .forEach {
+                // TODO handle conflicts with existing scope, e.g. generic functions
+                declareTypeAlias(it.key, it.value.toTypeNode())
+            }
+        other.typeAliasResolution
+            .filterKeys { !it.endsWith('?') }
+            .forEach {
+                // TODO handle conflicts with existing scope, e.g. generic functions
+                declareTypeAliasResolution(it.key, it.value.toTypeNode())
+            }
 //        this.transformedSymbols += other.transformedSymbols
     }
 

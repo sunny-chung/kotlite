@@ -10,6 +10,7 @@ class KDateTimeFormatValue(value: KDateTimeFormat) : DelegatedValue<KDateTimeFor
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KDateTimeFormat",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = true,
             primaryConstructorParameters = listOf(CustomFunctionParameter("pattern", "String")),
             constructInstance = { interpreter, callArguments, callPosition ->

@@ -13,6 +13,8 @@ open class ClassDefinition(
      */
     val isInstanceCreationAllowed: Boolean,
 
+    val typeParameters: List<TypeParameterNode>,
+
     /**
      * Only contains ClassInstanceInitializerNode and PropertyDeclarationNode
      */
@@ -32,7 +34,7 @@ open class ClassDefinition(
                 it.type,
                 it.isMutable
             ) ?: if (it.type.name == name) {
-                PropertyType(ObjectType(this, it.type.isNullable), it.isMutable)
+                PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
             } else throw RuntimeException("Unknown type ${it.type.name}"))
         }
     // key = original name
@@ -42,7 +44,7 @@ open class ClassDefinition(
                 it.type,
                 it.isMutable
             ) ?: if (it.type.name == name) {
-                PropertyType(ObjectType(this, it.type.isNullable), it.isMutable)
+                PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
             } else throw RuntimeException("Unknown type ${it.type.name}"))
         }
     // key = original name
@@ -63,7 +65,7 @@ open class ClassDefinition(
     fun findMemberFunctionsByDeclaredName(declaredName: String) =
         memberFunctions.filter { it.value.name == declaredName }
 
-    open fun construct(interpreter: Interpreter, callArguments: Array<RuntimeValue>, callPosition: SourcePosition): ClassInstance {
-        return interpreter.constructClassInstance(callArguments, callPosition, this@ClassDefinition)
+    open fun construct(interpreter: Interpreter, callArguments: Array<RuntimeValue>, typeArguments: Array<DataType>, callPosition: SourcePosition): ClassInstance {
+        return interpreter.constructClassInstance(callArguments, callPosition, typeArguments, this@ClassDefinition)
     }
 }

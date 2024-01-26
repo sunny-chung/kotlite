@@ -10,6 +10,7 @@ class KInstantValue(value: KInstant) : DelegatedValue<KInstant>(value, clazz) {
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KInstant",
+            typeParameters = emptyList(),
             isInstanceCreationAllowed = true,
             primaryConstructorParameters = listOf(CustomFunctionParameter("timestampMs", "Long")),
             constructInstance = { interpreter, callArguments, callPosition ->

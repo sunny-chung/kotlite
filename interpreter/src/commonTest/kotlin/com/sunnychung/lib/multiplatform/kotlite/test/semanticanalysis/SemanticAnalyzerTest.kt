@@ -22,6 +22,10 @@ fun assertSemanticFail(code: String, environment: ExecutionEnvironment = Executi
         }
     }
 }
+fun assertSemanticSuccess(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) {
+    val a = semanticAnalyzer(code, environment)
+    a.analyze()
+}
 fun assertTypeCheckFail(code: String) {
     val a = semanticAnalyzer(code)
     assertFailsWith<TypeMismatchException> { a.analyze() }

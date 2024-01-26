@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.log
 
 class SemanticAnalyzerSymbolTable(
@@ -63,7 +64,7 @@ class SemanticAnalyzerSymbolTable(
                     owner = null,
                     type = CallableType.Constructor,
                     arguments = it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList(),
-                    typeParameters = emptyList(),
+                    typeParameters = it.first.typeParameters,
                     returnType = TypeNode(it.first.fullQualifiedName, null, false),
                     definition = it.first,
                     scope = this
@@ -141,7 +142,7 @@ class SemanticAnalyzerSymbolTable(
                         acc && if (callArg == null) {
                             functionArg.defaultValue != null
                         } else {
-                            currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterType(callable.typeParameters))!!.isAssignableFrom(callArg.type)
+                            currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) ))!!.isAssignableFrom(callArg.type)
                             // TODO filter whether same type parameter always map to same argument
                         }
                     }

@@ -664,6 +664,27 @@ class LambdaTest {
     }
 
     @Test
+    fun returnNestedLambdaFromClassFunctionWithClassMemberAccess() {
+        val interpreter = interpreter("""
+            class MyCls(val value: Int) {
+                fun getValueReader(): () -> (() -> Int) = {
+                    {
+                        val x: Int = value
+                        x
+                    }
+                }
+            }
+            val o = MyCls(10)
+            val a: Int = o.getValueReader()()()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
+
+    @Test
     fun executeLambdaReturnedBySameClass() {
         val interpreter = interpreter("""
             var a: Int = 10
