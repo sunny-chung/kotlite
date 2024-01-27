@@ -17,7 +17,7 @@ class ParseLibHeaderTest {
         assertEquals(3, headers.size)
         headers.forEach {
             assertTrue(it is FunctionDeclarationNode)
-            assertEquals("String", it.receiver)
+            assertEquals("String", it.receiver?.descriptiveName())
         }
     }
 
@@ -30,7 +30,7 @@ class ParseLibHeaderTest {
         assertEquals(2, headers.size)
         headers.forEach {
             assertTrue(it is FunctionDeclarationNode)
-            assertEquals("String", it.receiver)
+            assertEquals("String", it.receiver?.descriptiveName())
         }
     }
 
@@ -46,7 +46,7 @@ class ParseLibHeaderTest {
         assertEquals(2, headers.size)
         headers.forEach {
             assertTrue(it is PropertyDeclarationNode)
-            assertEquals("String", it.receiver)
+            assertEquals("String", it.receiver?.descriptiveName())
             assertTrue(it.accessors?.getter != null)
         }
     }
@@ -66,12 +66,12 @@ class ParseLibHeaderTest {
         assertEquals(4, headers.size)
         headers.take(2).forEach {
             assertTrue(it is PropertyDeclarationNode)
-            assertEquals("String", it.receiver)
+            assertEquals("String", it.receiver?.descriptiveName())
             assertTrue(it.accessors?.getter != null)
         }
         headers.subList(2, 4).forEach {
             assertTrue(it is FunctionDeclarationNode)
-            assertEquals("String", it.receiver)
+            assertEquals("String", it.receiver?.descriptiveName())
         }
     }
 }

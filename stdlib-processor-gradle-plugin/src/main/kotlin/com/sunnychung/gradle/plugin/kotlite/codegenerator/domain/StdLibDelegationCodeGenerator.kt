@@ -64,16 +64,16 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
 
     fun FunctionDeclarationNode.generate(indent: String): String {
         return """CustomFunctionDefinition(
-    receiverType = ${receiver?.let { "\"${it.escape()}\"" } ?: "null"},
+    receiverType = ${receiver?.let { "\"${it.descriptiveName().escape()}\"" } ?: "null"},
     functionName = "${name.escape()}",
     returnType = "${returnType.descriptiveName()}",
     parameterTypes = listOf(${if (valueParameters.isNotEmpty()) "\n${valueParameters.joinToString("") { "${it.generate(indent(8))},\n" }}${indent(4)}" else ""}),
     executable = { receiver, args ->
         ${
-            if (receiver != null && !receiver!!.endsWith(".Companion")) {
-                val isReceiverNullable = receiver!!.endsWith('?')
+            if (receiver != null && !receiver!!.name.endsWith(".Companion")) {
+                val isReceiverNullable = receiver!!.isNullable
                 val question = if (isReceiverNullable) "?" else ""
-                "val unwrappedReceiver = (receiver as$question ${receiver!!.trimEnd('?')}Value)$question.value"
+                "val unwrappedReceiver = (receiver as$question ${receiver!!.name}Value)$question.value"
             } else ""
         }
     ${valueParameters.mapIndexed { i, it ->
@@ -81,8 +81,8 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
         }.joinToString("")}
         val result = ${
             if (receiver != null) {
-                if (receiver!!.endsWith(".Companion")) {
-                    "$receiver."
+                if (receiver!!.name.endsWith(".Companion")) {
+                    "${receiver!!.name}."
                 } else {
                     "unwrappedReceiver."
                 }
@@ -128,30 +128,30 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
     }
 
     fun PropertyDeclarationNode.generate(indent: String): String {
-        val isReceiverNullable = receiver!!.endsWith('?')
+        val isReceiverNullable = receiver!!.isNullable
         val receiverQuestion = if (isReceiverNullable) "?" else ""
 
         return """ExtensionProperty(
     declaredName = "${name.escape()}",
-    receiver = "${receiver!!.escape()}",
+    receiver = "${receiver!!.descriptiveName().escape()}",
     type = "${type.descriptiveName().escape()}",
     getter = ${accessors?.getter?.let { """{ receiver ->
         ${
-            if (!receiver!!.endsWith(".Companion")) {
-                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value"
+            if (!receiver!!.name.endsWith(".Companion")) {
+                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.name}Value)$receiverQuestion.value"
             } else ""
         }
-        val result = ${if (receiver!!.endsWith(".Companion")) "$receiver" else "unwrappedReceiver"}.$name
+        val result = ${if (receiver!!.name.endsWith(".Companion")) receiver!!.name else "unwrappedReceiver"}.$name
         ${wrap("result", type)}
     }""" } ?: "null"},
     setter = ${accessors?.setter?.let { """{ receiver, value ->
         ${
-            if (!receiver!!.endsWith(".Companion")) {
-                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.trimEnd('?')}Value)$receiverQuestion.value"
+            if (!receiver!!.name.endsWith(".Companion")) {
+                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.name}Value)$receiverQuestion.value"
             } else ""
         }
         val unwrappedValue = ${unwrap("value", type)}
-        ${if (receiver!!.endsWith(".Companion")) "$receiver" else "unwrappedReceiver"}.$name = unwrappedValue
+        ${if (receiver!!.name.endsWith(".Companion")) receiver!!.name else "unwrappedReceiver"}.$name = unwrappedValue
     }""" } ?: "null"},
 )""".prependIndent(indent)
     }

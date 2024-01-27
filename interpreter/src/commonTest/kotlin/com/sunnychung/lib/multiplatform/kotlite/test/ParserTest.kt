@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test
 
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.error.ExpectTokenMismatchException
+import com.sunnychung.lib.multiplatform.kotlite.error.ParseException
 import com.sunnychung.lib.multiplatform.kotlite.error.UnexpectedTokenException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
@@ -138,7 +139,7 @@ class ParserTest {
 
     @Test
     fun invalidQuestionMarkInExtensionFunctionDeclaration1() {
-        assertFailsWith<ExpectTokenMismatchException> {
+        assertFailsWith<ParseException> {
             parser("""
                 fun Int.func?(): Int = 2
             """.trimIndent()

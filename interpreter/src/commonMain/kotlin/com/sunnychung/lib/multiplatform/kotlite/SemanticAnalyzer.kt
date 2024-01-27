@@ -242,12 +242,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun findExtensionFunction(receiverType: DataType, functionName: String): FunctionDeclarationNode? {
-        return if (receiverType is ObjectType) {
-            val clazz = receiverType.clazz
-            currentScope.findExtensionFunction("${clazz.fullQualifiedName}/${functionName}")
-        } else {
-            currentScope.findExtensionFunction("${receiverType.name}/${functionName}")
-        }
+//        return if (receiverType is ObjectType) {
+//            val clazz = receiverType.clazz
+//            currentScope.findExtensionFunction("${clazz.fullQualifiedName}/${functionName}")
+//        } else {
+//            currentScope.findExtensionFunction("${receiverType.name}/${functionName}")
+//        }
+        return currentScope.findExtensionFunctions(receiverType, functionName).firstOrNull()?.first
     }
 
     fun ScriptNode.visit(modifier: Modifier = Modifier()) {
@@ -475,11 +476,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
             previousScope.registerTransformedSymbol(IdentifierClassifier.Function, transformedRefName!!, name)
         } else {
-            val typeNode = TypeNode(receiver.trimEnd('?'), null, receiver.endsWith("?"))
+            val typeNode = receiver
             currentScope.declareProperty(name = "this", type = typeNode, isMutable = false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
-            val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException("Class `$receiver` not found")
+            val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException("Class `${receiver.descriptiveName()}` not found")
             if (!typeNode.isNullable) {
+                clazz.typeParameters.forEachIndexed { index, it ->
+                    currentScope.declareTypeAlias(it.name, it.typeUpperBound)
+                    if ((receiver.arguments?.get(index) ?: throw SemanticException("Missing receiver type argument")).name != "*") {
+                        currentScope.declareTypeAliasResolution(it.name, receiver.arguments!![index])
+                    }
+                }
                 clazz.memberProperties.forEach {
                     currentScope.declareProperty(
                         name = it.key,
@@ -488,12 +495,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     )
                     currentScope.declarePropertyOwner(
                         name = "${it.key}/${currentScope.scopeLevel}",
-                        owner = "this/$receiver"
+                        owner = "this/${receiver.descriptiveName()}"
                     )
                 }
                 clazz.memberFunctions.forEach {
                     currentScope.declareFunction(name = it.key, node = it.value)
-                    currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/$receiver")
+                    currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/${receiver.descriptiveName()}")
                 }
             }
             currentScope.findExtensionPropertyByReceiver(typeNode.descriptiveName()).forEach {
@@ -504,7 +511,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 )
                 currentScope.declarePropertyOwner(
                     name = "${it.second.declaredName}/${currentScope.scopeLevel}",
-                    owner = "this/$receiver",
+                    owner = "this/${receiver.descriptiveName()}",
                     extensionPropertyRef = it.first,
                 )
             }
@@ -518,13 +525,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             // 2. `transformedRefName` should be identical among these extension functions, because
             //    only one implementation would be registered in Interpreter.
             transformedRefName = "${typeNode.descriptiveName()}/$name/${++functionDefIndex}"
-            previousScope.declareExtensionFunction("${typeNode.name}/$name", this.copy(receiver = receiver.trimEnd('?')))
+            previousScope.declareExtensionFunction("${typeNode.name}/$name", this.copy(receiver = receiver.copy(isNullable = false)))
 
             if (typeNode.isNullable) {
                 previousScope.declareExtensionFunction("${typeNode.name}?/$name", this)
 //                transformedRefName = "${typeNode.name}?/$name/${++functionDefIndex}"
 
-                previousScope.declareExtensionFunction("Nothing/$name", this.copy(receiver = "Nothing"))
+                previousScope.declareExtensionFunction("Nothing/$name", this.copy(receiver = typeRegistry["Null"]))
 //                transformedRefName = "Nothing/$name/${++functionDefIndex}"
             }
         }
@@ -939,13 +946,18 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
         } else {
             if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
-            if (currentScope.findExtensionFunctionsByOriginalName(subjectType.nameWithNullable, memberName).isNotEmpty()) return
+            if (currentScope.findExtensionFunctions(subjectType, memberName).isNotEmpty()) return
         }
         throw SemanticException("Type `${subjectType.nameWithNullable}` has no member `$memberName`")
     }
 
     fun ClassDeclarationNode.visit(modifier: Modifier = Modifier()) {
-        val fullQualifiedClassName = name
+        val fullQualifiedClassName = fullQualifiedName
+        val classType = TypeNode(
+            name = fullQualifiedClassName,
+            arguments = typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull(),
+            isNullable = false,
+        )
 
         // Declare nullable class type
         currentScope.parentScope!!.declareClass(
@@ -1012,7 +1024,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                             val p = it.parameter
                             PropertyDeclarationNode(
                                 name = p.name,
-                                receiver = fullQualifiedClassName,
+                                receiver = classType,
                                 declaredType = p.type,
                                 isMutable = it.isMutable,
                                 initialValue = p.defaultValue,

@@ -438,7 +438,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     CallableType.ExtensionFunction -> {
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
                             ?: throw RuntimeException("Analysed function $functionRefName not found")
-                        if (subject == NullValue && !function.receiver!!.endsWith("?")) {
+                        if (subject == NullValue && !function.receiver!!.isNullable) {
                             throw EvaluateNullPointerException()
                         }
                         return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
@@ -729,6 +729,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             val symbolTable = callStack.currentSymbolTable()
             symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
             symbolTable.assign("this/${subject.type().name}", subject)
+            if (subject.type().descriptiveName != subject.type().name) {
+                symbolTable.declareProperty("this/${subject.type().descriptiveName}", subject.type().toTypeNode(), false)
+                symbolTable.assign("this/${subject.type().descriptiveName}", subject)
+            }
             symbolTable.declareProperty("this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
             symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
@@ -813,6 +817,11 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun ClassDeclarationNode.eval() {
         val declarationScope = callStack.currentSymbolTable()
+        val classType = TypeNode(
+            name = fullQualifiedName,
+            arguments = typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull(),
+            isNullable = false,
+        )
 
         callStack.push(fullQualifiedName, ScopeType.Class, SourcePosition(1, 1))
         try {
@@ -833,7 +842,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         val p = it.parameter
                         PropertyDeclarationNode(
                             name = p.name,
-                            receiver = fullQualifiedName,
+                            receiver = classType,
                             declaredType = p.type,
                             isMutable = it.isMutable,
                             initialValue = p.defaultValue,

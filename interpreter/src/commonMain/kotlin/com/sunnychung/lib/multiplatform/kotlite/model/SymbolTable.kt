@@ -78,6 +78,10 @@ open class SymbolTable(
     }
 
     fun typeNodeToDataType(type: TypeNode): DataType? {
+        if (type.name == "*") {
+            return AnyType(isNullable = true) // TODO any better handling? additional validations of use of type *?
+        }
+
         val alias = findTypeAlias("${type.name}${if (type.isNullable) "?" else ""}")
         if (alias != null) {
             return findTypeAliasResolution("${type.name}${if (type.isNullable) "?" else ""}")
@@ -191,8 +195,16 @@ open class SymbolTable(
     }
 
     fun getPropertyTypeOrNull(name: String, isThisScopeOnly: Boolean = false): Pair<PropertyType, SymbolTable>? {
-        return propertyDeclarations[name]?.let { it to this }
-            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.getPropertyTypeOrNull(name) }
+        return (propertyDeclarations[name]?.let { it to this }
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.getPropertyTypeOrNull(name) })
+            ?.let { result ->
+                if (result.first.type is TypeParameterType) {
+                    findTypeAliasResolution(result.first.type.name)?.let {
+                        return@let PropertyType(it, result.first.isMutable) to result.second
+                    }
+                }
+                result
+            }
     }
 
     fun getPropertyType(name: String, isThisScopeOnly: Boolean = false): Pair<PropertyType, SymbolTable> {
@@ -252,9 +264,9 @@ open class SymbolTable(
         return functionSignature
     }
 
-    fun findExtensionFunction(name: String, isThisScopeOnly: Boolean = false): FunctionDeclarationNode? {
-        return extensionFunctionDeclarations[name]
-            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunction(name) }
+    fun findExtensionFunction(transformedName: String, isThisScopeOnly: Boolean = false): FunctionDeclarationNode? {
+        return extensionFunctionDeclarations[transformedName]
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunction(transformedName) }
     }
 
     fun declareExtensionProperty(transformedName: String, extensionProperty: ExtensionProperty) {

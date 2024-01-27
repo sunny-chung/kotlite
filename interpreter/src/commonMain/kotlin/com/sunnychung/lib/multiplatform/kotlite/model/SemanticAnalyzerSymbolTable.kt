@@ -1,6 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
+import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.log
 
@@ -33,16 +33,8 @@ class SemanticAnalyzerSymbolTable(
                 } ?: emptyList())
     }
 
-    fun findExtensionFunctionsByOriginalName(receiver: String, originalName: String, isThisScopeOnly: Boolean = false): List<Pair<FunctionDeclarationNode, SymbolTable>> {
-        return extensionFunctionDeclarations.filter { it.value.receiver == receiver && it.value.name == originalName }
-            .map { it.value to this } +
-                (Unit.takeIf { !isThisScopeOnly }?.let {
-                    (parentScope as? SemanticAnalyzerSymbolTable)?.findExtensionFunctionsByOriginalName(receiver, originalName, isThisScopeOnly)
-                } ?: emptyList())
-    }
-
     // only use in semantic analyzer
-    private fun findAllMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverClass: ClassDefinition?, arguments: List<FunctionCallArgumentInfo>): List<FindCallableResult> {
+    private fun findAllMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverClass: ClassDefinition?, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>): List<FindCallableResult> {
         var thisScopeCandidates = mutableListOf<FindCallableResult>()
         if (receiverClass == null) {
             findFunctionsByOriginalName(originalName, isThisScopeOnly = true).map {
@@ -100,7 +92,7 @@ class SemanticAnalyzerSymbolTable(
                     scope = this
                 )
             }.let { thisScopeCandidates += it }
-            findExtensionFunctionsByOriginalName(receiverClass.fullQualifiedName, originalName, isThisScopeOnly = true).map {
+            findExtensionFunctions(receiverType!!, originalName, isThisScopeOnly = true).map {
                 FindCallableResult(
                     transformedName = it.first.transformedRefName!!,
                     owner = null,
@@ -150,16 +142,57 @@ class SemanticAnalyzerSymbolTable(
                 else -> throw UnsupportedOperationException()
             }
         }.toMutableList()
-        return thisScopeCandidates + ((parentScope as? SemanticAnalyzerSymbolTable)?.findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, arguments) ?: emptyList())
+        return thisScopeCandidates + ((parentScope as? SemanticAnalyzerSymbolTable)?.findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments) ?: emptyList())
     }
 
     // only use in semantic analyzer
     fun findMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>): List<FindCallableResult> {
         val receiverClass = receiverType?.let { (findClass(it.nameWithNullable) ?: throw RuntimeException("Class ${it.nameWithNullable} not found")).first }
-        return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, arguments)
+        return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments)
             .also { log.v { "Matching functions:\n${it.joinToString("\n")}" } }
             .firstOrNull()?.let { listOf(it) }
             ?: emptyList()
+    }
+
+    fun findExtensionFunctions(receiverType: DataType, functionName: String, isThisScopeOnly: Boolean = false): List<Pair<FunctionDeclarationNode, SymbolTable>> {
+        return extensionFunctionDeclarations.values.filter { func ->
+            (func.receiver?.let {
+                if (it.name != receiverType.name ||
+                    it.isNullable != receiverType.isNullable
+                ) return@let false
+                // at here, class name and nullability matched
+                val objectTypeReceiver = receiverType as? ObjectType
+                if (it.arguments.isNullOrEmpty() && (objectTypeReceiver == null || objectTypeReceiver.arguments.isEmpty())) {
+                    return@let true
+                }
+                // at here, function receiver type has some type parameter, so receiverType can only be class instance
+                if (objectTypeReceiver == null) {
+                    throw RuntimeException("Receiver must be a class instance")
+                }
+                if (it.arguments!!.size != objectTypeReceiver.arguments.size) {
+                    throw RuntimeException("Number of type arguments mismatch")
+                }
+                it.arguments.forEachIndexed { index, argType ->
+                    if (argType.name == "*") return@forEachIndexed
+                    val typeParameter = func.typeParameters.firstOrNull { it.name == argType.name }
+                    val functionTypeParameterType = if (typeParameter != null) {
+                        typeParameter.typeUpperBound ?: TypeNode("Any", null, true)
+                    } else {
+                        argType
+                    }.let { typeNodeToDataType(it) } // TODO generic type
+                        ?: throw SemanticException("Unknown type ${argType.descriptiveName()}")
+                    if (!functionTypeParameterType.isAssignableFrom(objectTypeReceiver.arguments[index])) {
+                        return@let false // type mismatch
+                    }
+                }
+                true
+            } ?: false) && func.name == functionName
+        }.map {
+            it to this
+        } + (Unit.takeIf { !isThisScopeOnly }?.let {
+            (parentScope as? SemanticAnalyzerSymbolTable)
+                ?.findExtensionFunctions(receiverType, functionName, isThisScopeOnly)
+        } ?: emptyList())
     }
 
     fun DataType.toTypeNode(): TypeNode =
@@ -181,7 +214,7 @@ class SemanticAnalyzerSymbolTable(
 fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable): String {
     with (symbolTable) {
         val typeParameters = typeParameters.associateBy { it.name }
-        return (receiver?.let { "$it/" } ?: "") + name + "//" + valueParameters.joinToString("/") {
+        return (receiver?.let { "${it.descriptiveName()}/" } ?: "") + name + "//" + valueParameters.joinToString("/") {
             if (typeParameters.containsKey(it.type.name)) {
                 val typeUpperBound = typeParameters[it.type.name]!!.typeUpperBound
                 typeUpperBound?.toClass()?.fullQualifiedName ?: "Any?"

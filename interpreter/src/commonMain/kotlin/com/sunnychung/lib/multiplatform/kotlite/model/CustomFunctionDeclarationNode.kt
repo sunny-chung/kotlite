@@ -4,19 +4,19 @@ import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 
-fun String.toTypeNode() = Parser(Lexer(this)).type()
+fun String.toTypeNode() = Parser(Lexer(this)).type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
 
 class CustomFunctionDeclarationNode(
     private val def: CustomFunctionDefinition,
     name: String? = null,
-    receiver: String? = null,
+    receiver: TypeNode? = null,
     returnType: TypeNode? = null,
     valueParameters: List<FunctionValueParameterNode>? = null,
     body: BlockNode? = null,
     transformedRefName: String? = null,
 ) : FunctionDeclarationNode(
     name = name ?: def.functionName,
-    receiver = receiver ?: def.receiverType,
+    receiver = receiver ?: def.receiverType?.toTypeNode(),
     declaredReturnType = returnType ?: def.returnType.toTypeNode(),
     valueParameters = valueParameters ?: def.parameterTypes.map {
         FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() })
@@ -30,8 +30,9 @@ class CustomFunctionDeclarationNode(
 
     override fun copy(
         name: String,
-        receiver: String?,
+        receiver: TypeNode?,
         declaredReturnType: TypeNode?,
+        typeParameters: List<TypeParameterNode>,
         valueParameters: List<FunctionValueParameterNode>,
         body: BlockNode,
         transformedRefName: String?,
@@ -41,9 +42,9 @@ class CustomFunctionDeclarationNode(
             throw UnsupportedOperationException("Copying subclasses is not supported")
         }
         return CustomFunctionDeclarationNode(
-            def.copy(
+            def/*.copy(
                 receiverType = receiver,
-            ),
+            )*/,
             name = name,
             receiver = receiver,
             returnType = declaredReturnType,

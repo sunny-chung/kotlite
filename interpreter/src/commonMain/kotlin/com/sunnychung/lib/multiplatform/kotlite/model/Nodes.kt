@@ -109,7 +109,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
 data class PropertyDeclarationNode(
     val name: String,
-    val receiver: String?,
+    val receiver: TypeNode?,
     val declaredType: TypeNode?,
     val isMutable: Boolean,
     val initialValue: ASTNode?,
@@ -122,6 +122,7 @@ data class PropertyDeclarationNode(
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self\n" +
+                (receiver?.let { "$self-- receiver type -->${it.toMermaid()}\n" } ?: "") +
                 (declaredType?.let { "$self-- declared type -->${it.toMermaid()}\n" } ?: "") +
                 (inferredType?.let { "$self-- inferred type -->${it.toMermaid()}\n" } ?: "") +
                 (initialValue?.let { "$self-- initial value -->${it.toMermaid()}\n" } ?: "")
@@ -175,7 +176,7 @@ interface CallableNode {
 
 open class FunctionDeclarationNode(
     override val name: String,
-    val receiver: String? = null,
+    val receiver: TypeNode? = null,
     val declaredReturnType: TypeNode?,
     override val valueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
@@ -189,6 +190,7 @@ open class FunctionDeclarationNode(
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name`\"]"
         return (declaredReturnType?.let { "$self-- type -->${it.toMermaid()}\n" } ?: "") +
+                (receiver?.let { "$self-- receiver -->${it.toMermaid()}\n" } ?: "") +
                 "$self-->${body.toMermaid()}\n"
     }
 
@@ -204,8 +206,9 @@ open class FunctionDeclarationNode(
 
     open fun copy(
         name: String = this.name,
-        receiver: String? = this.receiver,
+        receiver: TypeNode? = this.receiver,
         declaredReturnType: TypeNode? = this.declaredReturnType,
+        typeParameters: List<TypeParameterNode> = this.typeParameters,
         valueParameters: List<FunctionValueParameterNode> = this.valueParameters,
         body: BlockNode = this.body,
         transformedRefName: String? = this.transformedRefName,
@@ -218,6 +221,7 @@ open class FunctionDeclarationNode(
             name = name,
             receiver = receiver,
             declaredReturnType = declaredReturnType,
+            typeParameters = typeParameters,
             valueParameters = valueParameters,
             body = body,
             transformedRefName = transformedRefName,

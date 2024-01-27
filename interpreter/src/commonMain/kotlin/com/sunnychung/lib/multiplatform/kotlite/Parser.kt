@@ -999,9 +999,25 @@ class Parser(protected val lexer: Lexer) {
      *     simpleIdentifier [{NL} typeArguments]
      *
      */
-    fun typeReference(): TypeNode {
-        val name = eat(TokenType.Identifier).value as String
-        val argument = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
+    fun typeReference(isParseDottedIdentifiers: Boolean = false, isIncludeLastIdentifierAsTypeName: Boolean = false): TypeNode {
+        if (isCurrentToken(TokenType.Operator, "*")) {
+            eat(TokenType.Operator, "*")
+            return TypeNode("*", null, false)
+        }
+
+        var cursorPosBeforeLastDot: Int? = null
+        val nameB = StringBuilder()
+        nameB.append(eat(TokenType.Identifier).value as String)
+        while (isParseDottedIdentifiers && isCurrentTokenExcludingNL(TokenType.Operator, ".")) {
+            cursorPosBeforeLastDot = tokenIndex
+            repeatedNL()
+            eat(TokenType.Operator, ".")
+            nameB.append(".")
+            repeatedNL()
+            nameB.append(eat(TokenType.Identifier).value as String)
+        }
+        val name = nameB.toString()
+        val argument = if (isCurrentTokenExcludingNL(TokenType.Operator, "<")) {
             typeArguments()
         } else null
         val isNullable = if (isCurrentTokenExcludingNL(TokenType.Symbol, "?")) {
@@ -1009,6 +1025,10 @@ class Parser(protected val lexer: Lexer) {
             eat(TokenType.Symbol, "?")
             true
         } else false
+        if (!isIncludeLastIdentifierAsTypeName && argument == null && !isNullable && cursorPosBeforeLastDot != null) {
+            resetTokenToIndex(cursorPosBeforeLastDot)
+            return TypeNode(name.substringBeforeLast("."), argument, isNullable)
+        }
         return TypeNode(name, argument, isNullable)
     }
 
@@ -1089,7 +1109,7 @@ class Parser(protected val lexer: Lexer) {
      *     [typeModifiers] (functionType | parenthesizedType | nullableType | typeReference | definitelyNonNullableType)
      *
      */
-    fun type(isTryParenthesizedType: Boolean = true): TypeNode {
+    fun type(isTryParenthesizedType: Boolean = true, isParseDottedIdentifiers: Boolean = false, isIncludeLastIdentifierAsTypeName: Boolean = false): TypeNode {
         val originalTokenIndex = tokenIndex
         return when {
             isCurrentToken(TokenType.Operator, "(") -> try {
@@ -1102,7 +1122,7 @@ class Parser(protected val lexer: Lexer) {
                     throw e
                 }
             }
-            else -> typeReference()
+            else -> typeReference(isParseDottedIdentifiers = isParseDottedIdentifiers, isIncludeLastIdentifierAsTypeName = isIncludeLastIdentifierAsTypeName)
         }
     }
 
@@ -1357,35 +1377,59 @@ class Parser(protected val lexer: Lexer) {
      *     userType
      *     | 'dynamic'
      */
-    fun receiverTypeAndIdentifier(): Pair<String?, String> {
-        val identifiers = mutableListOf<String>()
-        var hasEatenQuestionMark = false
-        var numOfDotsAfterQuestionMark = 0
-        do {
-            if (hasEatenQuestionMark) {
-                ++numOfDotsAfterQuestionMark
-                if (numOfDotsAfterQuestionMark > 1) {
-                    throw ExpectTokenMismatchException("(", currentToken.position)
-                }
+    fun receiverTypeAndIdentifier(): Pair<TypeNode?, String> {
+        // TODO revisit when package is supported
+//        val identifiers = mutableListOf<String>()
+//        var hasEatenQuestionMark = false
+//        var numOfDotsAfterQuestionMark = 0
+//        do {
+//            if (hasEatenQuestionMark) {
+//                ++numOfDotsAfterQuestionMark
+//                if (numOfDotsAfterQuestionMark > 1) {
+//                    throw ExpectTokenMismatchException("(", currentToken.position)
+//                }
+//            }
+//            if (identifiers.isNotEmpty()) {
+//                if (isCurrentToken(TokenType.Operator, "?.")) {
+//                    eat(TokenType.Operator, "?.")
+//                } else {
+//                    eat(TokenType.Operator, ".")
+//                }
+//            }
+//            var identifier = userDefinedIdentifier()
+//            repeatedNL()
+//            if (isCurrentToken(TokenType.Operator, "?.")) {
+//                identifier += "?"
+//                hasEatenQuestionMark = true
+//            }
+//            identifiers += identifier
+//        } while (isCurrentToken(TokenType.Operator, ".") || isCurrentToken(TokenType.Operator, "?."))
+//        val name = identifiers.removeLast()
+//        val receiver = identifiers.takeIf { it.isNotEmpty() }?.joinToString(".")
+//        return receiver to name
+
+        val type = if (isCurrentToken(TokenType.Operator, "(")) {
+            nullableParenthesizedType()
+        } else {
+            typeReference(isParseDottedIdentifiers = true)
+        }
+        val isNullable = if (isCurrentToken(TokenType.Operator, "?.")) {
+            eat(TokenType.Operator, "?.")
+            true
+        } else if (isCurrentToken(TokenType.Operator, ".")) {
+            eat(TokenType.Operator, ".")
+            false
+        } else { // no receiver
+            if (!type.arguments.isNullOrEmpty()) {
+                throw ParseException("Unexpected token '<'")
             }
-            if (identifiers.isNotEmpty()) {
-                if (isCurrentToken(TokenType.Operator, "?.")) {
-                    eat(TokenType.Operator, "?.")
-                } else {
-                    eat(TokenType.Operator, ".")
-                }
+            if (type.isNullable) {
+                throw ParseException("Unexpected token '?'")
             }
-            var identifier = userDefinedIdentifier()
-            repeatedNL()
-            if (isCurrentToken(TokenType.Operator, "?.")) {
-                identifier += "?"
-                hasEatenQuestionMark = true
-            }
-            identifiers += identifier
-        } while (isCurrentToken(TokenType.Operator, ".") || isCurrentToken(TokenType.Operator, "?."))
-        val name = identifiers.removeLast()
-        val receiver = identifiers.takeIf { it.isNotEmpty() }?.joinToString(".")
-        return receiver to name
+            return null to type.name
+        }
+        val name = userDefinedIdentifier()
+        return type.copy(isNullable = isNullable) to name
     }
 
     /**
@@ -1431,7 +1475,8 @@ class Parser(protected val lexer: Lexer) {
                 receiver = receiver,
                 declaredReturnType = type ?: TypeNode("Unit", null, false),
                 valueParameters = valueParameters,
-                body = dummyBlockNode()
+                body = dummyBlockNode(),
+                typeParameters = typeParameters,
             )
         }
         val body = functionBody()
