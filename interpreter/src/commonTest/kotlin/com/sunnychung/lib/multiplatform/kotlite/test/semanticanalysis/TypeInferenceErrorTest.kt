@@ -94,4 +94,19 @@ class TypeInferenceErrorTest {
             val b = f(2, "b")(4)
         """.trimIndent())
     }
+
+    @Test
+    fun impossibleToInferFunctionReturnType() {
+        assertSemanticFail("""
+            fun f(x: Int) = f(x)
+        """.trimIndent())
+    }
+
+    @Test
+    fun unsupportedFunctionReturnTypeInference() {
+        // even the official Kotlin compiler does not infer this case
+        assertSemanticFail("""
+            fun f(x: Int) = if (x < 1) 0 else 1 + f(x - 1)
+        """.trimIndent())
+    }
 }

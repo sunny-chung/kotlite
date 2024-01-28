@@ -45,6 +45,7 @@ class SemanticAnalyzerSymbolTable(
                     type = if (owner == null) CallableType.Function else CallableType.ClassMemberFunction,
                     arguments = it.first.valueParameters,
                     typeParameters = it.first.typeParameters,
+                    receiverType = null,
                     returnType = it.first.returnType,
                     definition = it.first,
                     scope = this
@@ -57,6 +58,7 @@ class SemanticAnalyzerSymbolTable(
                     type = CallableType.Constructor,
                     arguments = it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList(),
                     typeParameters = it.first.typeParameters,
+                    receiverType = null,
                     returnType = TypeNode(it.first.fullQualifiedName, null, false),
                     definition = it.first,
                     scope = this
@@ -73,6 +75,7 @@ class SemanticAnalyzerSymbolTable(
                     type = CallableType.Property,
                     arguments = (it.first.type as FunctionType).arguments,
                     typeParameters = emptyList(),
+                    receiverType = null,
                     returnType = (it.first.type as FunctionType).returnType.toTypeNode(),
                     definition = it.first,
                     scope = this
@@ -87,6 +90,7 @@ class SemanticAnalyzerSymbolTable(
                     type = CallableType.ClassMemberFunction,
                     arguments = it.valueParameters,
                     typeParameters = it.typeParameters,
+                    receiverType = it.receiver,
                     returnType = it.returnType,
                     definition = it,
                     scope = this
@@ -99,6 +103,7 @@ class SemanticAnalyzerSymbolTable(
                     type = CallableType.ExtensionFunction,
                     arguments = it.first.valueParameters,
                     typeParameters = it.first.typeParameters,
+                    receiverType = it.first.receiver,
                     returnType = it.first.returnType,
                     definition = it.first,
                     scope = this
@@ -134,7 +139,7 @@ class SemanticAnalyzerSymbolTable(
                         acc && if (callArg == null) {
                             functionArg.defaultValue != null
                         } else {
-                            currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) ))!!.isAssignableFrom(callArg.type)
+                            currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) ))!!.isConvertibleFrom(callArg.type)
                             // TODO filter whether same type parameter always map to same argument
                         }
                     }

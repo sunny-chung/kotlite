@@ -34,6 +34,13 @@ sealed interface DataType {
         return other.isAssignableFrom(this)
     }
 
+    // It is similar to `isAssignableFrom()`, except would return true for assignable type arguments
+    // e.g. List<Any>.isAssignableFrom(List<Int>) = false, but
+    // List<Any>.isConvertibleFrom(List<Int>) = true
+    fun isConvertibleFrom(other: DataType): Boolean {
+        return this.isAssignableFrom(other)
+    }
+
     fun copyOf(isNullable: Boolean): DataType
 
     fun toTypeNode() = TypeNode(name, null, isNullable)
@@ -102,6 +109,16 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
                 (isNullable || !other.isNullable)
     }
 
+    override fun isConvertibleFrom(other: DataType): Boolean {
+        if (other is NullType && isNullable) return true
+        return other is ObjectType &&
+                other.clazz.fullQualifiedName == clazz.fullQualifiedName &&
+                other.arguments.withIndex().all {
+                    arguments[it.index].isConvertibleFrom(it.value)
+                } &&
+                (isNullable || !other.isNullable)
+    }
+
     override fun toTypeNode(): TypeNode {
         return TypeNode(name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
     }
@@ -126,9 +143,9 @@ data class TypeParameterType(
 
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
 
-//    override fun isAssignableFrom(other: DataType): Boolean {
-//        return upperBound.isAssignableFrom(other)
-//    }
+    override fun isConvertibleFrom(other: DataType): Boolean {
+        return upperBound.isAssignableFrom(other)
+    }
 
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NullType && isNullable) return true
@@ -143,7 +160,7 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
     override val name: String = "Function"
 
     override val nameWithNullable: String
-        get() = "Function<${(arguments + returnType).joinToString(", ") { it.nameWithNullable }}>".let {
+        get() = "Function<${(arguments + returnType).joinToString(", ") { it.descriptiveName }}>".let {
             if (isNullable) "($it)?" else it
         }
 

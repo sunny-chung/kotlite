@@ -144,7 +144,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = (name?.let { "$name = " } ?: "") + value.generate()
 
     protected fun FunctionCallNode.generate()
-        = "${function.generate()}${debug("<f:$functionRefName>")}(${arguments.joinToString(", ") { it.generate() }})"
+        = "${function.generate()}${debug("<f:$functionRefName>")}${if (typeArguments.isNotEmpty()) "<${typeArguments.joinToString(", ") { it.descriptiveName() }}>" else ""}(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
         = "fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
@@ -186,7 +186,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "$operator(${node?.let { it.generate() } ?: " "})"
 
     protected fun VariableReferenceNode.generate()
-        = "${ownerRef?.let { "${it.ownerRefName}." } ?: ""}$variableName${debug("<$transformedRefName>")}"
+        = "${ownerRef?.let { "${it.ownerRefName}." } ?: ""}$variableName${debug("<r:$transformedRefName>")}"
 
     protected fun WhileNode.generate()
         = "while (${condition.generate()})${body?.let { " ${it.generate()}" } ?: ";"}"

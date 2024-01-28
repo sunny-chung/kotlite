@@ -252,4 +252,22 @@ class FunctionResolutionTest {
         assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun functionTypeHasTypeParameter() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            fun sum(p: MyPair<Int, Int>): Int = p.first + p.second
+            val p1 = MyPair<Int, Int>(10, 12)
+            val p2 = MyPair<Int, Int>(31, 32)
+            val a = sum(p1)
+            val b = sum(p2)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(22, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(63, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
+import com.sunnychung.lib.multiplatform.kotlite.error.CannotInferTypeException
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
@@ -8,8 +9,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class TypeInferenceTest {
@@ -622,5 +625,323 @@ class TypeInferenceTest {
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
         assertTrue(symbolTable.findPropertyByDeclaredName("f") is NullValue)
         assertTrue(symbolTable.findPropertyByDeclaredName("g") is NullValue)
+    }
+
+    @Test
+    fun inferGenericClass() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            val p1 = MyPair(10, "abc")
+            val a1 = p1.first
+            val b1 = p1.second
+            val p2 = MyPair("def", 2.45)
+            val a2 = p2.first
+            val b2 = p2.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b1") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a2") as StringValue).value)
+        compareNumber(2.45, symbolTable.findPropertyByDeclaredName("b2") as DoubleValue)
+    }
+
+    @Test
+    fun inferGenericClassWithNamedArguments() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            val p1 = MyPair(second = "abc", first = 10)
+            val a1 = p1.first
+            val b1 = p1.second
+            val p2 = MyPair(first = "def", second = 2.45)
+            val a2 = p2.first
+            val b2 = p2.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b1") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a2") as StringValue).value)
+        compareNumber(2.45, symbolTable.findPropertyByDeclaredName("b2") as DoubleValue)
+    }
+
+    @Test
+    fun inferNestedGenericClass() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            class MyVal<T>(val value: T)
+            val p1 = MyPair(MyVal(10), MyVal(MyVal("abc")))
+            val a1 = p1.first.value
+            val b1 = p1.second.value.value
+            val p2 = MyPair(MyPair("def", MyVal(MyPair(2, MyVal("abc")))), 2.45)
+            val a2 = p2.first.first
+            val b2 = p2.first.second.value.first
+            val c2 = p2.first.second.value.second.value
+            val d2 = p2.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(8, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b1") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a2") as StringValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("c2") as StringValue).value)
+        compareNumber(2.45, symbolTable.findPropertyByDeclaredName("d2") as DoubleValue)
+    }
+
+    @Test
+    fun genericFunction1() {
+        val interpreter = interpreter("""
+            fun <T> identity(a: T): T = a
+            val a = identity(10)
+            val x = "abc"
+            val b = identity(a = x)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
+
+    @Test
+    fun genericFunction2() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            fun <A, B> extractFirst(p: MyPair<A, B>): A = p.first
+            fun <A, B> extractSecond(p: MyPair<A, B>) = p.second
+            val p1 = MyPair(second = "abc", first = 10)
+            val a1 = extractFirst(p1)
+            val b1 = extractSecond(p1)
+            val p2 = MyPair(first = "def", second = 2.45)
+            val a2 = extractFirst(p2)
+            val b2 = extractSecond(p2)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b1") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a2") as StringValue).value)
+        compareNumber(2.45, symbolTable.findPropertyByDeclaredName("b2") as DoubleValue)
+    }
+
+    @Test
+    fun genericFunctionWithLambdaArgumentContainingTypeParameters() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            fun <A, B> extractFirst(p: MyPair<A, B>, op: (MyPair<A, B>) -> A): A = op(p)
+            fun <A, B> extractSecond(p: MyPair<A, B>, op: (MyPair<A, B>) -> B) = op(p)
+            val p1 = MyPair(second = "abc", first = 10)
+            val a1 = extractFirst(p1) { it -> it.first }
+            val b1 = extractSecond(p1) { it -> it.second }
+            val p2 = MyPair(first = "def", second = "ghi")
+            val a2 = extractFirst(p2) { it -> it.second } // note the lambda is intentionally reversed in order to test lambda is working
+            val b2 = extractSecond(p2) { it -> it.first } // note the lambda is intentionally reversed in order to test lambda is working
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b1") as StringValue).value)
+        assertEquals("ghi", (symbolTable.findPropertyByDeclaredName("a2") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("b2") as StringValue).value)
+    }
+
+    @Test
+    fun genericFunctionWithNestedTypeParameters() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            class MyVal<T>(val value: T)
+            fun <A, B> extractFirst(p: MyPair<A, B>): A = p.first
+            fun <A, B> extractSecond(p: MyPair<A, B>): B = p.second
+            fun <A> extractValue(v: MyVal<A>): A = v.value
+            val p1 = MyPair(MyVal(10), MyVal(MyVal("abc")))
+            val a1 = extractValue(p1.first)
+            val b1 = extractValue(extractValue(extractSecond(p1)))
+            val p2 = MyPair(MyPair("def", MyVal(MyPair(2, MyVal("abc")))), 2.45)
+            val a2 = extractFirst(extractFirst(p2))
+            val b2 = extractFirst(extractValue(extractSecond(extractFirst(p2))))
+            val c2 = extractValue(extractSecond(extractValue(extractSecond(extractFirst(p2)))))
+            val d2 = extractSecond(p2)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(8, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b1") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a2") as StringValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("c2") as StringValue).value)
+        compareNumber(2.45, symbolTable.findPropertyByDeclaredName("d2") as DoubleValue)
+    }
+
+    @Test
+    fun functionWithClassNameIsSameAsTypeParameterNameNested() {
+        assertFailsWith<CannotInferTypeException> { // TODO to be fixed
+                val interpreter = interpreter("""
+                class T<T>(var value: T) {
+                    fun getValue(): T = value
+                    fun func(op: () -> T): T = op()
+                    fun asT(): T = 20 as T
+                }
+                fun <A> extractValue(v: T<A>): A = v.getValue()
+                val o = T(T(T(10)))
+    //            extractValue(o)
+    //            val a = extractValue(extractValue(o)).func { 15 }
+    //            val b = extractValue(extractValue(extractValue(o)))
+    //            val c = extractValue(extractValue(o.getValue()))
+    //            val d = extractValue(extractValue(o)).asT()
+            """.trimIndent())
+            interpreter.eval()
+            val symbolTable = interpreter.callStack.currentSymbolTable()
+            assertEquals(5, symbolTable.propertyValues.size)
+            println(symbolTable.propertyValues)
+            assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
+            assertEquals(
+                "T<T<T<Int>>>",
+                (symbolTable.findPropertyByDeclaredName("o") as ClassInstance).type().descriptiveName
+            )
+            assertEquals(15, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+            assertEquals(10, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+            assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+            assertEquals(20, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        }
+    }
+
+    @Test
+    fun extensionFunctionUseUnrelatedTypeParameter() {
+        val interpreter = interpreter("""
+            class MyVal1<A>(val value: A) {
+                fun getValue(): A = value
+            }
+            fun <T, X> MyVal1<X>.identity(value: T): T = value
+            val o = MyVal1("def")
+            val a: String = o.getValue()
+            val b: Int = o.identity(20)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun extensionFunctionUseBothClassTypeParameterAndFunctionTypeParameter() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            class MyVal1<A>(val value: A) {
+                fun getValue(): A = value
+            }
+            fun <T, X> MyVal1<X>.toPair(value: T): MyPair<X, T> = MyPair<X, T>(this.value, value)
+            val o = MyVal1("def")
+            val p = o.toPair(20)
+            val a: String = p.first
+            val b: Int = p.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun extensionFunctionUseStarAsTypeParameter() {
+        val interpreter = interpreter("""
+            class MyVal1<A>(val value: A) {
+                fun getValue(): A = value
+            }
+            fun MyVal1<*>.individualFunc(): Int = 20
+            val o = MyVal1("def")
+            val a: String = o.getValue()
+            val b: Int = o.individualFunc()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun extensionFunctionUseStarAndUnrelatedTypeParameter() {
+        val interpreter = interpreter("""
+            class MyVal1<A>(val value: A) {
+                fun getValue(): A = value
+            }
+            fun <T> MyVal1<*>.identity(value: T): T = value
+            val o = MyVal1("def")
+            val a: String = o.getValue()
+            val b: Int = o.identity(20)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun extensionFunctionUseLambda() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(val first: A, val second: B)
+            class MyVal1<A>(val value: A) {
+                fun getValue(): A = value
+            }
+            fun <T, R> MyVal1<T>.map(op: (T) -> R) = MyVal1(op(value))
+            val o = MyVal1("def")
+            val a = o.map { it -> "abc" + it }
+            val av = a.value
+            val b = a.map { _ -> 20 }
+            val bv = b.getValue()
+            val c = b.map { it -> it * 4.5 }
+            val cv = c.getValue()
+            val d = c.map { it -> MyPair("new", it) }
+            val dv1 = d.value.first
+            val dv2 = d.value.second
+            val e = d.map { it -> MyPair(it.first + " pair", it.second * 2) }
+            val ev1 = e.value.first
+            val ev2 = e.value.second
+            val f = e.map { _ -> MyPair(123, MyPair(234, "bcd")) }
+            val fv1 = f.value.first
+            val fv2 = f.value.second.first
+            val fv3 = f.value.second.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(17, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("MyVal1<String>", (symbolTable.findPropertyByDeclaredName("a") as ClassInstance).type().descriptiveName)
+        assertEquals("abcdef", (symbolTable.findPropertyByDeclaredName("av") as StringValue).value)
+        assertEquals("MyVal1<Int>", (symbolTable.findPropertyByDeclaredName("b") as ClassInstance).type().descriptiveName)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("bv") as IntValue).value)
+        assertEquals("MyVal1<Double>", (symbolTable.findPropertyByDeclaredName("c") as ClassInstance).type().descriptiveName)
+        compareNumber(20 * 4.5, symbolTable.findPropertyByDeclaredName("cv") as DoubleValue)
+        assertEquals("MyVal1<MyPair<String, Double>>", (symbolTable.findPropertyByDeclaredName("d") as ClassInstance).type().descriptiveName)
+        assertEquals("new", (symbolTable.findPropertyByDeclaredName("dv1") as StringValue).value)
+        compareNumber(20 * 4.5, symbolTable.findPropertyByDeclaredName("dv2") as DoubleValue)
+        assertEquals("MyVal1<MyPair<String, Double>>", (symbolTable.findPropertyByDeclaredName("e") as ClassInstance).type().descriptiveName)
+        assertEquals("new pair", (symbolTable.findPropertyByDeclaredName("ev1") as StringValue).value)
+        compareNumber(20 * 4.5 * 2, symbolTable.findPropertyByDeclaredName("ev2") as DoubleValue)
+        assertEquals("MyVal1<MyPair<Int, MyPair<Int, String>>>", (symbolTable.findPropertyByDeclaredName("f") as ClassInstance).type().descriptiveName)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("fv1") as IntValue).value)
+        assertEquals(234, (symbolTable.findPropertyByDeclaredName("fv2") as IntValue).value)
+        assertEquals("bcd", (symbolTable.findPropertyByDeclaredName("fv3") as StringValue).value)
     }
 }

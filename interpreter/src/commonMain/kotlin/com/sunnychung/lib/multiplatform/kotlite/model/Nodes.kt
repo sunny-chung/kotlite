@@ -2,7 +2,9 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.annotation.ModifyByAnalyzer
+import com.sunnychung.lib.multiplatform.kotlite.error.CannotInferTypeException
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
+import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import kotlin.random.Random
 
@@ -143,7 +145,9 @@ open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var
 
 data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     @ModifyByAnalyzer var inferredType: TypeNode? = null
-    val type: TypeNode get() = declaredType ?: inferredType!!
+    val type: TypeNode get() = declaredType ?: inferredType
+        ?: throw CannotInferTypeException("function value parameter type $name")
+
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Value Parameter Node `$name`\"]"
         return "$self\n" + (if (declaredType != null) "$self-- declared type -->${declaredType.toMermaid()}\n" else "") +
@@ -185,7 +189,7 @@ open class FunctionDeclarationNode(
     @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
-        get() = declaredReturnType ?: inferredReturnType!!
+        get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException("return type of function $name")
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name`\"]"
@@ -247,9 +251,10 @@ data class FunctionCallNode(
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
     @ModifyByAnalyzer var callableType: CallableType? = null,
+    @ModifyByAnalyzer var inferredTypeArguments: List<TypeNode>? = null,
 ) : ASTNode {
     val typeArguments: List<TypeNode>
-        get() = declaredTypeArguments
+        get() = declaredTypeArguments.emptyToNull() ?: inferredTypeArguments ?: emptyList()
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"
         return "$self-- function -->${function.toMermaid()}\n" +

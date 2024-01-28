@@ -6,6 +6,7 @@ data class FindCallableResult(
     val type: CallableType,
     val arguments: List<Any>,
     val typeParameters: List<TypeParameterNode>,
+    val receiverType: TypeNode?,
     val returnType: TypeNode,
     val definition: Any,
     val scope: SymbolTable,

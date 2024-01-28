@@ -729,9 +729,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             val symbolTable = callStack.currentSymbolTable()
             symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
             symbolTable.assign("this/${subject.type().name}", subject)
-            if (subject.type().descriptiveName != subject.type().name) {
-                symbolTable.declareProperty("this/${subject.type().descriptiveName}", subject.type().toTypeNode(), false)
-                symbolTable.assign("this/${subject.type().descriptiveName}", subject)
+            if (function.receiver != null && function.receiver!!.descriptiveName() != subject.type().name) {
+                symbolTable.declareProperty("this/${function.receiver!!.descriptiveName()}", subject.type().toTypeNode(), false)
+                symbolTable.assign("this/${function.receiver!!.descriptiveName()}", subject)
             }
             symbolTable.declareProperty("this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
