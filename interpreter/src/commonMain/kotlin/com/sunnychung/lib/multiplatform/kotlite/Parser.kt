@@ -248,7 +248,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun postfixUnaryExpression(): ASTNode {
         var result = primaryExpression() // TODO complete expression
-        while (currentToken.type in setOf(TokenType.Operator, TokenType.Symbol)) {
+        while (currentTokenExcludingNL().type in setOf(TokenType.Operator, TokenType.Symbol)) {
             val newResult = postfixUnarySuffix(result)
             if (newResult == result) break
             result = newResult
