@@ -19,7 +19,7 @@ class CustomFunctionDeclarationNode(
     receiver = receiver ?: def.receiverType?.toTypeNode(),
     declaredReturnType = returnType ?: def.returnType.toTypeNode(),
     valueParameters = valueParameters ?: def.parameterTypes.map {
-        FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() })
+        FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() }, it.modifiers)
     },
     body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode()),
     transformedRefName = transformedRefName,

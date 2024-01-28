@@ -26,6 +26,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
@@ -603,7 +604,7 @@ class Parser(protected val lexer: Lexer) {
                     throw ExpectTokenMismatchException(",", currentToken.position)
                 }
                 val (name, type) = variableDeclaration()
-                parameters += FunctionValueParameterNode(name = name, declaredType = type, defaultValue = null)
+                parameters += FunctionValueParameterNode(name = name, declaredType = type, modifiers = emptySet(), defaultValue = null)
                 if (isCurrentTokenExcludingNL(TokenType.Symbol, ",")) {
                     repeatedNL()
                     eat(TokenType.Symbol, ",")
@@ -1276,7 +1277,7 @@ class Parser(protected val lexer: Lexer) {
             name = "set",
             declaredReturnType = returnType,
             valueParameters = listOf(
-                FunctionValueParameterNode(parameterName, type, null)
+                FunctionValueParameterNode(parameterName, type, null, emptySet())
             ),
             body = body
         )
@@ -1338,8 +1339,21 @@ class Parser(protected val lexer: Lexer) {
      * functionValueParameter:
      *     [parameterModifiers] parameter [{NL} '=' {NL} expression]
      *
+     * parameterModifiers:
+     *     annotation | parameterModifier {annotation | parameterModifier}
+     *
+     * parameterModifier:
+     *     'vararg'
+     *     | 'noinline'
+     *     | 'crossinline'
+     *
      */
     fun functionValueParameter(): FunctionValueParameterNode {
+        val modifiers = mutableSetOf<FunctionValueParameterModifier>()
+        if (isCurrentToken(TokenType.Identifier, "vararg")) {
+            eat(TokenType.Identifier, "vararg")
+            modifiers += FunctionValueParameterModifier.vararg
+        }
         val (name, type) = parameter()
         repeatedNL()
         val defaultValue = if (currentToken.type == TokenType.Symbol && currentToken.value == "=") {
@@ -1347,7 +1361,7 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             expression()
         } else null
-        return FunctionValueParameterNode(name = name, declaredType = type, defaultValue = defaultValue)
+        return FunctionValueParameterNode(name = name, declaredType = type, defaultValue = defaultValue, modifiers = modifiers)
     }
 
     /**
@@ -1504,6 +1518,13 @@ class Parser(protected val lexer: Lexer) {
      *     [{NL} '=' {NL} expression]
      */
     fun classParameter(): ClassParameterNode {
+        val modifiers = mutableSetOf<FunctionValueParameterModifier>()
+        if (isCurrentToken(TokenType.Identifier, "vararg")) {
+            throw UnsupportedOperationException("vararg in class primary constructor is not supported")
+
+            eat(TokenType.Identifier, "vararg")
+            modifiers += FunctionValueParameterModifier.vararg
+        }
         val isMutable = if (currentToken.type == TokenType.Identifier && currentToken.value in setOf("val", "var")) {
             (currentToken.value == "var").also { eat(TokenType.Identifier) }
         } else null
@@ -1524,7 +1545,8 @@ class Parser(protected val lexer: Lexer) {
             parameter = FunctionValueParameterNode(
                 name = name,
                 declaredType = type,
-                defaultValue = defaultValue
+                defaultValue = defaultValue,
+                modifiers = modifiers,
             )
         )
     }

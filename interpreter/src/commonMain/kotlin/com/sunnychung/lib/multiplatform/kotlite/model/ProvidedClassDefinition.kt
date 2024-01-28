@@ -30,6 +30,7 @@ class ProvidedClassDefinition(
                     Parser(Lexer(it)).expression()
                 },
                 transformedRefName = it.name,
+                modifiers = emptySet(),
             )
         )
     })

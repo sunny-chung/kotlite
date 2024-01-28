@@ -143,7 +143,11 @@ open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 
-data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+enum class FunctionValueParameterModifier {
+    vararg
+}
+
+data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, val modifiers: Set<FunctionValueParameterModifier>, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     @ModifyByAnalyzer var inferredType: TypeNode? = null
     val type: TypeNode get() = declaredType ?: inferredType
         ?: throw CannotInferTypeException("function value parameter type $name")
@@ -187,6 +191,7 @@ open class FunctionDeclarationNode(
     override val typeParameters: List<TypeParameterNode> = emptyList(),
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,
+    @ModifyByAnalyzer var isVararg: Boolean = false
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
         get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException("return type of function $name")

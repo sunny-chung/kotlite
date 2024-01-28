@@ -42,12 +42,14 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallResult
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ListValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
@@ -465,15 +467,21 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>, extraTypeResolutions: List<TypeParameterNode>, extraSymbols: SymbolTable? = null, subject: RuntimeValue? = null): FunctionCallResult {
         // TODO optimize to remove most loops
-        val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
-        callNode.arguments.forEach { a ->
-            val index = if (a.name != null) {
-                functionNode.valueParameters.indexOfFirst { it.name == a.name }
-            } else {
-                a.index
+        val isVararg = functionNode.valueParameters.firstOrNull()?.modifiers?.contains(FunctionValueParameterModifier.vararg) ?: false
+        val callArguments = if (isVararg) {
+            callNode.arguments.map { a -> a.value.eval() as RuntimeValue? }.toTypedArray()
+        } else {
+            val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
+            callNode.arguments.forEach { a ->
+                val index = if (a.name != null) {
+                    functionNode.valueParameters.indexOfFirst { it.name == a.name }
+                } else {
+                    a.index
+                }
+                if (index < 0) throw RuntimeException("Named argument `${a.name}` could not be found.")
+                callArguments[index] = a.value.eval() as RuntimeValue
             }
-            if (index < 0) throw RuntimeException("Named argument `${a.name}` could not be found.")
-            callArguments[index] = a.value.eval() as RuntimeValue
+            callArguments
         }
 
         return evalFunctionCall(callArguments, callNode.typeArguments.toTypedArray(), callNode.position, functionNode, extraScopeParameters, extraTypeResolutions, extraSymbols, subject)
@@ -489,14 +497,17 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         extraSymbols: SymbolTable? = null,
         subject: RuntimeValue? = null
     ): FunctionCallResult {
-        if (arguments.size != functionNode.valueParameters.size) {
+        val isVararg = functionNode.valueParameters.firstOrNull()?.modifiers?.contains(FunctionValueParameterModifier.vararg) ?: false
+        if (!isVararg && arguments.size != functionNode.valueParameters.size) {
             throw RuntimeException("Arguments size not match. Optional arguments should be specified as null.")
         }
 
-        arguments.forEachIndexed { index, it ->
-            val parameterNode = functionNode.valueParameters[index]
-            if (it == null && parameterNode.defaultValue == null) {
-                throw RuntimeException("Missing parameter `${parameterNode.name} in function call ${functionNode.name}`")
+        if (!isVararg) {
+            arguments.forEachIndexed { index, it ->
+                val parameterNode = functionNode.valueParameters[index]
+                if (it == null && parameterNode.defaultValue == null) {
+                    throw RuntimeException("Missing parameter `${parameterNode.name} in function call ${functionNode.name}`")
+                }
             }
         }
 
@@ -550,7 +561,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 symbolTable.declareTypeAliasResolution(it.key, typeArgumentsInDataType[it.key]!!)
             }
             functionNode.valueParameters.forEachIndexed { index, it ->
-                if (!(functionNode is LambdaLiteralNode && it.name == "_")) {
+                if (!isVararg && !(functionNode is LambdaLiteralNode && it.name == "_")) {
                     val argumentType = it.type //.resolveGenericParameterTypeArguments(typeParametersReplacedWithArguments)
                     symbolTable.declareProperty(it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
@@ -558,6 +569,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue).also { arguments[index] = it }
                     )
                 }
+            }
+
+            val arguments = if (isVararg) {
+                arrayOf(ListValue(arguments.filterNotNull().toList(), symbolTable().assertToDataType(functionNode.valueParameters.first().type)))
+            } else {
+                arguments
             }
 
             // execute function

@@ -270,4 +270,23 @@ class FunctionResolutionTest {
         assertEquals(22, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(63, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun vararg() {
+        val interpreter = interpreter("""
+            var a: Int = 0
+            fun f(vararg args: Int) {
+                ++a
+            }
+            f()
+            f(1)
+            f(1, 2, 3)
+            f(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(1, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
 }

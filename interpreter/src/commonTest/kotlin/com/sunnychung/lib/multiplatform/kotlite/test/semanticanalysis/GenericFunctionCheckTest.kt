@@ -27,4 +27,13 @@ class GenericFunctionCheckTest {
             val s: String = identity<Int>(123)
         """.trimIndent())
     }
+
+    @Test
+    fun genericVarargWithoutArgument() {
+        // even the official Kotlin compiler does not infer this case
+        assertSemanticFail("""
+            fun <T> f(vararg args: T) {}
+            f()
+        """.trimIndent())
+    }
 }

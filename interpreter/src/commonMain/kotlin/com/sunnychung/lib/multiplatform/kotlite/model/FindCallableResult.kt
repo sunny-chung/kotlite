@@ -4,6 +4,7 @@ data class FindCallableResult(
     val transformedName: String,
     val owner: String?,
     val type: CallableType,
+    val isVararg: Boolean,
     val arguments: List<Any>,
     val typeParameters: List<TypeParameterNode>,
     val receiverType: TypeNode?,

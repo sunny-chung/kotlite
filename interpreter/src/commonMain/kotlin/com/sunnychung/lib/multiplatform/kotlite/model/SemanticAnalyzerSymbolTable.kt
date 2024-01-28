@@ -43,6 +43,7 @@ class SemanticAnalyzerSymbolTable(
                     transformedName = it.first.transformedRefName!!,
                     owner = owner,
                     type = if (owner == null) CallableType.Function else CallableType.ClassMemberFunction,
+                    isVararg = it.first.isVararg,
                     arguments = it.first.valueParameters,
                     typeParameters = it.first.typeParameters,
                     receiverType = null,
@@ -56,6 +57,7 @@ class SemanticAnalyzerSymbolTable(
                     transformedName = it.first.fullQualifiedName,
                     owner = null,
                     type = CallableType.Constructor,
+                    isVararg = false,
                     arguments = it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList(),
                     typeParameters = it.first.typeParameters,
                     receiverType = null,
@@ -73,6 +75,7 @@ class SemanticAnalyzerSymbolTable(
                     transformedName = transformedName,
                     owner = findPropertyOwner(transformedName)?.ownerRefName,
                     type = CallableType.Property,
+                    isVararg = false,
                     arguments = (it.first.type as FunctionType).arguments,
                     typeParameters = emptyList(),
                     receiverType = null,
@@ -88,6 +91,7 @@ class SemanticAnalyzerSymbolTable(
                     transformedName = it.transformedRefName!!,
                     owner = null,
                     type = CallableType.ClassMemberFunction,
+                    isVararg = it.isVararg,
                     arguments = it.valueParameters,
                     typeParameters = it.typeParameters,
                     receiverType = it.receiver,
@@ -101,6 +105,7 @@ class SemanticAnalyzerSymbolTable(
                     transformedName = it.first.transformedRefName!!,
                     owner = null,
                     type = CallableType.ExtensionFunction,
+                    isVararg = it.first.isVararg,
                     arguments = it.first.valueParameters,
                     typeParameters = it.first.typeParameters,
                     receiverType = it.first.receiver,
@@ -111,11 +116,20 @@ class SemanticAnalyzerSymbolTable(
             }.let { thisScopeCandidates += it }
         }
         thisScopeCandidates = thisScopeCandidates.filter { callable ->
+            if (callable.isVararg) {
+                val functionArgType = currentSymbolTable.typeNodeToDataType(
+                    (callable.arguments.first() as FunctionValueParameterNode).type.resolveGenericParameterTypeToUpperBound(
+                        callable.typeParameters + (receiverClass?.typeParameters ?: emptyList())
+                    )
+                )!!
+                return@filter arguments.all { functionArgType.isConvertibleFrom(it.type) }
+            }
+
             if (callable.arguments.isEmpty()) {
                 return@filter arguments.isEmpty()
             }
             when (callable.arguments.first()) {
-                is DataType -> return@filter arguments.size == callable.arguments.size &&
+                is DataType /* is a lambda */ -> return@filter arguments.size == callable.arguments.size &&
                         arguments.all { it.name == null } &&
                         callable.arguments.foldIndexed(true) { i, acc, it -> acc && (it as DataType).isAssignableFrom(arguments[i].type) }
                 is FunctionValueParameterNode -> {

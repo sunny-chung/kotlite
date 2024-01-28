@@ -39,6 +39,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
@@ -452,6 +453,24 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         val previousScope = currentScope
         var additionalScopeCount = 0
         var variantsOfThis = mutableListOf<FunctionDeclarationNode>()
+        val isVararg = valueParameters.isNotEmpty() &&
+            valueParameters.first().modifiers.contains(FunctionValueParameterModifier.vararg)
+
+        if (isVararg && valueParameters.size > 1) {
+            throw SemanticException("Only exactly one function parameter is supported if there is a vararg parameter")
+        }
+        if (!isVararg && valueParameters.size > 1) {
+            (1..< valueParameters.size).forEach { i ->
+                if (valueParameters[i].modifiers.contains(FunctionValueParameterModifier.vararg)) {
+                    throw SemanticException("Only exactly one function parameter is supported if there is a vararg parameter")
+                }
+            }
+        }
+        if (isVararg && valueParameters.first().defaultValue != null) {
+            throw SemanticException("Vararg value argument with a default value is not supported")
+        }
+        this.isVararg = isVararg
+
         pushScope(
             scopeName = name,
             scopeType = ScopeType.ExtraWrap,
@@ -733,6 +752,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //            throw SemanticException("Too much arguments. At most ${functionArgumentDeclarations.size} are accepted.")
 //        }
 
+        val isVararg = (functionArgumentAndReturnTypeDeclarations.valueParameters.firstOrNull() as? FunctionValueParameterNode)?.let {
+            it.modifiers.contains(FunctionValueParameterModifier.vararg)
+        } ?: false
+
         if (declaredTypeArguments.isNotEmpty() && functionArgumentAndReturnTypeDeclarations.typeParameters.size != declaredTypeArguments.size) {
             throw SemanticException("Number of type arguments does not match with number of type parameters of the matched callable")
         }
@@ -778,7 +801,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //
         // callArgumentMappedIndexes[index of `arguments`] = index of matched argument
         val callArgumentMappedIndexes = arguments.mapIndexed { i, a ->
-            if (a.name == null) {
+            if (isVararg) {
+                0
+            } else if (a.name == null) {
                 i
             } else {
                 argumentInfos.indexOfFirst { it.name == a.name }.also {

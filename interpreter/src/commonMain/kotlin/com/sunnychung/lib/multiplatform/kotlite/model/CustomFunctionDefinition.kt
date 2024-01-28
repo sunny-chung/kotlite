@@ -13,4 +13,4 @@ data class CustomFunctionDefinition(
     val executable: (RuntimeValue?, List<RuntimeValue?>) -> RuntimeValue,
 )
 
-class CustomFunctionParameter(val name: String, val type: String, val defaultValueExpression: String? = null)
+class CustomFunctionParameter(val name: String, val type: String, val defaultValueExpression: String? = null, val modifiers: Set<FunctionValueParameterModifier> = emptySet())

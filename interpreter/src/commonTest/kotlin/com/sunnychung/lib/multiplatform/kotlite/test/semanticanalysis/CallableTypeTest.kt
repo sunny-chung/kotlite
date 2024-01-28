@@ -262,4 +262,33 @@ class CallableTypeTest {
             val b: Int = a!!()
         """.trimIndent()).analyze()
     }
+
+    @Test
+    fun varargIncompatibleArgumentType1() {
+        assertSemanticFail("""
+            var a = 0
+            fun f(vararg args: Any) {
+                ++a
+            }
+            f(null)
+        """.trimIndent())
+    }
+
+    @Test
+    fun varargIncompatibleArgumentType2() {
+        assertSemanticFail("""
+            var a = 0
+            fun f(vararg args: String) {
+                ++a
+            }
+            f(1, 2, 3)
+        """.trimIndent())
+    }
+
+    @Test
+    fun varargWithDefaultValue() {
+        assertSemanticFail("""
+            fun f(vararg args: Int = 1) {}
+        """.trimIndent())
+    }
 }

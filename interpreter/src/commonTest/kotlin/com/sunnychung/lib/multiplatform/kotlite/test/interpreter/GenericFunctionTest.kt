@@ -173,4 +173,25 @@ class GenericFunctionTest {
         assertEquals("67,abc", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
         assertEquals("67,123,abc", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
     }
+
+    @Test
+    fun genericVararg() {
+        val interpreter = interpreter("""
+            var a: Int = 0
+            fun <T> f(vararg args: T) {
+                ++a
+            }
+            f(1)
+            f(null)
+            f(1, 2, 3)
+            f("abc", "def", "ghijk")
+            f(1, "abc", 4.5, true)
+            f(null, 2, 3, null)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(1, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
 }
