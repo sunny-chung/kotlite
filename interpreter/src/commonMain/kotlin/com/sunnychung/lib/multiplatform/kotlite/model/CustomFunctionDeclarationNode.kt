@@ -11,6 +11,7 @@ class CustomFunctionDeclarationNode(
     name: String? = null,
     receiver: TypeNode? = null,
     returnType: TypeNode? = null,
+    typeParameters: List<TypeParameterNode>? = null,
     valueParameters: List<FunctionValueParameterNode>? = null,
     body: BlockNode? = null,
     transformedRefName: String? = null,
@@ -18,14 +19,17 @@ class CustomFunctionDeclarationNode(
     name = name ?: def.functionName,
     receiver = receiver ?: def.receiverType?.toTypeNode(),
     declaredReturnType = returnType ?: def.returnType.toTypeNode(),
+    typeParameters = typeParameters ?: def.typeParameters.map {
+        TypeParameterNode(it.name, it.typeUpperBound?.toTypeNode())
+    },
     valueParameters = valueParameters ?: def.parameterTypes.map {
         FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() }, it.modifiers)
     },
     body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode()),
     transformedRefName = transformedRefName,
 ) {
-    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>): RuntimeValue {
-        return def.executable(receiver, arguments)
+    override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>, typeArguments: Map<String, DataType>): RuntimeValue {
+        return def.executable(receiver, arguments, typeArguments)
     }
 
     override fun copy(

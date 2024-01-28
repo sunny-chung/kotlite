@@ -163,5 +163,10 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kdatetime.extension.weeks",
             )
         ),
+        "Collections" to KotliteModuleConfig(
+            imports = listOf(
+                "com.sunnychung.lib.multiplatform.kotlite.model.ListValue"
+            )
+        ),
     )
 }

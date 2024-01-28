@@ -519,7 +519,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         // resolve type arguments to DataType first, so that
         // class with same name of function type parameter name is resolved before function type parameter declarations
         val typeArgumentsInDataType = typeParametersReplacedWithArguments.mapValues {
-            symbolTable().typeNodeToDataType(it.value)
+            symbolTable().assertToDataType(it.value)
         }
 
         val scopeType = if (functionNode is FunctionDeclarationNode) ScopeType.Function else ScopeType.Closure
@@ -579,7 +579,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
             // execute function
             val returnValue = try {
-                val result = functionNode.execute(this, subject, arguments.toList() as List<RuntimeValue>)
+                val result = functionNode.execute(this, subject, arguments.toList() as List<RuntimeValue>, typeArgumentsInDataType.toMap())
                 if (returnType is UnitType) {
                     UnitValue
                 } else {

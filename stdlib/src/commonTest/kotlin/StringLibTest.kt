@@ -20,7 +20,7 @@ fun interpreter(code: String, isDebug: Boolean = false, executionEnvironment: Ex
     }
     SemanticAnalyzer(it, executionEnvironment).analyze()
     if (isDebug) {
-        println(CodeGenerator(it, isPrintDebugInfo = false).generateCode())
+        println(CodeGenerator(it, isPrintDebugInfo = true).generateCode())
     }
     Interpreter(it, executionEnvironment)
 }
