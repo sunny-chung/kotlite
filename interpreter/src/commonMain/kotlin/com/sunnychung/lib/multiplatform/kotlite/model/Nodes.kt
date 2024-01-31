@@ -390,14 +390,30 @@ class StringNode(
 }
 
 data class LambdaLiteralNode(
-    override val valueParameters: List<FunctionValueParameterNode>,
+    val declaredValueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
     @ModifyByAnalyzer var type: FunctionTypeNode? = null,
     @ModifyByAnalyzer var accessedRefs: SymbolReferenceSet? = null,
     @ModifyByAnalyzer var parameterTypesUpperBound: List<TypeNode>? = null,
     @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
 ) : ASTNode, CallableNode {
+    @ModifyByAnalyzer var valueParameterIt: FunctionValueParameterNode? = null
+
     override val typeParameters: List<TypeParameterNode> = emptyList()
+    override val valueParameters: List<FunctionValueParameterNode>
+        get() = if (declaredValueParameters.isEmpty() && parameterTypesUpperBound?.size == 1) {
+            if (valueParameterIt == null) {
+                valueParameterIt = FunctionValueParameterNode(
+                    name = "it",
+                    declaredType = parameterTypesUpperBound!!.first(),
+                    defaultValue = null,
+                    modifiers = emptySet()
+                )
+            }
+            listOf(valueParameterIt!!)
+        } else {
+            declaredValueParameters
+        }
 
     override val returnType: TypeNode
         get() = type!!.returnType!!

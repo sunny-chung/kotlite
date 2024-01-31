@@ -20,7 +20,7 @@ class ListTest {
         }
         val interpreter = interpreter("""
             val l = listOf(1, 2, 3, 4, 5)
-            l.forEach { it -> println(it) }
+            l.forEach { println(it) }
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
         assertEquals("1\n2\n3\n4\n5\n", console.toString())
@@ -39,9 +39,9 @@ class ListTest {
         }
         val interpreter = interpreter("""
             listOf(1, 2, 3, 4, 5)
-                .map { it -> it * 2 }
-                .map { it -> "(${'$'}it)" }
-                .forEach { it -> println(it) }
+                .map { it * 2 }
+                .map { "(${'$'}it)" }
+                .forEach { println(it) }
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
         assertEquals("(2)\n(4)\n(6)\n(8)\n(10)\n", console.toString())
@@ -55,7 +55,7 @@ class ListTest {
         val interpreter = interpreter("""
             val a = listOf(1, 2, 3, 4, 5)
                 .shuffled()
-                .filter { it -> it <= 3 }
+                .filter { it <= 3 }
                 .size
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()

@@ -1067,4 +1067,35 @@ class LambdaTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertEquals(21, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
+
+    @Test
+    fun implicitItArgument1() {
+        val interpreter = interpreter("""
+            fun f(g: (Int) -> Int): Int {
+                return g(4) + g(5)
+            }
+            val x = f { it * 2 }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(18, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun implicitItArgument2() {
+        val interpreter = interpreter("""
+            fun f(g: (Int) -> Int): Int {
+                return g(4) + g(5)
+            }
+            val lambda: (Int) -> Int = { it * 2 }
+            val x = f(lambda)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(18, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }

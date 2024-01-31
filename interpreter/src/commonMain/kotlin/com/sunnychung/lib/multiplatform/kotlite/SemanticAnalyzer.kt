@@ -885,7 +885,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         arguments.forEachIndexed { i, callArgument ->
             val functionArgumentType = argumentInfos[callArgumentMappedIndexes[i]].type
             if (callArgument.value is LambdaLiteralNode && functionArgumentType is FunctionType) {
-                if (callArgument.value.valueParameters.size != functionArgumentType.arguments.size) {
+                if (callArgument.value.valueParameters.size != functionArgumentType.arguments.size && !(callArgument.value.valueParameters.isEmpty() && functionArgumentType.arguments.size == 1)) {
                     throw SemanticException("Lambda argument count is different from function parameter declaration.")
                 }
                 callArgument.value.parameterTypesUpperBound = functionArgumentType.arguments.map {
