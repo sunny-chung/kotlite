@@ -1061,6 +1061,17 @@ class Parser(protected val lexer: Lexer) {
             if (typeParameters.isNotEmpty() && !hasEatenComma) {
                 throw ExpectTokenMismatchException(",", currentToken.position)
             }
+
+            val originalTokenIndex = tokenIndex
+            try {
+                eat(TokenType.Identifier)
+                repeatedNL()
+                eat(TokenType.Symbol, ":")
+                repeatedNL()
+            } catch (_: ParseException) {
+                resetTokenToIndex(originalTokenIndex)
+            }
+
             typeParameters += type()
             repeatedNL()
             if (isCurrentToken(TokenType.Symbol, ",")) {
