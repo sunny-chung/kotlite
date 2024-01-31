@@ -68,13 +68,11 @@ class ListTest {
         val env = ExecutionEnvironment().apply {
             install(CollectionsLibModule())
         }
-        // TODO enhance the syntax sugar of joinToString
         val interpreter = interpreter("""
             val a = listOf(1, 2, 3, 4, 5)
                 .mapIndexed { index, it -> "(${'$'}index: ${'$'}{ it * 2 })" }
                 .takeLast(3)
-                // .joinToString("\n") { it -> ">${'$'}it" }
-                .joinToString(separator = "\n", transform = { it -> ">${'$'}it" })
+                .joinToString(separator = "\n") { it -> ">${'$'}it" }
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
         val symbolTable = interpreter.symbolTable()

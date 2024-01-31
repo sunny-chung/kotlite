@@ -472,14 +472,17 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             callNode.arguments.map { a -> a.value.eval() as RuntimeValue? }.toTypedArray()
         } else {
             val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
-            callNode.arguments.forEach { a ->
+            callNode.arguments.forEachIndexed { i, a ->
+                val value = a.value.eval() as RuntimeValue
                 val index = if (a.name != null) {
                     functionNode.valueParameters.indexOfFirst { it.name == a.name }
+                } else if (i == callNode.arguments.lastIndex && value is LambdaValue) {
+                    functionNode.valueParameters.lastIndex
                 } else {
                     a.index
                 }
                 if (index < 0) throw RuntimeException("Named argument `${a.name}` could not be found.")
-                callArguments[index] = a.value.eval() as RuntimeValue
+                callArguments[index] = value
             }
             callArguments
         }

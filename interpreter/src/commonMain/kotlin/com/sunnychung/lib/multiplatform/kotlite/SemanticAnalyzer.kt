@@ -805,7 +805,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             if (isVararg) {
                 0
             } else if (a.name == null) {
-                i
+                if (i == arguments.lastIndex && a.type(ResolveTypeModifier(isSkipGenerics = true)) is FunctionTypeNode) {
+                    argumentInfos.lastIndex
+                } else {
+                    i
+                }
             } else {
                 argumentInfos.indexOfFirst { it.name == a.name }.also {
                     if (it < 0) throw SemanticException("Argument ${a.name} not found")

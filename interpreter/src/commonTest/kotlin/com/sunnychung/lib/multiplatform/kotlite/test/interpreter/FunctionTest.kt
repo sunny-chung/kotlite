@@ -266,4 +266,21 @@ class FunctionTest {
         println(symbolTable.propertyValues)
         assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
     }
+
+    @Test
+    fun functionWithDefaultExpressionsAndLambdaArgumentAtLast() {
+        val interpreter = interpreter("""
+            fun myFunction(a: Int, b: Int = 100 + 2 * a, f: (Int) -> Int = { it + 1 }): Int {
+                val q: Int = a + b * 2
+                return f(q)
+            }
+            var x: Int = 1 + 2
+            x += myFunction(4) { it * 2 }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(443, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }

@@ -137,15 +137,20 @@ class SemanticAnalyzerSymbolTable(
                     val argumentsReordered = arrayOfNulls<FunctionCallArgumentInfo>(callable.arguments.size)
                     val typeParameterMapping = mutableMapOf<String, DataType>()
                     arguments.forEachIndexed { i, arg ->
-                        if (arg.name == null) {
-                            argumentsReordered[i] = arg
+                        val newIndex = if (arg.name == null) {
+                            if (i == arguments.lastIndex && arg.type is FunctionType) {
+                                callable.arguments.lastIndex
+                            } else {
+                                i
+                            }
                         } else {
                             val findIndex = callable.arguments.indexOfFirst { (it as FunctionValueParameterNode).name == arg.name }
                             if (findIndex < 0) {
                                 return@filter false
                             }
-                            argumentsReordered[findIndex] = arg
+                            findIndex
                         }
+                        argumentsReordered[newIndex] = arg
                     }
                     callable.arguments.foldIndexed(true) { i, acc, it ->
                         val functionArg = it as FunctionValueParameterNode
