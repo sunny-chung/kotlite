@@ -4,6 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.annotation.ModifyByAnalyzer
 
 class ExtensionProperty(
     val declaredName: String,
+    val typeParameters: List<TypeParameter> = emptyList(),
     val receiver: String,
     val type: String,
     val getter: ((receiver: RuntimeValue) -> RuntimeValue)? = null,
@@ -17,4 +18,5 @@ class ExtensionProperty(
 
     internal @ModifyByAnalyzer var transformedName: String? = null
     internal @ModifyByAnalyzer var typeNode: TypeNode? = null
+    internal @ModifyByAnalyzer var receiverType: TypeNode? = null
 }

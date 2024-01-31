@@ -22,6 +22,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
@@ -531,7 +532,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/${receiver.descriptiveName()}")
                 }
             }
-            currentScope.findExtensionPropertyByReceiver(typeNode.descriptiveName()).forEach {
+            currentScope.findExtensionPropertyByReceiver(typeNode.resolveGenericParameterTypeToUpperBound(clazz.typeParameters)).forEach {
                 currentScope.declareProperty(
                     name = it.second.declaredName,
                     type = it.second.typeNode!!,
@@ -1076,7 +1077,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 }
                 return
             }
-            currentScope.findExtensionPropertyByDeclaration(subjectType.nameWithNullable, memberName)?.let {
+            val resolvedSubjectType = subjectType.toTypeNode()
+//                .let {
+//                    if (subject is ClassInstance) {
+//                        it.resolveGenericParameterTypeArguments(subject.typeArgumentByName.mapValues { it.value.toTypeNode() })
+//                    } else {
+//                        it
+//                    }
+//                }
+            currentScope.findExtensionPropertyByDeclaration(resolvedSubjectType, memberName)?.let {
                 if (isCheckWriteAccess && it.second.setter == null) {
                     throw SemanticException("Setter for `$memberName` is not declared")
                 } else if (!isCheckWriteAccess && it.second.getter == null) {
@@ -1165,6 +1174,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                             val p = it.parameter
                             PropertyDeclarationNode(
                                 name = p.name,
+                                typeParameters = emptyList(),
                                 receiver = classType,
                                 declaredType = p.type,
                                 isMutable = it.isMutable,

@@ -2,7 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierException
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
-import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.log
 
 open class SymbolTable(
@@ -273,11 +273,38 @@ open class SymbolTable(
         if (extensionProperties.containsKey(transformedName)) {
             throw DuplicateIdentifierException(name = transformedName, classifier = IdentifierClassifier.Property)
         }
-        val receiverClass = findClass(extensionProperty.receiver)?.first ?: throw RuntimeException("Class `${extensionProperty.receiver}` not found")
+        if (extensionProperty.receiverType == null) {
+            extensionProperty.receiverType = extensionProperty.receiver.toTypeNode()
+        }
+        val receiverType = extensionProperty.receiverType!!
+        val receiverClass = findClass(receiverType.name)?.first ?: throw RuntimeException("Class `${receiverType.name}` not found")
+        if (receiverClass.typeParameters.size != (receiverType.arguments?.size ?: 0)) {
+            throw RuntimeException("Number of type parameters of class `${receiverType.name}` mismatch")
+        }
+        val extensionTypeParameters = extensionProperty.typeParameters.toTypeParameterNodes()
+        receiverClass.typeParameters.forEachIndexed { index, tp ->
+            if (!assertToDataType(tp.typeUpperBoundOrAny()).isAssignableFrom(
+                    assertToDataType(
+                        receiverType.arguments!![index]
+                            .resolveGenericParameterTypeToUpperBound(extensionTypeParameters)
+                    )
+            )) {
+                throw RuntimeException("Provided type parameter `${tp.name}` of the class `${receiverType.name}` is out of bound (Upper bound: `${tp.typeUpperBoundOrAny().descriptiveName()}`)")
+            }
+        }
         if (receiverClass.memberPropertyNameToTransformedName.containsKey(extensionProperty.declaredName)) {
             throw DuplicateIdentifierException(name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
         }
-        if (extensionProperties.any { it.value.receiver == extensionProperty.receiver && it.value.declaredName == extensionProperty.declaredName }) {
+        val resolvedReceiverType = extensionProperty.receiverType!!.resolveGenericParameterTypeToUpperBound(extensionTypeParameters)
+        if (extensionProperties.any {
+            val existingResolvedReceiverType = it.value.receiverType!!.resolveGenericParameterTypeToUpperBound(it.value.typeParameters.toTypeParameterNodes())
+            existingResolvedReceiverType.name == resolvedReceiverType.name &&
+            existingResolvedReceiverType.arguments?.withIndex()?.all {
+                it.value.name == resolvedReceiverType.arguments!![it.index].name &&
+                it.value.isNullable == resolvedReceiverType.arguments!![it.index].isNullable
+            } != false &&
+            it.value.declaredName == extensionProperty.declaredName
+        }) {
             throw DuplicateIdentifierException(name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
         }
         extensionProperties[transformedName] = extensionProperty
@@ -288,14 +315,39 @@ open class SymbolTable(
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionProperty(name) }
     }
 
-    fun findExtensionPropertyByDeclaration(receiver: String, declaredName: String, isThisScopeOnly: Boolean = false): Pair<String, ExtensionProperty>? {
-        return extensionProperties.asSequence().firstOrNull { it.value.receiver == receiver && it.value.declaredName == declaredName }?.toPair()
-            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionPropertyByDeclaration(receiver, declaredName, isThisScopeOnly) }
+    /**
+     * @param resolvedReceiver resolved means there is no generic type parameter
+     */
+    fun findExtensionPropertyByDeclaration(resolvedReceiver: TypeNode, declaredName: String, isThisScopeOnly: Boolean = false): Pair<String, ExtensionProperty>? {
+        return extensionProperties.asSequence()
+            .filter {
+                it.value.receiverType!!.name == resolvedReceiver.name &&
+                        (resolvedReceiver.isNullable || !it.value.receiverType!!.isNullable) &&
+                        it.value.declaredName == declaredName
+            }
+            // Here assumes at most 3 same-name extension properties declared: exact type or Any? or Any. exact type one has higher precedence
+            .let {
+                it.firstOrNull { it.value.receiverType!!.descriptiveName() == resolvedReceiver.descriptiveName() }
+                    ?: it.firstOrNull()
+            }
+            ?.toPair()
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionPropertyByDeclaration(resolvedReceiver, declaredName, isThisScopeOnly) }
     }
 
-    fun findExtensionPropertyByReceiver(receiver: String, isThisScopeOnly: Boolean = false): List<Pair<String, ExtensionProperty>> {
-        return extensionProperties.filter { it.value.receiver == receiver }.map { it.toPair() }.toList() +
-            (Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionPropertyByReceiver(receiver, isThisScopeOnly) }
+    /**
+     * @param resolvedReceiver resolved means there is no generic type parameter
+     */
+    fun findExtensionPropertyByReceiver(resolvedReceiver: TypeNode, isThisScopeOnly: Boolean = false): List<Pair<String, ExtensionProperty>> {
+        return extensionProperties
+            .asSequence()
+            .filter { it.value.receiverType!!.name == resolvedReceiver.name && (resolvedReceiver.isNullable || !it.value.receiverType!!.isNullable) }
+            .map { it.toPair() }
+            .groupBy { it.second.declaredName }
+            // Here assumes at most 3 same-name extension properties declared: exact type or Any? or Any. exact type one has higher precedence
+            .mapValues { it.value.firstOrNull { it.second.receiverType!!.descriptiveName() == resolvedReceiver.descriptiveName() } ?: it.value.first() }
+            .map { it.value }
+            .toList() +
+            (Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionPropertyByReceiver(resolvedReceiver, isThisScopeOnly) }
                 ?: emptyList())
     }
 

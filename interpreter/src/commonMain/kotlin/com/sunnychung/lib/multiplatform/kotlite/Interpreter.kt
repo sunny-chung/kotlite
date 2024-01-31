@@ -859,6 +859,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         val p = it.parameter
                         PropertyDeclarationNode(
                             name = p.name,
+                            typeParameters = emptyList(),
                             receiver = classType,
                             declaredType = p.type,
                             isMutable = it.isMutable,

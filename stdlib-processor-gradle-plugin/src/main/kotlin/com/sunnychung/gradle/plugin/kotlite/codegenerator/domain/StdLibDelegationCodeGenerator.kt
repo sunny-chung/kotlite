@@ -36,22 +36,33 @@ internal class StdLibDelegationCodeGenerator(val name: String, val code: String,
 
 package $outputPackage
 
+import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
+import com.sunnychung.lib.multiplatform.kotlite.model.BooleanType
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
+import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
+import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
+import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
+import com.sunnychung.lib.multiplatform.kotlite.model.LongType
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NullType
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
+import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 
 ${config.imports.joinToString("") { "import $it\n" } }
@@ -75,7 +86,7 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
     }
 
     fun PropertyDeclarationNode.generate(indent: String): String {
-        with (ScopedDelegationCodeGenerator(emptyList())) {
+        with (ScopedDelegationCodeGenerator(typeParameters)) {
             return generate(indent)
         }
     }
@@ -168,8 +179,24 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         }
     }
 
+    fun unwrapValueType(type: TypeNode): String {
+        fun replace(type: TypeNode): TypeNode {
+            // TODO don't hardcode
+            if (type.name == "Any") {
+                return TypeNode("RuntimeValue", null, false)
+            }
+            return TypeNode(
+                type.name,
+                type.arguments?.map { replace(it) },
+                type.isNullable,
+                type.transformedRefName,
+            )
+        }
+        return replace(type).descriptiveName()
+    }
+
     fun generateLambda(variableName: String, type: FunctionTypeNode, indent: Int): String {
-        return """{ ${type.parameterTypes!!.mapIndexed { i, it -> "arg$i: ${it.descriptiveName()}" }.joinToString(", ")} ${if (!type.parameterTypes!!.isEmpty()) "->" else ""}
+        return """{ ${type.parameterTypes!!.mapIndexed { i, it -> "arg$i: ${unwrapValueType(it)}" }.joinToString(", ")} ${if (!type.parameterTypes!!.isEmpty()) "->" else ""}
 ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i", it)}" }.joinToString("\n")}
 
         val result = ($variableName as LambdaValue).execute(arrayOf(${type.parameterTypes!!.indices.joinToString(", ") { "wa$it" }}))
@@ -199,6 +226,9 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
 
         return """ExtensionProperty(
     declaredName = "${name.escape()}",
+    typeParameters = listOf<TypeParameter>(${typeParameters.joinToString("") {
+        "\n${it.generate(indent(8))}," }
+    }${indent(4)}),
     receiver = "${receiver!!.descriptiveName().escape()}",
     type = "${type.descriptiveName().escape()}",
     getter = ${accessors?.getter?.let { """{ receiver ->

@@ -1,15 +1,27 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
+import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticSuccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class CustomBuiltinExtensionPropertyTest {
+    private val LIST_CLAZZ = ProvidedClassDefinition(
+        fullQualifiedName = "List",
+        typeParameters = listOf(TypeParameterNode(name = "T", typeUpperBound = null)),
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+    )
 
     @Test
     fun getter() {
@@ -127,5 +139,108 @@ class CustomBuiltinExtensionPropertyTest {
             val s = "abcde"
             val a = s.f
         """.trimIndent(), environment = env)
+    }
+
+    @Test
+    fun duplicateExtensionProperty() {
+        val env = ExecutionEnvironment().apply {
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                receiver = "String",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                receiver = "String",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+        }
+        assertSemanticFail(code = "", environment = env)
+    }
+
+    @Test
+    fun duplicateExtensionPropertyOfGenericClass1() {
+        val env = ExecutionEnvironment().apply {
+            registerClass(LIST_CLAZZ)
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                receiver = "List<Any>",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                receiver = "List<Any>",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+        }
+        assertSemanticFail(code = "", environment = env)
+    }
+
+    @Test
+    fun duplicateExtensionPropertyOfGenericClass2() {
+        val env = ExecutionEnvironment().apply {
+            registerClass(LIST_CLAZZ)
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                typeParameters = listOf(TypeParameter("T", "Any")),
+                receiver = "List<T>",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                typeParameters = listOf(TypeParameter("T", "Any")),
+                receiver = "List<T>",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+        }
+        assertSemanticFail(code = "", environment = env)
+    }
+
+    @Test
+    fun duplicateExtensionPropertyOfGenericClass3() {
+        val env = ExecutionEnvironment().apply {
+            registerClass(LIST_CLAZZ)
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                receiver = "List<Any?>",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                typeParameters = listOf(TypeParameter("T", "Any?")),
+                receiver = "List<T>",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+        }
+        assertSemanticFail(code = "", environment = env)
+    }
+
+    @Test
+    fun extensionPropertyOfGenericClassAndMoreSpecificExtensionProperty() {
+        val env = ExecutionEnvironment().apply {
+            registerClass(LIST_CLAZZ)
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                typeParameters = listOf(TypeParameter("T", "Any?")),
+                receiver = "List<T>",
+                type = "Int",
+                getter = { subject -> IntValue(1) }
+            ))
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                receiver = "List<Int>",
+                type = "Int",
+                getter = { subject -> IntValue(2) }
+            ))
+        }
+        assertSemanticSuccess(code = "", environment = env)
     }
 }

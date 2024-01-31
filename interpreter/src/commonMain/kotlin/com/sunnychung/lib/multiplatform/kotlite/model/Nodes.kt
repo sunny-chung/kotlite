@@ -111,6 +111,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
 data class PropertyDeclarationNode(
     val name: String,
+    val typeParameters: List<TypeParameterNode>,
     val receiver: TypeNode?,
     val declaredType: TypeNode?,
     val isMutable: Boolean,
@@ -462,3 +463,4 @@ class TypeParameterNode(val name: String, val typeUpperBound: TypeNode?): ASTNod
     override fun toMermaid(): String = "${generateId()}[\"Type Parameter Node `$name`\"]" +
         (typeUpperBound?.let { "--type upper bound -->${it.toMermaid()}" } ?: "")
 }
+fun TypeParameterNode.typeUpperBoundOrAny() = typeUpperBound ?: TypeNode("Any", null, true)

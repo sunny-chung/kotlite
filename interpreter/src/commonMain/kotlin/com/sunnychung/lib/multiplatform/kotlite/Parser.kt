@@ -1178,6 +1178,9 @@ class Parser(protected val lexer: Lexer) {
             }
         }
         repeatedNL()
+        val typeParameters = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
+            typeParameters()
+        } else emptyList()
         val (receiver, name) = receiverTypeAndIdentifier()
         val type = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
             repeatedNL()
@@ -1236,7 +1239,7 @@ class Parser(protected val lexer: Lexer) {
             }
             else -> null
         }
-        return PropertyDeclarationNode(name = name, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
+        return PropertyDeclarationNode(name = name, typeParameters = typeParameters, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
     }
 
     /**
