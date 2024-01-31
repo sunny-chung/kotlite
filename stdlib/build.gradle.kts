@@ -165,7 +165,8 @@ kotliteStdLibHeaderProcessor {
         ),
         "Collections" to KotliteModuleConfig(
             imports = listOf(
-                "com.sunnychung.lib.multiplatform.kotlite.model.ListValue"
+                "com.sunnychung.lib.multiplatform.kotlite.model.ListValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListValue",
             )
         ),
     )

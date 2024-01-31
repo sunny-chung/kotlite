@@ -124,4 +124,18 @@ class StringLibTest {
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
     }
+
+    @Test
+    fun length() {
+        val env = ExecutionEnvironment().apply {
+            install(TextLibModule())
+        }
+        val interpreter = interpreter("""
+            val a = "abcdef"
+            val b = a.length
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }
