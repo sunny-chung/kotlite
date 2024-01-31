@@ -952,6 +952,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun FunctionValueParameterNode.visit(modifier: Modifier = Modifier(), functionDeclarationNode: FunctionDeclarationNode?) {
+        if (defaultValue is LambdaLiteralNode && type is FunctionTypeNode) {
+            defaultValue.parameterTypesUpperBound = (type as FunctionTypeNode).parameterTypes
+        }
         defaultValue?.visit(modifier = modifier)
         if (currentScope.hasProperty(name = name, isThisScopeOnly = true)) {
             throw SemanticException("Property `$name` has already been declared")

@@ -1098,4 +1098,34 @@ class LambdaTest {
         assertEquals(2, symbolTable.propertyValues.size)
         assertEquals(18, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
+
+    @Test
+    fun lambdaAsDefaultExpressionOfFunctionParameter() {
+        val interpreter = interpreter("""
+            fun f(g: (Int) -> Int = { it -> it * 2 }): Int {
+                return g(4) + g(5)
+            }
+            val x = f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(18, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun lambdaWithImplicitItAsDefaultExpressionOfFunctionParameter() {
+        val interpreter = interpreter("""
+            fun f(g: (Int) -> Int = { it * 2 }): Int {
+                return g(4) + g(5)
+            }
+            val x = f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(18, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }
