@@ -13,6 +13,7 @@ class CustomFunctionDeclarationNode(
     returnType: TypeNode? = null,
     typeParameters: List<TypeParameterNode>? = null,
     valueParameters: List<FunctionValueParameterNode>? = null,
+    modifiers: Set<FunctionModifier>? = null,
     body: BlockNode? = null,
     transformedRefName: String? = null,
 ) : FunctionDeclarationNode(
@@ -25,6 +26,7 @@ class CustomFunctionDeclarationNode(
     valueParameters = valueParameters ?: def.parameterTypes.map {
         FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() }, it.modifiers)
     },
+    modifiers = modifiers ?: def.modifiers,
     body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode()),
     transformedRefName = transformedRefName,
 ) {
@@ -38,6 +40,7 @@ class CustomFunctionDeclarationNode(
         declaredReturnType: TypeNode?,
         typeParameters: List<TypeParameterNode>,
         valueParameters: List<FunctionValueParameterNode>,
+        modifiers: Set<FunctionModifier>,
         body: BlockNode,
         transformedRefName: String?,
         inferredReturnType: TypeNode?,
@@ -52,7 +55,9 @@ class CustomFunctionDeclarationNode(
             name = name,
             receiver = receiver,
             returnType = declaredReturnType,
+            typeParameters = typeParameters,
             valueParameters = valueParameters,
+            modifiers = modifiers,
             body = body,
             transformedRefName = transformedRefName
         )

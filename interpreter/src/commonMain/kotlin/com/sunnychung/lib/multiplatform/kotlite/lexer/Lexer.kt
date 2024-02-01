@@ -7,7 +7,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 
-private val NON_IDENTIFIER_CHARACTERS = setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '<', '>', '!', '|', '&', '.', '?', '"', '\n', '\\')
+private val NON_IDENTIFIER_CHARACTERS = setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '[', ']', '<', '>', '!', '|', '&', '.', '?', '"', '\n', '\\')
 
 class Lexer(val code: String) {
     private var pos: Int = 0
@@ -216,7 +216,7 @@ class Lexer(val code: String) {
                         c in setOf('\n') -> return Token(TokenType.NewLine, c.toString(), makeSourcePosition())
                         c.isWhitespace() -> continue
                         c.isDigit() -> return readNumber()
-                        c in setOf('(', ')') -> return Token(TokenType.Operator, c.toString(), makeSourcePosition())
+                        c in setOf('(', ')', '[', ']') -> return Token(TokenType.Operator, c.toString(), makeSourcePosition())
                         c in setOf('+', '-', '*', '/', '%') -> {
                             val position = makeSourcePosition()
                             if (nextChar() == '=') {

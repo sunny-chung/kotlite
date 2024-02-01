@@ -22,7 +22,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
-import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
@@ -38,11 +37,13 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentInfo
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
+import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
@@ -59,8 +60,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
+import com.sunnychung.lib.multiplatform.kotlite.model.SearchFunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.SemanticAnalyzerSymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
@@ -106,6 +109,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             "Null" to TypeNode("Nothing", null, true),
         ) }
         .toMap()
+
+    val supportedOperatorFunctionNames = setOf("get")
 
     init {
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
@@ -209,6 +214,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is ClassParameterNode -> this.visit(modifier = modifier)
             is ClassPrimaryConstructorNode -> this.visit(modifier = modifier)
             is NavigationNode -> this.visit(modifier = modifier)
+            is IndexOpNode -> this.visit(modifier = modifier)
             is PropertyAccessorsNode -> TODO()
             is ValueNode -> {}
             is StringLiteralNode -> {}
@@ -450,7 +456,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         currentScope = currentScope.parentScope!! as SemanticAnalyzerSymbolTable
     }
 
-    fun FunctionDeclarationNode.visit(modifier: Modifier = Modifier()) {
+    fun FunctionDeclarationNode.visit(modifier: Modifier = Modifier(), isClassMemberFunction: Boolean = false) {
         val previousScope = currentScope
         var additionalScopeCount = 0
         var variantsOfThis = mutableListOf<FunctionDeclarationNode>()
@@ -471,6 +477,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             throw SemanticException("Vararg value argument with a default value is not supported")
         }
         this.isVararg = isVararg
+
+        if (modifiers.contains(FunctionModifier.operator)) {
+            if (!isClassMemberFunction && receiver == null) {
+                throw SemanticException("Operator functions are only allowed as a class member or as an extension function")
+            }
+            if (name !in supportedOperatorFunctionNames) {
+                throw SemanticException("`$name` is not a supported operator function name. Supported names are: ${supportedOperatorFunctionNames.joinToString(", ")}")
+            }
+        }
 
         pushScope(
             scopeName = name,
@@ -596,6 +611,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
         }
 
+        if (modifierFilter == null) {
+            modifierFilter = SearchFunctionModifier.NoRestriction
+        }
+
         pushScope("func", ScopeType.Function)
 
         // visit argument must before evaluating type
@@ -613,7 +632,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     currentSymbolTable = currentScope,
                     originalName = function.variableName,
                     receiverType = null,
-                    arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) }
+                    arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
+                    modifierFilter = modifierFilter!!,
                 )
                     .firstOrNull()
                     ?: throw SemanticException("No matching function `${function.variableName}` found")
@@ -672,7 +692,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         currentScope,
                         function.member.name,
                         it,
-                        arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) }
+                        arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
+                        modifierFilter = modifierFilter!!,
                     )
                 }
                     .distinct()
@@ -1108,6 +1129,26 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         throw SemanticException("Type `${subjectType.nameWithNullable}` has no member `$memberName`")
     }
 
+    fun IndexOpNode.visit(modifier: Modifier = Modifier(), isCheckWriteAccess: Boolean = false) {
+//        subject.visit(modifier)
+//        val subjectType = currentScope.assertToDataType(subject.type())
+//        if (subjectType !is ObjectType) {
+//            throw SemanticException("Index operator cannot be applied to type ${subjectType.descriptiveName()}")
+//        }
+//        val expressionTypes = expressions.map {
+//            visit(modifier)
+//            type()
+//        }
+        call = FunctionCallNode(
+            function = NavigationNode(subject, ".", ClassMemberReferenceNode("get")),
+            arguments = arguments.mapIndexed { index, it -> FunctionCallArgumentNode(index = index, value = it) },
+            declaredTypeArguments = emptyList(),
+            position = SourcePosition(1, 1) /* TODO */,
+            modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+        )
+        call!!.visit(modifier)
+    }
+
     fun ClassDeclarationNode.visit(modifier: Modifier = Modifier()) {
         val fullQualifiedClassName = fullQualifiedName
         val classType = TypeNode(
@@ -1234,7 +1275,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
-                    it.visit(modifier = modifier)
+                    it.visit(modifier = modifier, isClassMemberFunction = true)
                 }
         }
         popScope()
@@ -1356,6 +1397,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is FunctionDeclarationNode -> typeRegistry["Unit"]!!
             is FunctionValueParameterNode -> type
             is IfNode -> this.type(modifier = modifier)
+            is IndexOpNode -> this.type(modifier = modifier)
             is NavigationNode -> this.type(modifier = modifier)
             is PropertyAccessorsNode -> this.type
             is PropertyDeclarationNode -> typeRegistry["Unit"]!!
@@ -1426,6 +1468,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 ?: currentScope.findFunctionsByOriginalName(variableName).firstOrNull()?.let { FunctionTypeNode(parameterTypes = null, returnType = null, isNullable = false) }
                 ?: currentScope.getPropertyType(variableName).first.type.toTypeNode()!!
             ).also { type = it }
+
+    fun IndexOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        return call!!.type(modifier = modifier)
+    }
 
     fun NavigationNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier(), lookupType: IdentifierClassifier = IdentifierClassifier.Property): TypeNode {
         type?.let { return it }

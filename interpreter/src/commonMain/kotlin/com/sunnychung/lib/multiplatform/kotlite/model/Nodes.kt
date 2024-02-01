@@ -144,6 +144,13 @@ open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 
+/**
+ * Member names are the exact identifiers in Kotlin code
+ */
+enum class FunctionModifier {
+    operator
+}
+
 enum class FunctionValueParameterModifier {
     vararg
 }
@@ -190,6 +197,7 @@ open class FunctionDeclarationNode(
     override val valueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
     override val typeParameters: List<TypeParameterNode> = emptyList(),
+    val modifiers: Set<FunctionModifier> = emptySet(),
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,
     @ModifyByAnalyzer var isVararg: Boolean = false
@@ -220,6 +228,7 @@ open class FunctionDeclarationNode(
         declaredReturnType: TypeNode? = this.declaredReturnType,
         typeParameters: List<TypeParameterNode> = this.typeParameters,
         valueParameters: List<FunctionValueParameterNode> = this.valueParameters,
+        modifiers: Set<FunctionModifier> = this.modifiers,
         body: BlockNode = this.body,
         transformedRefName: String? = this.transformedRefName,
         inferredReturnType: TypeNode? = this.inferredReturnType,
@@ -233,6 +242,7 @@ open class FunctionDeclarationNode(
             declaredReturnType = declaredReturnType,
             typeParameters = typeParameters,
             valueParameters = valueParameters,
+            modifiers = modifiers,
             body = body,
             transformedRefName = transformedRefName,
             inferredReturnType = inferredReturnType,
@@ -258,6 +268,7 @@ data class FunctionCallNode(
     @ModifyByAnalyzer var functionRefName: String? = null,
     @ModifyByAnalyzer var callableType: CallableType? = null,
     @ModifyByAnalyzer var inferredTypeArguments: List<TypeNode>? = null,
+    @ModifyByAnalyzer var modifierFilter: SearchFunctionModifier? = null,
 ) : ASTNode {
     val typeArguments: List<TypeNode>
         get() = declaredTypeArguments.emptyToNull() ?: inferredTypeArguments ?: emptyList()
@@ -480,3 +491,15 @@ class TypeParameterNode(val name: String, val typeUpperBound: TypeNode?): ASTNod
         (typeUpperBound?.let { "--type upper bound -->${it.toMermaid()}" } ?: "")
 }
 fun TypeParameterNode.typeUpperBoundOrAny() = typeUpperBound ?: TypeNode("Any", null, true)
+
+class IndexOpNode(val subject: ASTNode, val arguments: List<ASTNode>): ASTNode {
+    @ModifyByAnalyzer var call: FunctionCallNode? = null
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Index Op Node\"]"
+        return "$self-- subject -->${subject.toMermaid()}\n" +
+                arguments.mapIndexed { index, it ->
+                    "$self-- argument[$index] -->${it.toMermaid()}"
+                }.joinToString("\n")
+    }
+}

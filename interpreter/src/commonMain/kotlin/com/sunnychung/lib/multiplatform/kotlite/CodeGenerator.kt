@@ -21,6 +21,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
+import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
@@ -93,6 +94,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is StringNode -> this.generate()
             is LambdaLiteralNode -> this.generate()
             is AsOpNode -> this.generate()
+            is IndexOpNode -> this.generate()
         }
 
     protected fun AssignmentNode.generate()
@@ -147,7 +149,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "${function.generate()}${debug("<f:$functionRefName>")}${if (typeArguments.isNotEmpty()) "<${typeArguments.joinToString(", ") { it.descriptiveName() }}>" else ""}(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
-        = "fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
+        = "${modifiers.joinToString("") { "$it " }}fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
 
     protected fun FunctionValueParameterNode.generate()
         = "$name<$transformedRefName>: ${type.generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"
@@ -216,5 +218,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             "${indent()}}"
 
     protected fun AsOpNode.generate() = "(${expression.generate()} as${if (isNullable) "?" else ""} ${type.generate()})"
+
+    protected fun IndexOpNode.generate() = "${subject.generate()}[${arguments.joinToString(", ") { it.generate() }}]"
 
 }

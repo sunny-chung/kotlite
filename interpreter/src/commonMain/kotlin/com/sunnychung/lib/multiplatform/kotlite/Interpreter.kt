@@ -45,6 +45,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
+import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
@@ -136,6 +137,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is CharNode -> this.eval()
             is AsOpNode -> this.eval()
             is TypeParameterNode -> TODO()
+            is IndexOpNode -> this.eval()
         }
     }
 
@@ -928,6 +930,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             } // TODO remove */
             else -> throw UnsupportedOperationException()
         }
+    }
+
+    fun IndexOpNode.eval(): RuntimeValue {
+        return call!!.eval()
     }
 
     fun AsOpNode.eval(): RuntimeValue {

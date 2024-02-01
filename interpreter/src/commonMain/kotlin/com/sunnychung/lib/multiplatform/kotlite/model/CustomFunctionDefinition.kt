@@ -10,6 +10,7 @@ data class CustomFunctionDefinition(
      * List of arguments, which each is a pair of parameter name and data type.
      */
     val parameterTypes: List<CustomFunctionParameter>,
+    val modifiers: Set<FunctionModifier> = emptySet(),
 
     val executable: (receiver: RuntimeValue?, args: List<RuntimeValue>, typeArgs: Map<String, DataType>) -> RuntimeValue,
 )

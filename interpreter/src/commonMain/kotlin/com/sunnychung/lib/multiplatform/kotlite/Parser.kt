@@ -25,10 +25,12 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
+import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
@@ -300,6 +302,43 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * indexingSuffix:
+     *     '['
+     *     {NL}
+     *     expression
+     *     {{NL} ',' {NL} expression}
+     *     [{NL} ',']
+     *     {NL}
+     *     ']'
+     */
+    fun indexingSuffix(subject: ASTNode): IndexOpNode {
+        val expressions = mutableListOf<ASTNode>()
+        var hasEatenComma = false
+        eat(TokenType.Operator, "[")
+        repeatedNL()
+        expressions += expression()
+        repeatedNL()
+        if (isCurrentToken(TokenType.Symbol, ",")) {
+            eat(TokenType.Symbol, ",")
+            hasEatenComma = true
+            repeatedNL()
+        }
+        while (!isCurrentToken(TokenType.Operator, "]")) {
+            if (!hasEatenComma) throw ExpectTokenMismatchException(", ", currentToken.position)
+            expressions += expression()
+            hasEatenComma = false
+            repeatedNL()
+            if (isCurrentToken(TokenType.Symbol, ",")) {
+                eat(TokenType.Symbol, ",")
+                hasEatenComma = true
+                repeatedNL()
+            }
+        }
+        eat(TokenType.Operator, "]")
+        return IndexOpNode(subject = subject, arguments = expressions)
+    }
+
+    /**
      * postfixUnarySuffix:
      *     postfixUnaryOperator
      *     | typeArguments
@@ -315,6 +354,7 @@ class Parser(protected val lexer: Lexer) {
             } catch (_: ParseException) {
                 resetTokenToIndex(originalTokenIndex)
             }
+            "[" -> return indexingSuffix(subject)
             "++", "--" -> { eat(TokenType.Operator, op); return UnaryOpNode(subject, "post$op") }
             "!" -> { // this rule prevents conflict with consecutive boolean "Not" operators
                 val nextToken = peekNextToken()
@@ -1477,8 +1517,17 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun functionDeclaration(isProcessBody: Boolean = true): FunctionDeclarationNode {
+        val modifiers = mutableSetOf<FunctionModifier>()
         eat(TokenType.Identifier).also {
-            if (it.value !in setOf("fun")) throw UnexpectedTokenException(it)
+            when (it.value) {
+                "operator" -> {
+                    modifiers += FunctionModifier.operator
+                    repeatedNL()
+                    eat(TokenType.Identifier, "fun")
+                }
+                "fun" -> { /* do nothing */ }
+                else -> throw UnexpectedTokenException(it)
+            }
         }
         repeatedNL()
         val typeParameters = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
@@ -1505,6 +1554,7 @@ class Parser(protected val lexer: Lexer) {
                 valueParameters = valueParameters,
                 body = dummyBlockNode(),
                 typeParameters = typeParameters,
+                modifiers = modifiers,
             )
         }
         val body = functionBody()
@@ -1515,6 +1565,7 @@ class Parser(protected val lexer: Lexer) {
             valueParameters = valueParameters,
             body = body,
             typeParameters = typeParameters,
+            modifiers = modifiers,
         )
     }
 
@@ -1709,7 +1760,7 @@ class Parser(protected val lexer: Lexer) {
         }
         when (currentToken.value as String) {
             "val", "var" -> return propertyDeclaration()
-            "fun" -> return functionDeclaration()
+            "fun", "operator" -> return functionDeclaration()
             "class" -> return classDeclaration()
         }
         throw UnexpectedTokenException(currentToken)

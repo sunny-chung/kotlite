@@ -34,7 +34,7 @@ class SemanticAnalyzerSymbolTable(
     }
 
     // only use in semantic analyzer
-    private fun findAllMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverClass: ClassDefinition?, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>): List<FindCallableResult> {
+    private fun findAllMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverClass: ClassDefinition?, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>, modifierFilter: SearchFunctionModifier): List<FindCallableResult> {
         var thisScopeCandidates = mutableListOf<FindCallableResult>()
         if (receiverClass == null) {
             findFunctionsByOriginalName(originalName, isThisScopeOnly = true).map {
@@ -115,64 +115,78 @@ class SemanticAnalyzerSymbolTable(
                 )
             }.let { thisScopeCandidates += it }
         }
-        thisScopeCandidates = thisScopeCandidates.filter { callable ->
-            if (callable.isVararg) {
-                val functionArgType = currentSymbolTable.typeNodeToDataType(
-                    (callable.arguments.first() as FunctionValueParameterNode).type.resolveGenericParameterTypeToUpperBound(
-                        callable.typeParameters + (receiverClass?.typeParameters ?: emptyList())
-                    )
-                )!!
-                return@filter arguments.all { functionArgType.isConvertibleFrom(it.type) }
-            }
+        thisScopeCandidates = thisScopeCandidates
+            .filter { callable ->
+                when (modifierFilter) {
+                    SearchFunctionModifier.OperatorFunctionOnly -> {
+                        if (callable.definition is FunctionDeclarationNode) {
+                            callable.definition.modifiers.contains(FunctionModifier.operator)
+                        } else {
+                            false
+                        }
+                    }
 
-            if (callable.arguments.isEmpty()) {
-                return@filter arguments.isEmpty()
-            }
-            when (callable.arguments.first()) {
-                is DataType /* is a lambda */ -> return@filter arguments.size == callable.arguments.size &&
-                        arguments.all { it.name == null } &&
-                        callable.arguments.foldIndexed(true) { i, acc, it -> acc && (it as DataType).isAssignableFrom(arguments[i].type) }
-                is FunctionValueParameterNode -> {
-                    if (arguments.size > callable.arguments.size) return@filter false
-                    val argumentsReordered = arrayOfNulls<FunctionCallArgumentInfo>(callable.arguments.size)
-                    val typeParameterMapping = mutableMapOf<String, DataType>()
-                    arguments.forEachIndexed { i, arg ->
-                        val newIndex = if (arg.name == null) {
-                            if (i == arguments.lastIndex && arg.type is FunctionType) {
-                                callable.arguments.lastIndex
-                            } else {
-                                i
-                            }
-                        } else {
-                            val findIndex = callable.arguments.indexOfFirst { (it as FunctionValueParameterNode).name == arg.name }
-                            if (findIndex < 0) {
-                                return@filter false
-                            }
-                            findIndex
-                        }
-                        argumentsReordered[newIndex] = arg
-                    }
-                    callable.arguments.foldIndexed(true) { i, acc, it ->
-                        val functionArg = it as FunctionValueParameterNode
-                        val callArg = argumentsReordered[i]
-                        acc && if (callArg == null) {
-                            functionArg.defaultValue != null
-                        } else {
-                            currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) ))!!.isConvertibleFrom(callArg.type)
-                            // TODO filter whether same type parameter always map to same argument
-                        }
-                    }
+                    SearchFunctionModifier.NoRestriction -> true
                 }
-                else -> throw UnsupportedOperationException()
             }
-        }.toMutableList()
-        return thisScopeCandidates + ((parentScope as? SemanticAnalyzerSymbolTable)?.findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments) ?: emptyList())
+            .filter { callable ->
+                if (callable.isVararg) {
+                    val functionArgType = currentSymbolTable.typeNodeToDataType(
+                        (callable.arguments.first() as FunctionValueParameterNode).type.resolveGenericParameterTypeToUpperBound(
+                            callable.typeParameters + (receiverClass?.typeParameters ?: emptyList())
+                        )
+                    )!!
+                    return@filter arguments.all { functionArgType.isConvertibleFrom(it.type) }
+                }
+
+                if (callable.arguments.isEmpty()) {
+                    return@filter arguments.isEmpty()
+                }
+                when (callable.arguments.first()) {
+                    is DataType /* is a lambda */ -> return@filter arguments.size == callable.arguments.size &&
+                            arguments.all { it.name == null } &&
+                            callable.arguments.foldIndexed(true) { i, acc, it -> acc && (it as DataType).isAssignableFrom(arguments[i].type) }
+                    is FunctionValueParameterNode -> {
+                        if (arguments.size > callable.arguments.size) return@filter false
+                        val argumentsReordered = arrayOfNulls<FunctionCallArgumentInfo>(callable.arguments.size)
+                        val typeParameterMapping = mutableMapOf<String, DataType>()
+                        arguments.forEachIndexed { i, arg ->
+                            val newIndex = if (arg.name == null) {
+                                if (i == arguments.lastIndex && arg.type is FunctionType) {
+                                    callable.arguments.lastIndex
+                                } else {
+                                    i
+                                }
+                            } else {
+                                val findIndex = callable.arguments.indexOfFirst { (it as FunctionValueParameterNode).name == arg.name }
+                                if (findIndex < 0) {
+                                    return@filter false
+                                }
+                                findIndex
+                            }
+                            argumentsReordered[newIndex] = arg
+                        }
+                        callable.arguments.foldIndexed(true) { i, acc, it ->
+                            val functionArg = it as FunctionValueParameterNode
+                            val callArg = argumentsReordered[i]
+                            acc && if (callArg == null) {
+                                functionArg.defaultValue != null
+                            } else {
+                                currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) ))!!.isConvertibleFrom(callArg.type)
+                                // TODO filter whether same type parameter always map to same argument
+                            }
+                        }
+                    }
+                    else -> throw UnsupportedOperationException()
+                }
+            }.toMutableList()
+        return thisScopeCandidates + ((parentScope as? SemanticAnalyzerSymbolTable)?.findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter) ?: emptyList())
     }
 
     // only use in semantic analyzer
-    fun findMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>): List<FindCallableResult> {
+    fun findMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>, modifierFilter: SearchFunctionModifier): List<FindCallableResult> {
         val receiverClass = receiverType?.let { (findClass(it.nameWithNullable) ?: throw RuntimeException("Class ${it.nameWithNullable} not found")).first }
-        return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments)
+        return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter)
             .also { log.v { "Matching functions:\n${it.joinToString("\n")}" } }
             .firstOrNull()?.let { listOf(it) }
             ?: emptyList()
@@ -247,4 +261,9 @@ fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable
             }
         }
     }
+}
+
+enum class SearchFunctionModifier {
+    OperatorFunctionOnly,
+    NoRestriction,
 }
