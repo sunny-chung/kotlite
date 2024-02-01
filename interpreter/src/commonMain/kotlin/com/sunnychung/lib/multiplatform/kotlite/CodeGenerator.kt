@@ -152,7 +152,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "${modifiers.joinToString("") { "$it " }}fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
 
     protected fun FunctionValueParameterNode.generate()
-        = "$name<$transformedRefName>: ${type.generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"
+        = "${modifiers.joinToString("") { "$it " }}$name<$transformedRefName>: ${type.generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"
 
     protected fun IfNode.generate()
         = "if (${condition.generate()}) ${trueBlock?.let { it.generate() } ?: ";"}${falseBlock?.let { " else ${it.generate()}" } ?: ""}"
