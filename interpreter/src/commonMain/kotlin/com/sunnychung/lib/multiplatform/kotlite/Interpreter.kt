@@ -324,7 +324,13 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         val result = value.eval() as RuntimeValue
 
         val read = { subject.eval() as RuntimeValue }
-        val write = { value: RuntimeValue -> subject.write(value) }
+        val write = { value: RuntimeValue ->
+            if (functionCall != null) {
+                functionCall!!.eval()
+            } else {
+                subject.write(value)
+            }
+        }
 
         val finalResult = if (operator == "=") {
             result as RuntimeValue
@@ -933,7 +939,11 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun IndexOpNode.eval(): RuntimeValue {
-        return call!!.eval()
+        if (hasFunctionCall == true) {
+            return call!!.eval()
+        } else {
+            return subject.eval() as RuntimeValue
+        }
     }
 
     fun AsOpNode.eval(): RuntimeValue {

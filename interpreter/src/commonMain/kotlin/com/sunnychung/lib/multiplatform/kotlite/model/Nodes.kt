@@ -133,6 +133,8 @@ data class PropertyDeclarationNode(
 }
 
 data class AssignmentNode(val subject: ASTNode, val operator: String, val value: ASTNode, @ModifyByAnalyzer @Deprecated("To be removed") var transformedRefName: String? = null) : ASTNode {
+    @ModifyByAnalyzer var functionCall: FunctionCallNode? = null
+
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Assignment Node `$operator`\"]"
         return "$self-- subject -->${subject.toMermaid()}\n" +
@@ -493,6 +495,7 @@ class TypeParameterNode(val name: String, val typeUpperBound: TypeNode?): ASTNod
 fun TypeParameterNode.typeUpperBoundOrAny() = typeUpperBound ?: TypeNode("Any", null, true)
 
 class IndexOpNode(val subject: ASTNode, val arguments: List<ASTNode>): ASTNode {
+    @ModifyByAnalyzer var hasFunctionCall: Boolean? = null
     @ModifyByAnalyzer var call: FunctionCallNode? = null
 
     override fun toMermaid(): String {

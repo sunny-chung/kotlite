@@ -125,4 +125,46 @@ class OperatorFunctionTest {
         assertEquals((3..6).sum(), (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals((12..18).sum(), (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun indexAssignment() {
+        val interpreter = interpreter("""
+            var calls = 0
+            class MyPair<T>(var first: T, var second: T) {
+                operator fun get(index: Int): T {
+                    return if (index == 0) {
+                        first
+                    } else if (index == 1) {
+                        second
+                    } else {
+                        first // TODO: throw exception
+                    }
+                }
+                operator fun set(index: Int, newValue: T) {
+                    ++calls
+                    if (index == 0) {
+                        first = newValue
+                    } else {
+                        second = newValue
+                    }
+                }
+            }
+            val x = MyPair(123, 45)
+            val a = x[0]
+            val b = x[1]
+            x[0] = 67
+            x[1] = 890
+            val c = x[0]
+            val d = x[1]
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(67, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(890, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("calls") as IntValue).value)
+    }
 }

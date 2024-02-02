@@ -110,7 +110,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         ) }
         .toMap()
 
-    val supportedOperatorFunctionNames = setOf("get")
+    val supportedOperatorFunctionNames = setOf("get", "set")
 
     init {
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
@@ -290,7 +290,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun AssignmentNode.visit(modifier: Modifier = Modifier()) {
-        if (subject !is VariableReferenceNode && subject !is NavigationNode) {
+        if (subject !is VariableReferenceNode && subject !is NavigationNode && subject !is IndexOpNode) {
             throw SemanticException("$subject cannot be assigned")
         }
         when (subject) {
@@ -309,6 +309,22 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 // TODO handle NavigationNode
 
 //                log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
+            }
+            is IndexOpNode -> {
+                subject.visit(modifier = modifier, isWriteOnly = operator == "=")
+                functionCall = FunctionCallNode(
+                    /**
+                     * e.g. `x[0] = v`, subject == x[0], subject.subject == x
+                     */
+                    function = NavigationNode(subject.subject, ".", ClassMemberReferenceNode("set")),
+                    arguments = subject.arguments.mapIndexed { index, it ->
+                        FunctionCallArgumentNode(index = index, value = it)
+                    } + listOf(FunctionCallArgumentNode(index = subject.arguments.size, value = value)),
+                    declaredTypeArguments = emptyList(),
+                    position = SourcePosition(1, 1) /* TODO */,
+                    modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+                )
+                functionCall!!.visit(modifier)
             }
             else -> throw SemanticException("$subject cannot be assigned")
         }
@@ -1129,24 +1145,28 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         throw SemanticException("Type `${subjectType.nameWithNullable}` has no member `$memberName`")
     }
 
-    fun IndexOpNode.visit(modifier: Modifier = Modifier(), isCheckWriteAccess: Boolean = false) {
-//        subject.visit(modifier)
-//        val subjectType = currentScope.assertToDataType(subject.type())
-//        if (subjectType !is ObjectType) {
-//            throw SemanticException("Index operator cannot be applied to type ${subjectType.descriptiveName()}")
-//        }
-//        val expressionTypes = expressions.map {
-//            visit(modifier)
-//            type()
-//        }
-        call = FunctionCallNode(
-            function = NavigationNode(subject, ".", ClassMemberReferenceNode("get")),
-            arguments = arguments.mapIndexed { index, it -> FunctionCallArgumentNode(index = index, value = it) },
-            declaredTypeArguments = emptyList(),
-            position = SourcePosition(1, 1) /* TODO */,
-            modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
-        )
-        call!!.visit(modifier)
+    fun IndexOpNode.visit(modifier: Modifier = Modifier(), isWriteOnly: Boolean = false) {
+        if (hasFunctionCall != null) {
+            return
+        }
+        if (isWriteOnly) {
+            subject.visit(modifier)
+            arguments.forEach {
+                visit(modifier)
+                type()
+            }
+            hasFunctionCall = false
+        } else {
+            hasFunctionCall = true
+            call = FunctionCallNode(
+                function = NavigationNode(subject, ".", ClassMemberReferenceNode("get")),
+                arguments = arguments.mapIndexed { index, it -> FunctionCallArgumentNode(index = index, value = it) },
+                declaredTypeArguments = emptyList(),
+                position = SourcePosition(1, 1) /* TODO */,
+                modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+            )
+            call!!.visit(modifier)
+        }
     }
 
     fun ClassDeclarationNode.visit(modifier: Modifier = Modifier()) {
@@ -1233,7 +1253,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                             declarations.filterIsInstance<PropertyDeclarationNode>()),
                     memberFunctions = declarations
                         .filterIsInstance<FunctionDeclarationNode>()
-                        .associateBy { it.toSignature(currentScope.parentScope as SemanticAnalyzerSymbolTable) },
+                        .associateBy { it.toSignature(currentScope as SemanticAnalyzerSymbolTable) },
                     orderedInitializersAndPropertyDeclarations = declarations
                         .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
                 )
