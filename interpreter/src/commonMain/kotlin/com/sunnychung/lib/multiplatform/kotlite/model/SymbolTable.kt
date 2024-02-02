@@ -412,6 +412,10 @@ open class SymbolTable(
         }
     }
 
+    fun listTypeAliasInAllScopes(): List<TypeParameterNode> {
+        return listTypeAliasInThisScope() + (parentScope?.listTypeAliasInAllScopes() ?: emptyList())
+    }
+
     fun listTypeAliasResolutionInThisScope(): Map<String, DataType> {
         return typeAliasResolution
     }

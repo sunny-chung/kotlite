@@ -251,7 +251,8 @@ class SemanticAnalyzerSymbolTable(
 
 fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable): String {
     with (symbolTable) {
-        val typeParameters = typeParameters.associateBy { it.name }
+        val typeParameters = (symbolTable.listTypeAliasInAllScopes() + typeParameters /* typeParameters has higher precedence */)
+            .associateBy { it.name }
         return (receiver?.let { "${it.descriptiveName()}/" } ?: "") + name + "//" + valueParameters.joinToString("/") {
             if (typeParameters.containsKey(it.type.name)) {
                 val typeUpperBound = typeParameters[it.type.name]!!.typeUpperBound
