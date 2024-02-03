@@ -326,7 +326,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         val read = { subject.eval() as RuntimeValue }
         val write = { value: RuntimeValue ->
             if (functionCall != null) {
-                functionCall!!.eval()
+                // TODO any less "hacky" way to implement?
+                functionCall!!.eval(replaceArguments = mapOf(functionCall!!.arguments.lastIndex to value))
             } else {
                 subject.write(value)
             }
@@ -386,7 +387,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         }
     }
 
-    fun FunctionCallNode.eval(): RuntimeValue {
+    fun FunctionCallNode.eval(replaceArguments: Map<Int, RuntimeValue> = emptyMap()): RuntimeValue {
         // TODO move to semantic analyzer
         when (function) {
             is VariableReferenceNode -> {
@@ -407,19 +408,19 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     CallableType.Function -> {
                         val functionNode = callStack.currentSymbolTable().findFunction(functionRefName!!)?.first
                         if (functionNode != null) {
-                            return evalFunctionCall(functionNode)
+                            return evalFunctionCall(functionNode, replaceArguments = replaceArguments)
                         }
                     }
                     CallableType.Constructor -> {
                         val classDefinition = callStack.currentSymbolTable().findClass(functionRefName!!)?.first
                         if (classDefinition != null) {
-                            return evalCreateClassInstance(classDefinition, typeArguments)
+                            return evalCreateClassInstance(classDefinition, typeArguments, replaceArguments = replaceArguments)
                         }
                     }
                     CallableType.Property -> {
                         val variable = callStack.currentSymbolTable().read(functionRefName!!)
                         if (variable is LambdaValue) {
-                            return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs)
+                            return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs, replaceArguments = replaceArguments)
                         }
                     }
                     else -> {}
@@ -442,7 +443,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                             throw EvaluateNullPointerException()
                         }
                         (subject as? ClassInstance)?.clazz?.memberFunctions?.get(functionRefName)?.let { function ->
-                            return evalClassMemberAnyFunctionCall(subject, function)
+                            return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
                         }
                     }
                     CallableType.ExtensionFunction -> {
@@ -451,7 +452,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         if (subject == NullValue && !function.receiver!!.isNullable) {
                             throw EvaluateNullPointerException()
                         }
-                        return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function)
+                        return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function, replaceArguments = replaceArguments)
                     }
                     else -> {}
                 }
@@ -461,7 +462,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             else -> {
                 val variable = function.eval() as? RuntimeValue
                 if (variable is LambdaValue) {
-                    return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs)
+                    return evalFunctionCall(variable.value, extraSymbols = variable.symbolRefs, replaceArguments = replaceArguments)
                 } else {
                     throw RuntimeException("${variable?.type()} is not callable")
                 }
@@ -469,19 +470,29 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         }
     }
 
-    fun FunctionCallNode.evalFunctionCall(functionNode: CallableNode, extraSymbols: SymbolTable? = null): RuntimeValue {
-        return evalFunctionCall(this, functionNode, emptyMap(), emptyList(), extraSymbols).result
+    fun FunctionCallNode.evalFunctionCall(functionNode: CallableNode, extraSymbols: SymbolTable? = null, replaceArguments: Map<Int, RuntimeValue> = emptyMap()): RuntimeValue {
+        return evalFunctionCall(this, functionNode, emptyMap(), emptyList(), extraSymbols, replaceArguments).result
     }
 
-    fun evalFunctionCall(callNode: FunctionCallNode, functionNode: CallableNode, extraScopeParameters: Map<String, RuntimeValue>, extraTypeResolutions: List<TypeParameterNode>, extraSymbols: SymbolTable? = null, subject: RuntimeValue? = null): FunctionCallResult {
+    fun evalFunctionCall(
+        callNode: FunctionCallNode,
+        functionNode: CallableNode,
+        extraScopeParameters: Map<String, RuntimeValue>,
+        extraTypeResolutions: List<TypeParameterNode>,
+        extraSymbols: SymbolTable? = null,
+        replaceArguments: Map<Int, RuntimeValue> = emptyMap(),
+        subject: RuntimeValue? = null,
+    ): FunctionCallResult {
         // TODO optimize to remove most loops
-        val isVararg = functionNode.valueParameters.firstOrNull()?.modifiers?.contains(FunctionValueParameterModifier.vararg) ?: false
+        val isVararg =
+            functionNode.valueParameters.firstOrNull()?.modifiers?.contains(FunctionValueParameterModifier.vararg)
+                ?: false
         val callArguments = if (isVararg) {
             callNode.arguments.map { a -> a.value.eval() as RuntimeValue? }.toTypedArray()
         } else {
             val callArguments = arrayOfNulls<RuntimeValue>(functionNode.valueParameters.size)
             callNode.arguments.forEachIndexed { i, a ->
-                val value = a.value.eval() as RuntimeValue
+                val value = replaceArguments[i] ?: a.value.eval() as RuntimeValue
                 val index = if (a.name != null) {
                     functionNode.valueParameters.indexOfFirst { it.name == a.name }
                 } else if (i == callNode.arguments.lastIndex && value is LambdaValue) {
@@ -495,7 +506,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             callArguments
         }
 
-        return evalFunctionCall(callArguments, callNode.typeArguments.toTypedArray(), callNode.position, functionNode, extraScopeParameters, extraTypeResolutions, extraSymbols, subject)
+        return evalFunctionCall(callArguments, callNode.typeArguments.toTypedArray(), callNode.position, functionNode, extraScopeParameters, extraTypeResolutions, extraSymbols, replaceArguments, subject)
     }
 
     fun evalFunctionCall(
@@ -506,6 +517,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         extraScopeParameters: Map<String, RuntimeValue>,
         extraTypeResolutions: List<TypeParameterNode>,
         extraSymbols: SymbolTable? = null,
+        replaceArguments: Map<Int, RuntimeValue> = emptyMap(),
         subject: RuntimeValue? = null
     ): FunctionCallResult {
         val isVararg = functionNode.valueParameters.firstOrNull()?.modifiers?.contains(FunctionValueParameterModifier.vararg) ?: false
@@ -516,7 +528,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         if (!isVararg) {
             arguments.forEachIndexed { index, it ->
                 val parameterNode = functionNode.valueParameters[index]
-                if (it == null && parameterNode.defaultValue == null) {
+                if (replaceArguments[index] == null && it == null && parameterNode.defaultValue == null) {
                     throw RuntimeException("Missing parameter `${parameterNode.name} in function call ${functionNode.name}`")
                 }
             }
@@ -577,7 +589,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     symbolTable.declareProperty(it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
                         it.transformedRefName!!,
-                        arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue).also { arguments[index] = it }
+                        replaceArguments[index] ?: arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue)
+                            .also { arguments[index] = it }
                     )
                 }
             }
@@ -611,7 +624,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         }
     }
 
-    fun FunctionCallNode.evalCreateClassInstance(clazz: ClassDefinition, typeArguments: List<TypeNode>): ClassInstance {
+    fun FunctionCallNode.evalCreateClassInstance(clazz: ClassDefinition, typeArguments: List<TypeNode>, replaceArguments: Map<Int, RuntimeValue> = emptyMap()): ClassInstance {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassInitializer, callPosition = this.position)
         try {
             // TODO generalize duplicated code
@@ -624,7 +637,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     a.index
                 }
                 if (index < 0) throw RuntimeException("Named argument `${a.name}` could not be found.")
-                callArguments[index] = a.value.eval() as RuntimeValue
+                callArguments[index] = replaceArguments[index] ?: a.value.eval() as RuntimeValue
             }
             callArguments.forEachIndexed { index, it ->
                 val parameterNode = parameters[index].parameter
@@ -751,7 +764,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //        return evalClassMemberAnyFunctionCall(subject, function)
 //    }
 
-    fun FunctionCallNode.evalClassMemberAnyFunctionCall(subject: RuntimeValue, function: FunctionDeclarationNode): RuntimeValue {
+    fun FunctionCallNode.evalClassMemberAnyFunctionCall(subject: RuntimeValue, function: FunctionDeclarationNode, replaceArguments: Map<Int, RuntimeValue> = emptyMap()): RuntimeValue {
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
@@ -784,6 +797,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 functionNode = function,
                 extraScopeParameters = emptyMap(),
                 extraTypeResolutions = instanceGenericTypeResolutions /* type arguments */,
+                replaceArguments = replaceArguments,
                 subject = subject,
             )
 
