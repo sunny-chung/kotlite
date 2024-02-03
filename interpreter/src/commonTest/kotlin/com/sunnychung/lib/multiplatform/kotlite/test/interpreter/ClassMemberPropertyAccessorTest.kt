@@ -99,12 +99,12 @@ class ClassMemberPropertyAccessorTest {
             var a: Int = -10
             class MyCls {
                 var a: Int = 1
+                var c: Int = 2
                 var b: Int
                     set(value) {
                         a += value
                         this.c = value
                     }
-                var c: Int = 2
             }
             val o: MyCls = MyCls()
             val x: Int = o.a

@@ -27,40 +27,40 @@ open class ClassDefinition(
 ) {
     // key = original name
     // does not include properties with custom accessors
-    val memberProperties: Map<String, PropertyType> = rawMemberProperties
-        .filter { it.accessors == null }
-        .associate {
-            it.name to (currentScope!!.typeNodeToPropertyType(
-                it.type,
-                it.isMutable
-            ) ?: if (it.type.name == name) {
-                PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
-            } else throw RuntimeException("Unknown type ${it.type.name}"))
-        }
+    val memberProperties: Map<String, PropertyType> = mutableMapOf()
     // key = original name
-    val memberPropertyTypes: Map<String, PropertyType> = rawMemberProperties
-        .associate {
-            it.name to (currentScope!!.typeNodeToPropertyType(
-                it.type,
-                it.isMutable
-            ) ?: if (it.type.name == name) {
-                PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
-            } else throw RuntimeException("Unknown type ${it.type.name}"))
-        }
+    val memberPropertyTypes: Map<String, PropertyType> = mutableMapOf()
     // key = original name
-    val memberPropertyCustomAccessors: Map<String, PropertyAccessorsNode> = rawMemberProperties
-        .filter { it.accessors != null }
-        .associate {
-            it.name to it.accessors!!
+    val memberPropertyCustomAccessors: Map<String, PropertyAccessorsNode> = mutableMapOf()
+    val memberTransformedNameToPropertyName: Map<String, String> = mutableMapOf()
+    val memberPropertyNameToTransformedName: Map<String, String> = mutableMapOf()
+
+    init {
+        rawMemberProperties.forEach { addProperty(currentScope, it) }
+    }
+
+    /**
+     * Only for SemanticAnalyzer use during parsing class declarations.
+     */
+    internal fun addProperty(currentScope: SymbolTable?, it: PropertyDeclarationNode) {
+        val type = (currentScope!!.typeNodeToPropertyType(
+            it.type,
+            it.isMutable
+        ) ?: if (it.type.name == name) {
+            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
+        } else throw RuntimeException("Unknown type ${it.type.name}"))
+        (memberPropertyTypes as MutableMap)[it.name] = type
+        if (it.accessors == null) {
+            (memberProperties as MutableMap)[it.name] = type
+        } else {
+            (memberPropertyCustomAccessors as MutableMap)[it.name] = it.accessors
         }
-    val memberTransformedNameToPropertyName: Map<String, String> = rawMemberProperties
-        .filter { it.transformedRefName != null }
-        .associate {
-            it.transformedRefName!! to it.name
+
+        if (it.transformedRefName != null) {
+            (memberTransformedNameToPropertyName as MutableMap)[it.transformedRefName!!] = it.name
+            (memberPropertyNameToTransformedName as MutableMap)[it.name] = it.transformedRefName!!
         }
-    val memberPropertyNameToTransformedName: Map<String, String> = rawMemberProperties
-        .filter { it.transformedRefName != null }
-        .associate { it.name to it.transformedRefName!! }
+    }
 
     fun findMemberFunctionsByDeclaredName(declaredName: String) =
         memberFunctions.filter { it.value.name == declaredName }

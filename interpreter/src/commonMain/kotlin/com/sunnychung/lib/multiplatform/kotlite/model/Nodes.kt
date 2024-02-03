@@ -121,7 +121,7 @@ data class PropertyDeclarationNode(
     @ModifyByAnalyzer var inferredType: TypeNode? = null,
 ) : ASTNode {
     val type: TypeNode
-        get() = declaredType ?: inferredType ?: throw SemanticException("Could not infer type")
+        get() = declaredType ?: inferredType ?: throw SemanticException("Could not infer type for property `$name`")
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self\n" +
