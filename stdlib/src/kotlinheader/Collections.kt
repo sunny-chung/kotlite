@@ -2,6 +2,10 @@ val <T> List<T>.size: Int
     get()
 val <T> List<T>.lastIndex: Int
     get()
+val <T> MutableList<T>.size: Int
+    get()
+val <T> MutableList<T>.lastIndex: Int
+    get()
 
 fun <T> listOf(vararg elements: T): List<T>
 fun <T> mutableListOf(vararg elements: T): MutableList<T>
@@ -77,7 +81,8 @@ fun <T, R> List<T>.foldRightIndexed(
 ): R
 fun <T> List<T>.forEach(action: (T) -> Unit)
 fun <T> List<T>.forEachIndexed(action: (index: Int, T) -> Unit)
-fun <T> List<T>.get(index: Int): T
+operator fun <T> List<T>.get(index: Int): T
+operator fun <T> MutableList<T>.get(index: Int): T
 fun <T> List<T>.getOrElse(
     index: Int,
     defaultValue: (Int) -> T
@@ -104,6 +109,7 @@ fun <T> List<T>.lastIndexOf(element: T): Int
 fun <T> List<T>.lastOrNull(): T?
 fun <T> List<T>.lastOrNull(predicate: (T) -> Boolean): T?
 fun <T, R> List<T>.map(transform: (T) -> R): List<R>
+fun <T, R> MutableList<T>.map(transform: (T) -> R): List<R>
 fun <T, R> List<T>.mapIndexed(transform: (index: Int, T) -> R): List<R>
 fun <T, R : Any> List<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
 fun <T, R : Any> List<T>.mapNotNull(transform: (T) -> R?): List<R>
@@ -130,6 +136,7 @@ fun <T> MutableList<T>.removeLastOrNull(): T?
 fun <T> MutableList<T>.retainAll(predicate: (T) -> Boolean): Boolean
 fun <T> MutableList<T>.reverse()
 fun <T> List<T>.reversed(): List<T>
+operator fun <T> MutableList<T>.set(index: Int, element: T): T
 fun <T> MutableList<T>.shuffle()
 fun <T> List<T>.shuffled(): List<T>
 fun <T> List<T>.single(): T

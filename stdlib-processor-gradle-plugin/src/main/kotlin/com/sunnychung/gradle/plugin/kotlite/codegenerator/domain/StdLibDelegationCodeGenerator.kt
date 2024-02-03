@@ -46,6 +46,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
@@ -111,6 +112,9 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     typeParameters = ${if (typeParameters.isEmpty()) "emptyList()" else "listOf(${typeParameters.joinToString("") {
         "\n${it.generate(indent(8))}," }
     }\n${indent(4)})"},
+    modifiers = setOf<FunctionModifier>(${modifiers.joinToString(", ") {
+        "FunctionModifier.${it.name}" }
+    }),
     executable = { receiver, args, typeArgs ->
         ${
             if (receiver != null && !receiver!!.name.endsWith(".Companion")) {
