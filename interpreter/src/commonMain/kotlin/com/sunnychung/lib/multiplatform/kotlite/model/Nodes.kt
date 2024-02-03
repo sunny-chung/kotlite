@@ -497,6 +497,7 @@ fun TypeParameterNode.typeUpperBoundOrAny() = typeUpperBound ?: TypeNode("Any", 
 class IndexOpNode(val subject: ASTNode, val arguments: List<ASTNode>): ASTNode {
     @ModifyByAnalyzer var hasFunctionCall: Boolean? = null
     @ModifyByAnalyzer var call: FunctionCallNode? = null
+    @ModifyByAnalyzer var type: TypeNode? = null
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Index Op Node\"]"

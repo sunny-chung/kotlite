@@ -1030,6 +1030,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     fun ASTNode.declaredType(): DataType = when (this) {
         is NavigationNode -> this.declaredType()
         is VariableReferenceNode -> this.declaredType()
+        is IndexOpNode -> this.declaredType()
         else -> throw UnsupportedOperationException()
     }
 
@@ -1040,6 +1041,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun VariableReferenceNode.declaredType(): DataType {
         return callStack.currentSymbolTable().typeNodeToPropertyType(type!!, false)!!.type
+    }
+
+    fun IndexOpNode.declaredType(): DataType {
+        return callStack.currentSymbolTable().assertToDataType(call!!.returnType!!)
     }
 
     fun eval() = scriptNode.eval()

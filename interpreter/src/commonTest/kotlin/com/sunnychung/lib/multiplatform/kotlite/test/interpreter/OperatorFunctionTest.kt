@@ -173,4 +173,68 @@ class OperatorFunctionTest {
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("numSetCalls") as IntValue).value)
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("numValueCalls") as IntValue).value)
     }
+
+    @Test
+    fun indexPlusAssign() {
+        val interpreter = interpreter("""
+            var numSetCalls = 0
+            var numValueCalls = 0
+            class MyPair<T>(var first: T, var second: T) {
+                operator fun get(index: Int): T {
+                    return if (index == 0) {
+                        first
+                    } else if (index == 1) {
+                        second
+                    } else {
+                        first // TODO: throw exception
+                    }
+                }
+                operator fun set(index: Int, newValue: T) {
+                    ++numSetCalls
+                    if (index == 0) {
+                        first = newValue
+                    } else {
+                        second = newValue
+                    }
+                }
+            }
+            fun <T> value(v: T): T {
+                ++numValueCalls
+                return v
+            }
+            val x = MyPair(123, 45)
+            val y = MyPair("ab", "cde")
+            
+            val a = x[0]
+            val b = x[1]
+            x[0] += value(67)
+            x[1] += value(890)
+            x[1] -= value(12)
+            val c = x[0]
+            val d = x[1]
+            
+            val e = y[0]
+            val f = y[1]
+            y[0] += value("qwe")
+            y[1] += value("rty")
+            val g = y[0]
+            val h = y[1]
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(12, symbolTable.propertyValues.size)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(190, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(923, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+
+        assertEquals("ab", (symbolTable.findPropertyByDeclaredName("e") as StringValue).value)
+        assertEquals("cde", (symbolTable.findPropertyByDeclaredName("f") as StringValue).value)
+        assertEquals("abqwe", (symbolTable.findPropertyByDeclaredName("g") as StringValue).value)
+        assertEquals("cderty", (symbolTable.findPropertyByDeclaredName("h") as StringValue).value)
+
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("numSetCalls") as IntValue).value)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("numValueCalls") as IntValue).value)
+    }
 }
