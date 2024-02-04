@@ -14,6 +14,7 @@ class ProvidedClassDefinition(
     currentScope = null,
     name = fullQualifiedName.substringAfterLast('.'),
     fullQualifiedName = fullQualifiedName,
+    modifiers = emptySet(),
     typeParameters = typeParameters,
     isInstanceCreationAllowed = isInstanceCreationAllowed,
     orderedInitializersAndPropertyDeclarations = emptyList(),

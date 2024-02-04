@@ -55,6 +55,7 @@ class ExecutionEnvironment(
                 ClassDefinition(
                     currentScope = topmostSymbolTable,
                     name = className,
+                    modifiers = emptySet(),
                     typeParameters = createTypeParameters(className),
                     isInstanceCreationAllowed = false,
                     orderedInitializersAndPropertyDeclarations = emptyList(),
@@ -66,6 +67,7 @@ class ExecutionEnvironment(
                 ClassDefinition(
                     currentScope = topmostSymbolTable,
                     name = "$className?",
+                    modifiers = emptySet(),
                     typeParameters = createTypeParameters(className),
                     isInstanceCreationAllowed = false,
                     orderedInitializersAndPropertyDeclarations = emptyList(),
@@ -77,6 +79,7 @@ class ExecutionEnvironment(
                 ClassDefinition(
                     currentScope = topmostSymbolTable,
                     name = "$className.Companion",
+                    modifiers = emptySet(),
                     typeParameters = createTypeParameters(className),
                     isInstanceCreationAllowed = false,
                     orderedInitializersAndPropertyDeclarations = emptyList(),

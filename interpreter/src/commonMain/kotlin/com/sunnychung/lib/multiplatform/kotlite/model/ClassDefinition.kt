@@ -17,6 +17,7 @@ open class ClassDefinition(
      * If it is an object class, no new instance can be created
      */
     val isInstanceCreationAllowed: Boolean,
+    val modifiers: Set<ClassModifier>,
 
     val typeParameters: List<TypeParameterNode>,
 

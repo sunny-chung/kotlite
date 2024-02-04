@@ -17,6 +17,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
@@ -51,6 +52,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
+
+val ACCEPTED_MODIFIERS = setOf(
+    "open", "override", "operator", "vararg"
+)
 
 /**
  * Reference grammar: https://kotlinlang.org/spec/syntax-and-grammar.html#grammar-rule-expression
@@ -1743,6 +1748,24 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * modifiers:
+     *     annotation | modifier {annotation | modifier}
+     *
+     * modifier:
+     *     (classModifier | memberModifier | visibilityModifier | functionModifier | propertyModifier | inheritanceModifier | parameterModifier | platformModifier) {NL}
+     *
+     */
+    fun modifiers(): Set<String> {
+        val modifiers = mutableSetOf<String>()
+        while (currentToken.type == TokenType.Identifier && currentToken.value in ACCEPTED_MODIFIERS) {
+            modifiers += currentToken.value as String
+            eat(TokenType.Identifier)
+            repeatedNL()
+        }
+        return modifiers
+    }
+
+    /**
      * classDeclaration:
      *     [modifiers]
      *     ('class' | (['fun' {NL}] 'interface'))
@@ -1754,7 +1777,13 @@ class Parser(protected val lexer: Lexer) {
      *     [{NL} typeConstraints]
      *     [({NL} classBody) | ({NL} enumClassBody)]
      */
-    fun classDeclaration(): ClassDeclarationNode {
+    fun classDeclaration(modifiers: Set<String>): ClassDeclarationNode {
+        val modifiers = modifiers.map {
+            when (it) {
+                "open" -> ClassModifier.open
+                else -> throw ParseException("Modifier `$it` cannot be applied to class")
+            }
+        }.toSet()
         eat(TokenType.Identifier, "class")
         repeatedNL()
         val name = userDefinedIdentifier()
@@ -1782,6 +1811,7 @@ class Parser(protected val lexer: Lexer) {
         } else listOf()
         return ClassDeclarationNode(
             name = name,
+            declaredModifiers = modifiers,
             typeParameters = typeParameters,
             primaryConstructor = primaryConstructor,
             superClassInvocation = superClassInvocation as FunctionCallNode?,
@@ -1802,10 +1832,24 @@ class Parser(protected val lexer: Lexer) {
 //            throw ParseException("Expected an identifier but missing")
             throw UnexpectedTokenException(currentToken)
         }
-        when (currentToken.value as String) {
-            "val", "var" -> return propertyDeclaration()
-            "fun", "operator" -> return functionDeclaration()
-            "class" -> return classDeclaration()
+        var modifiers: Set<String>? = null
+        while (true) {
+            when (currentToken.value as String) {
+                "val", "var" -> return propertyDeclaration()
+                "fun", "operator" -> return functionDeclaration()
+                "class" -> return classDeclaration(modifiers ?: emptySet())
+                else -> {
+                    if (modifiers == null) {
+                        modifiers = modifiers().also {
+                            if (it.isEmpty()) {
+                                throw UnexpectedTokenException(currentToken)
+                            }
+                        }
+                    } else {
+                        throw UnexpectedTokenException(currentToken)
+                    }
+                }
+            }
         }
         throw UnexpectedTokenException(currentToken)
     }
@@ -1886,7 +1930,7 @@ class Parser(protected val lexer: Lexer) {
     fun statement(): ASTNode { // TODO complete
         if (currentToken.type == TokenType.Identifier) {
             when (currentToken.value) {
-                "val", "var", "fun", "class" -> return declaration()
+                "val", "var", "fun", "class", in ACCEPTED_MODIFIERS -> return declaration()
                 "for", "while", "do" -> return loopStatement()
             }
         }

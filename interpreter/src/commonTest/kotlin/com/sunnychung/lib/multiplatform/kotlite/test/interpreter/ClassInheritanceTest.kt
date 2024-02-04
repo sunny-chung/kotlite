@@ -9,7 +9,7 @@ class ClassInheritanceTest {
     @Test
     fun inheritProperty() {
         val interpreter = interpreter("""
-            class A {
+            open class A {
                 var a = 1
             }
             class B(var b: Int) : A()
@@ -32,7 +32,7 @@ class ClassInheritanceTest {
     @Test
     fun inheritPropertyInConstructor() {
         val interpreter = interpreter("""
-            class A(val c: Int) {
+            open class A(val c: Int) {
                 var a = 1
             }
             class B(var b: Int) : A(b + 10)
@@ -57,7 +57,7 @@ class ClassInheritanceTest {
     @Test
     fun passArgumentToSuperConstructor() {
         val interpreter = interpreter("""
-            class A(val c: Int) {
+            open class A(val c: Int) {
                 var a = 1
             }
             class B(b: Int) : A(b + 10)
@@ -80,7 +80,7 @@ class ClassInheritanceTest {
     @Test
     fun inheritFunction() {
         val interpreter = interpreter("""
-            class A {
+            open class A {
                 var a = 1
                 fun hello() = a
             }
@@ -104,7 +104,7 @@ class ClassInheritanceTest {
     @Test
     fun inheritExtensionFunction() {
         val interpreter = interpreter("""
-            class A {
+            open class A {
                 fun Int.double() = this * 2
             }
             class B(val b: Int) : A() {

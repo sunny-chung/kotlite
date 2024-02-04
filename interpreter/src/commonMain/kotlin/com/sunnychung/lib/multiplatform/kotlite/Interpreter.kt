@@ -891,6 +891,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             declarationScope.declareClass(ClassDefinition(
                 currentScope = callStack.currentSymbolTable(),
                 name = name,
+                modifiers = modifiers,
                 fullQualifiedName = fullQualifiedName,
                 typeParameters = typeParameters,
                 isInstanceCreationAllowed = true,
@@ -935,6 +936,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             currentScope = callStack.currentSymbolTable(),
             name = "$name.Companion",
             fullQualifiedName = "$fullQualifiedName.Companion",
+            modifiers = emptySet(),
             typeParameters = emptyList(),
             isInstanceCreationAllowed = false,
             orderedInitializersAndPropertyDeclarations = emptyList(),

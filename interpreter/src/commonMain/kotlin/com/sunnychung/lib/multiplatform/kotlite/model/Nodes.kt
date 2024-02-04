@@ -157,6 +157,10 @@ enum class FunctionValueParameterModifier {
     vararg
 }
 
+enum class ClassModifier {
+    open
+}
+
 data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, val modifiers: Set<FunctionValueParameterModifier>, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     @ModifyByAnalyzer
     var inferredType: TypeNode? = null
@@ -356,12 +360,17 @@ data class ClassInstanceInitializerNode(val block: BlockNode) : ASTNode {
 
 data class ClassDeclarationNode(
     val name: String,
+    val declaredModifiers: Set<ClassModifier>,
     val typeParameters: List<TypeParameterNode>,
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superClassInvocation: FunctionCallNode?,
     val declarations: List<ASTNode>,
     @ModifyByAnalyzer var fullQualifiedName: String = name,
 ) : ASTNode {
+    @ModifyByAnalyzer val inferredModifiers: Set<ClassModifier> = mutableSetOf()
+    val modifiers: Set<ClassModifier>
+        get() = declaredModifiers + inferredModifiers
+
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Class Declaration Node `$name`\"]"
         return "$self\n" +

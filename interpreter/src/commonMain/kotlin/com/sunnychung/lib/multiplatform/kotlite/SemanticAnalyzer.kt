@@ -24,6 +24,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassTypeNode
@@ -1191,6 +1192,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope = currentScope,
                 name = "$name?",
                 fullQualifiedName = "$fullQualifiedClassName?",
+                modifiers = emptySet(),
                 typeParameters = typeParameters,
                 isInstanceCreationAllowed = false,
                 orderedInitializersAndPropertyDeclarations = emptyList(),
@@ -1207,6 +1209,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope = currentScope,
                 name = "$name.Companion",
                 fullQualifiedName = "$fullQualifiedClassName.Companion",
+                modifiers = emptySet(),
                 typeParameters = emptyList(),
                 isInstanceCreationAllowed = false,
                 orderedInitializersAndPropertyDeclarations = emptyList(),
@@ -1221,6 +1224,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         val superClass = (superClassInvocation?.function as? TypeNode)
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
+        if (superClass != null && ClassModifier.open !in superClass.modifiers) {
+            throw SemanticException("A class can only extend from an open class")
+        }
         superClass?.currentScope?.let { currentScope.mergeDeclarationsFrom(it) }
         // TODO handle override super class members
 
@@ -1249,6 +1255,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope = currentScope!!,
                 name = name,
                 fullQualifiedName = fullQualifiedName,
+                modifiers = modifiers,
                 typeParameters = typeParameters,
                 isInstanceCreationAllowed = true,
                 primaryConstructor = primaryConstructor,

@@ -5,9 +5,17 @@ import kotlin.test.Test
 class ClassInheritanceCheckTest {
 
     @Test
+    fun cannotExtendFromNonOpenClass() {
+        assertSemanticFail("""
+            class A
+            class B : A()
+        """.trimIndent())
+    }
+
+    @Test
     fun accessSubclassProperty1() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 var c = a + b
             }
@@ -18,7 +26,7 @@ class ClassInheritanceCheckTest {
     @Test
     fun accessSubclassProperty2() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 var c = a + this.b
             }
@@ -29,7 +37,7 @@ class ClassInheritanceCheckTest {
     @Test
     fun accessSubclassProperty3() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 fun sum(): Int = a + b
             }
@@ -40,7 +48,7 @@ class ClassInheritanceCheckTest {
     @Test
     fun accessSubclassProperty4() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 fun sum(): Int = a + this.b
             }
@@ -51,7 +59,7 @@ class ClassInheritanceCheckTest {
     @Test
     fun accessSubclassFunction1() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 val c = sub()
             }
@@ -64,7 +72,7 @@ class ClassInheritanceCheckTest {
     @Test
     fun accessSubclassFunction2() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 val c = this.sub()
             }
@@ -77,7 +85,7 @@ class ClassInheritanceCheckTest {
     @Test
     fun accessSubclassFunction3() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 fun f() {
                     sub()
@@ -92,7 +100,7 @@ class ClassInheritanceCheckTest {
     @Test
     fun accessSubclassFunction4() {
         assertSemanticFail("""
-            class A {
+            open class A {
                 var a = 1
                 fun f() {
                     this.sub()
