@@ -100,6 +100,9 @@ open class ClassDefinition(
         memberTransformedNameToPropertyName[transformedName] ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyDeclaredName(transformedName, inThisClassOnly) }
 
+    /**
+     * Key: Function signature
+     */
     fun getAllMemberFunctions(): Map<String, FunctionDeclarationNode> {
         return memberFunctions mergeIfNotExists (superClass?.getAllMemberFunctions() ?: emptyMap())
     }

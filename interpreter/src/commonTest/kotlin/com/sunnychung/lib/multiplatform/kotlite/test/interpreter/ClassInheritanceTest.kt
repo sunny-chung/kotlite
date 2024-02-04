@@ -120,4 +120,57 @@ class ClassInheritanceTest {
         assertEquals(2, symbolTable.propertyValues.size)
         assertEquals(246, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
     }
+
+    @Test
+    fun overrideMemberFunction() {
+        val interpreter = interpreter("""
+            var a = 1
+            open class A {
+                open fun f() {
+                    a += 5
+                }
+            }
+            class B : A() {
+                override fun f() {
+                    a += 7
+                }
+            }
+            
+            val x = B()
+            x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(8, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
+
+    @Test
+    fun memberFunctionsAreNotOverriddenIfSignaturesAreDifferent() {
+        val interpreter = interpreter("""
+            var a = 1
+            open class A {
+                fun f(x: Int) {
+                    a += 5
+                }
+            }
+            class B : A() {
+                fun f(x: String) {
+                    a += 7
+                }
+            }
+            
+            val x = B()
+            x.f(123)
+            val b = a
+            x.f("abc")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(13, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

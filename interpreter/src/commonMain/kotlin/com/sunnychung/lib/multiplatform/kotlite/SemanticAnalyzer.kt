@@ -1228,6 +1228,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             throw SemanticException("A class can only extend from an open class")
         }
         superClass?.currentScope?.let { currentScope.mergeDeclarationsFrom(it) }
+        val superClassFunctions = superClass?.getAllMemberFunctions()
         // TODO handle override super class members
 
         pushScope(name, ScopeType.Class)
@@ -1275,7 +1276,19 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     } ?: emptyList() /* intentionally exclude non-constructor property declarations, in order to allow inferring types */,
                 memberFunctions = declarations
                     .filterIsInstance<FunctionDeclarationNode>()
-                    .associateBy { it.toSignature(currentScope as SemanticAnalyzerSymbolTable) },
+                    .associateBy {
+                        it.toSignature(currentScope as SemanticAnalyzerSymbolTable).also { signature ->
+                            val superClassFunction = superClassFunctions?.get(signature)
+                            if (superClassFunction != null) {
+                                if (FunctionModifier.open !in superClassFunction.modifiers) {
+                                    throw SemanticException("A function cannot override another function not marked as `open`")
+                                }
+                                if (FunctionModifier.override !in it.modifiers) {
+                                    throw SemanticException("A function cannot override anything without the modifier `override`")
+                                }
+                            }
+                        }
+                    },
                 orderedInitializersAndPropertyDeclarations = declarations
                     .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
                 declarations = declarations,

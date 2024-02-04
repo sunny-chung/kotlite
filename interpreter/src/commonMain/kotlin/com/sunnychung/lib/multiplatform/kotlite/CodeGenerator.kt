@@ -118,7 +118,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
     protected fun BreakNode.generate() = "break"
 
     protected fun ClassDeclarationNode.generate()
-        = "class $name " +
+        = "${modifiers.joinToString("") { "$it " }}class $name " +
             (primaryConstructor?.let { "${it.generate()} " } ?: "") + "{\n" + run {
                 ++indentLevel
                 val s = declarations.joinToString("") { "${indent()}${it.generate()}\n" }

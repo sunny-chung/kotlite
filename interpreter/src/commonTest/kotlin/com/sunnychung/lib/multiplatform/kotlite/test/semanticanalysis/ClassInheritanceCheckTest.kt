@@ -112,4 +112,28 @@ class ClassInheritanceCheckTest {
         """.trimIndent())
     }
 
+    @Test
+    fun cannotOverrideNonOpenFunction() {
+        assertSemanticFail("""
+            open class A {
+                fun f() {}
+            }
+            class B : A() {
+                override fun f() {}
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun cannotOverrideFunctionWithoutOverrideModifier() {
+        assertSemanticFail("""
+            open class A {
+                open fun f() {}
+            }
+            class B : A() {
+                fun f() {}
+            }
+        """.trimIndent())
+    }
+
 }

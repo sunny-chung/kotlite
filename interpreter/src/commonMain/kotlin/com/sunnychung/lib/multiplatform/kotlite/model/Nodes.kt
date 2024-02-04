@@ -150,7 +150,7 @@ open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var
  * Member names are the exact identifiers in Kotlin code
  */
 enum class FunctionModifier {
-    operator
+    operator, open, override
 }
 
 enum class FunctionValueParameterModifier {
@@ -168,7 +168,7 @@ data class FunctionValueParameterNode(val name: String, val declaredType: TypeNo
         ?: throw CannotInferTypeException("function value parameter type $name")
 
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Function Value Parameter Node `$name`\"]"
+        val self = "${generateId()}[\"Function Value Parameter Node `$name` modifiers=[${modifiers.joinToString(", ")}] \"]"
         return "$self\n" + (if (declaredType != null) "$self-- declared type -->${declaredType.toMermaid()}\n" else "") +
                 if (defaultValue != null) "$self-->${defaultValue.toMermaid()}\n" else ""
     }
@@ -213,7 +213,7 @@ open class FunctionDeclarationNode(
         get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException("return type of function $name")
 
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Function Node `$name`\"]"
+        val self = "${generateId()}[\"Function Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
         return (declaredReturnType?.let { "$self-- type -->${it.toMermaid()}\n" } ?: "") +
                 (receiver?.let { "$self-- receiver -->${it.toMermaid()}\n" } ?: "") +
                 "$self-->${body.toMermaid()}\n"
@@ -372,7 +372,7 @@ data class ClassDeclarationNode(
         get() = declaredModifiers + inferredModifiers
 
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Class Declaration Node `$name`\"]"
+        val self = "${generateId()}[\"Class Declaration Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
         return "$self\n" +
                 (primaryConstructor?.let { "$self-- primary constructor -->${it.toMermaid()}\n" } ?: "") +
                 declarations.joinToString("") { "$self-->${it.toMermaid()}\n" }

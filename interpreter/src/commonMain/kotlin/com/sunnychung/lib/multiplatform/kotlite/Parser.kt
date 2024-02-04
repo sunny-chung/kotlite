@@ -1521,19 +1521,16 @@ class Parser(protected val lexer: Lexer) {
      *     [{NL} functionBody]
      *
      */
-    fun functionDeclaration(isProcessBody: Boolean = true): FunctionDeclarationNode {
-        val modifiers = mutableSetOf<FunctionModifier>()
-        eat(TokenType.Identifier).also {
-            when (it.value) {
-                "operator" -> {
-                    modifiers += FunctionModifier.operator
-                    repeatedNL()
-                    eat(TokenType.Identifier, "fun")
-                }
-                "fun" -> { /* do nothing */ }
-                else -> throw UnexpectedTokenException(it)
+    fun functionDeclaration(modifiers: Set<String>, isProcessBody: Boolean = true): FunctionDeclarationNode {
+        val modifiers = modifiers.map {
+            when (it) {
+                "operator" -> FunctionModifier.operator
+                "open" -> FunctionModifier.open
+                "override" -> FunctionModifier.override
+                else -> throw ParseException("Modifier `$it` cannot be applied to function")
             }
-        }
+        }.toSet()
+        eat(TokenType.Identifier, "fun")
         repeatedNL()
         val typeParameters = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
             typeParameters()
@@ -1836,19 +1833,16 @@ class Parser(protected val lexer: Lexer) {
         while (true) {
             when (currentToken.value as String) {
                 "val", "var" -> return propertyDeclaration()
-                "fun", "operator" -> return functionDeclaration()
+                "fun" -> return functionDeclaration(modifiers ?: emptySet())
                 "class" -> return classDeclaration(modifiers ?: emptySet())
-                else -> {
+                in ACCEPTED_MODIFIERS -> {
                     if (modifiers == null) {
-                        modifiers = modifiers().also {
-                            if (it.isEmpty()) {
-                                throw UnexpectedTokenException(currentToken)
-                            }
-                        }
+                        modifiers = modifiers()
                     } else {
                         throw UnexpectedTokenException(currentToken)
                     }
                 }
+                else -> throw UnexpectedTokenException(currentToken)
             }
         }
         throw UnexpectedTokenException(currentToken)
@@ -2004,12 +1998,17 @@ class Parser(protected val lexer: Lexer) {
      */
     fun libHeaderFile(): List<ASTNode> {
         val result = mutableListOf<ASTNode>()
+        var modifiers: Set<String>? = null
         while (currentTokenExcludingNL().type != TokenType.EOF) {
             repeatedNL()
             if (isCurrentToken(TokenType.Identifier, "val") || isCurrentToken(TokenType.Identifier, "var")) {
                 result += propertyDeclaration(isProcessBody = false)
-            } else {
-                result += functionDeclaration(isProcessBody = false)
+                modifiers = null
+            } else if (isCurrentToken(TokenType.Identifier, "fun")) {
+                result += functionDeclaration(modifiers ?: emptySet(), isProcessBody = false)
+                modifiers = null
+            } else if (currentToken.type == TokenType.Identifier && currentToken.value in ACCEPTED_MODIFIERS) {
+                modifiers = modifiers()
             }
         }
         eat(TokenType.EOF)
