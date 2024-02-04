@@ -1776,7 +1776,7 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             delegationSpecifiers()
         } else null
-        val declarations = if (token.type == TokenType.Symbol && token.value == "{") {
+        val declarations = if (isCurrentTokenExcludingNL(TokenType.Symbol, "{")) {
             repeatedNL()
             classBody()
         } else listOf()

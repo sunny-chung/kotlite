@@ -157,4 +157,24 @@ class ClassMemberPropertyTest {
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
+
+    @Test
+    fun constructorProperty() {
+        val interpreter = interpreter("""
+            class MyCls(var a: Int) {
+                fun getA(): Int = a
+            }
+            val o: MyCls = MyCls(10)
+            val a: Int = o.a
+            o.a += 2
+            val b: Int = o.getA()
+        """.trimIndent(), isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

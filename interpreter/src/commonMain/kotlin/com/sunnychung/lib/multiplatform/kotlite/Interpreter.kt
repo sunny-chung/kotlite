@@ -676,14 +676,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
 
         val symbolTable = callStack.currentSymbolTable()
-        val nonPropertyArguments = mutableMapOf<String, Pair<TypeNode, RuntimeValue>>()
+        val nonPropertyArguments = mutableMapOf<String, Pair<ClassParameterNode, RuntimeValue>>()
         clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
             val value = callArguments[index]
             if (it.isProperty) {
                 instance.assign(name = it.parameter.transformedRefName!!, value = value)
 //                    instance.memberPropertyValues[it.parameter.transformedRefName!!] = value
             } else {
-                nonPropertyArguments[it.parameter.transformedRefName!!] = Pair(it.parameter.type, value)
+                nonPropertyArguments[it.parameter.transformedRefName!!] = Pair(it, value)
             }
         }
 
@@ -722,10 +722,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             try {
                 val innerSymbolTable = callStack.currentSymbolTable()
                 nonPropertyArguments.forEach {
-                    val keyWithIncreasedScope = it.key.replaceAfterLast("/", innerSymbolTable.scopeLevel.toString())
-                    log.v("keyWithIncreasedScope = $keyWithIncreasedScope")
-                    innerSymbolTable.declareProperty(keyWithIncreasedScope, it.value.first.resolveGenericParameterTypeArguments(typeArgumentByName), false)
-                    innerSymbolTable.assign(keyWithIncreasedScope, it.value.second)
+                    innerSymbolTable.declareProperty(it.value.first.transformedRefNameInBody!!, it.value.first.parameter.type.resolveGenericParameterTypeArguments(typeArgumentByName), false)
+                    innerSymbolTable.assign(it.value.first.transformedRefNameInBody!!, it.value.second)
                 }
                 when (it) {
                     is PropertyDeclarationNode -> {
@@ -918,6 +916,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     .associateBy { it.transformedRefName!! },
                 orderedInitializersAndPropertyDeclarations = declarations
                     .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
+                declarations = declarations,
                 superClassInvocation = superClassInvocation,
                 superClass = superClass,
             ))
@@ -939,6 +938,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             typeParameters = emptyList(),
             isInstanceCreationAllowed = false,
             orderedInitializersAndPropertyDeclarations = emptyList(),
+            declarations = emptyList(),
             rawMemberProperties = emptyList(),
             memberFunctions = emptyMap(),
             primaryConstructor = null

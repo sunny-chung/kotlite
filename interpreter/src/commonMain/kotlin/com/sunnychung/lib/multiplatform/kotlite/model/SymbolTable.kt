@@ -446,6 +446,31 @@ open class SymbolTable(
 //        this.transformedSymbols += other.transformedSymbols
     }
 
+    fun mergeDeclarationsFrom(other: SymbolTable) {
+        log.d { "Merge declarations from other SymbolTable" }
+        other.propertyDeclarations.forEach {
+            declareProperty(it.key, it.value.type.toTypeNode(), it.value.isMutable)
+        }
+        other.extensionFunctionDeclarations.forEach {
+            declareExtensionFunction(it.key, it.value)
+        }
+        other.extensionProperties.forEach {
+            declareExtensionProperty(it.key, it.value)
+        }
+        other.functionDeclarations.forEach {
+            declareFunction(it.key, it.value)
+        }
+        other.classDeclarations.forEach {
+            declareClass(it.value)
+        }
+        other.typeAlias
+            .filterKeys { !it.endsWith('?') }
+            .forEach {
+                // TODO handle conflicts with existing scope, e.g. generic functions
+                declareTypeAlias(it.key, it.value.toTypeNode())
+            }
+    }
+
     override fun toString(): String {
         return "scopeLevel = $scopeLevel\n" +
                 "functionDeclarations = $functionDeclarations\n" +

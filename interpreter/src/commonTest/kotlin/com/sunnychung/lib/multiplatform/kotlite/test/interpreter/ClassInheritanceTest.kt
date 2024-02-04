@@ -55,6 +55,29 @@ class ClassInheritanceTest {
     }
 
     @Test
+    fun passArgumentToSuperConstructor() {
+        val interpreter = interpreter("""
+            class A(val c: Int) {
+                var a = 1
+            }
+            class B(b: Int) : A(b + 10)
+            
+            val x = B(123)
+            val a = x.a
+            x.a += 2
+            val c = x.a
+            val d = x.c
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(133, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
+
+    @Test
     fun inheritFunction() {
         val interpreter = interpreter("""
             class A {
@@ -76,5 +99,25 @@ class ClassInheritanceTest {
         assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun inheritExtensionFunction() {
+        val interpreter = interpreter("""
+            class A {
+                fun Int.double() = this * 2
+            }
+            class B(val b: Int) : A() {
+                fun doubleB() = b.double()
+            }
+            
+            val x = B(123)
+            val a = x.doubleB()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(246, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
     }
 }

@@ -647,6 +647,26 @@ class TypeInferenceTest {
     }
 
     @Test
+    fun classMemberFunction() {
+        val interpreter = interpreter("""
+            class A {
+                var a = 1
+                fun getA() = a
+            }
+            val o = A()
+            val x = o.a
+            o.a += 2
+            val y = o.getA()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
     fun inferGenericClass() {
         val interpreter = interpreter("""
             class MyPair<A, B>(val first: A, val second: B)

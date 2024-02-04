@@ -133,7 +133,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
 
     protected fun ClassParameterNode.generate() = (if (isProperty) {
         if (isMutable) "var " else "val "
-    } else "") + parameter.generate()
+    } else "") + parameter.generate() + "<$transformedRefNameInBody>"
 
     protected fun ClassPrimaryConstructorNode.generate()
         = "constructor(" + parameters.joinToString(", ") { it.generate() } + ")"

@@ -158,7 +158,8 @@ enum class FunctionValueParameterModifier {
 }
 
 data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, val modifiers: Set<FunctionValueParameterModifier>, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
-    @ModifyByAnalyzer var inferredType: TypeNode? = null
+    @ModifyByAnalyzer
+    var inferredType: TypeNode? = null
     val type: TypeNode get() = declaredType ?: inferredType
         ?: throw CannotInferTypeException("function value parameter type $name")
 
@@ -320,7 +321,19 @@ data class WhileNode(val condition: ASTNode, val body: BlockNode?) : ASTNode {
     }
 }
 
-data class ClassParameterNode(val isProperty: Boolean, val isMutable: Boolean, val parameter: FunctionValueParameterNode) : ASTNode {
+data class ClassParameterNode(
+    val isProperty: Boolean,
+    val isMutable: Boolean,
+    val parameter: FunctionValueParameterNode,
+
+    /**
+     * Used when this is a non-property class constructor parameter, where this parameter will have
+     * TWO transformedRefName:
+     * 1. While resolving default values of other constructor parameters (the one inside FunctionValueParameterNode is used)
+     * 2. While resolving initializers and default values of property declarations inside class body (this field is used)
+     */
+    @ModifyByAnalyzer var transformedRefNameInBody: String? = null,
+) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Class Primary Constructor Parameter Node isProperty=$isProperty isMutable=$isMutable\"]"
         return "$self-->${parameter.toMermaid()}\n"

@@ -17,6 +17,7 @@ class ProvidedClassDefinition(
     typeParameters = typeParameters,
     isInstanceCreationAllowed = isInstanceCreationAllowed,
     orderedInitializersAndPropertyDeclarations = emptyList(),
+    declarations = emptyList(),
     rawMemberProperties = emptyList(),
     memberFunctions = emptyMap(),
     primaryConstructor = ClassPrimaryConstructorNode(primaryConstructorParameters.map {

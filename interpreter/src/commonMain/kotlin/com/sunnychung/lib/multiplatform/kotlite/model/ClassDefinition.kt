@@ -5,7 +5,10 @@ import com.sunnychung.lib.multiplatform.kotlite.extension.merge
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 
 open class ClassDefinition(
-    currentScope: SymbolTable?,
+    /**
+     * For storing parsed declarations
+     */
+    internal val currentScope: SymbolTable?,
 
     val name: String,
     val fullQualifiedName: String = name, // TODO
@@ -22,8 +25,10 @@ open class ClassDefinition(
      */
     val orderedInitializersAndPropertyDeclarations: List<ASTNode>,
 
+    val declarations: List<ASTNode>,
+
     rawMemberProperties: List<PropertyDeclarationNode>,
-    val memberFunctions: Map<String, FunctionDeclarationNode>,
+    private val memberFunctions: Map<String, FunctionDeclarationNode>,
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superClassInvocation: FunctionCallNode? = null,
@@ -68,7 +73,7 @@ open class ClassDefinition(
     }
 
     fun getAllMemberProperties(): Map<String, PropertyType> {
-        return memberProperties merge (superClass?.getAllMemberProperties() ?: emptyMap())
+        return memberProperties mergeIfNotExists (superClass?.getAllMemberProperties() ?: emptyMap())
     }
 
     fun getDeclaredPropertiesInThisClass() = memberProperties
@@ -93,6 +98,10 @@ open class ClassDefinition(
     fun findMemberPropertyDeclaredName(transformedName: String, inThisClassOnly: Boolean = false): String? =
         memberTransformedNameToPropertyName[transformedName] ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyDeclaredName(transformedName, inThisClassOnly) }
+
+    fun getAllMemberFunctions(): Map<String, FunctionDeclarationNode> {
+        return memberFunctions mergeIfNotExists (superClass?.getAllMemberFunctions() ?: emptyMap())
+    }
 
     fun findMemberFunctionsByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, FunctionDeclarationNode> =
         memberFunctions.filter { it.value.name == declaredName } mergeIfNotExists
