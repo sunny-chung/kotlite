@@ -13,3 +13,14 @@ infix fun <K, V> Map<K, V>.merge(another: Map<K, V>): Map<K, V> {
     }
     return result
 }
+
+infix fun <K, V> Map<K, V>.mergeIfNotExists(another: Map<K, V>): Map<K, V> {
+    val result = mutableMapOf<K, V>()
+    this.toMap(result)
+    another.forEach {
+        if (!result.containsKey(it.key)) {
+            result[it.key] = it.value
+        }
+    }
+    return result
+}

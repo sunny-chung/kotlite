@@ -53,4 +53,28 @@ class ClassInheritanceTest {
         assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
         assertEquals(133, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
     }
+
+    @Test
+    fun inheritFunction() {
+        val interpreter = interpreter("""
+            class A {
+                var a = 1
+                fun hello() = a
+            }
+            class B(var b: Int) : A()
+            
+            val x = B(123)
+            val a = x.a
+            val b = x.b
+            x.a += 2
+            val c = x.hello()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
 }

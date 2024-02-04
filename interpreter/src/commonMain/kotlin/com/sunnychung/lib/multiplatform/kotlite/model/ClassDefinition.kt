@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.extension.merge
+import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 
 open class ClassDefinition(
     currentScope: SymbolTable?,
@@ -26,7 +27,7 @@ open class ClassDefinition(
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superClassInvocation: FunctionCallNode? = null,
-    private var superClass: ClassDefinition? = null
+    val superClass: ClassDefinition? = null
 ) {
 
     // key = original name
@@ -93,8 +94,13 @@ open class ClassDefinition(
         memberTransformedNameToPropertyName[transformedName] ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyDeclaredName(transformedName, inThisClassOnly) }
 
-    fun findMemberFunctionsByDeclaredName(declaredName: String) =
-        memberFunctions.filter { it.value.name == declaredName }
+    fun findMemberFunctionsByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, FunctionDeclarationNode> =
+        memberFunctions.filter { it.value.name == declaredName } mergeIfNotExists
+            (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
+
+    fun findMemberFunctionByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): FunctionDeclarationNode? =
+        memberFunctions[transformedName] ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionByTransformedName(transformedName, inThisClassOnly) }
 
     open fun construct(interpreter: Interpreter, callArguments: Array<RuntimeValue>, typeArguments: Array<DataType>, callPosition: SourcePosition): ClassInstance {
         return interpreter.constructClassInstance(callArguments, callPosition, typeArguments, this@ClassDefinition)

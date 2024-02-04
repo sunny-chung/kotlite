@@ -446,7 +446,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         if (subject == NullValue) {
                             throw EvaluateNullPointerException()
                         }
-                        (subject as? ClassInstance)?.clazz?.memberFunctions?.get(functionRefName)?.let { function ->
+                        (subject as? ClassInstance)?.clazz?.findMemberFunctionByTransformedName(functionRefName!!)?.let { function ->
                             return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
                         }
                     }
@@ -774,8 +774,17 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
-            symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
-            symbolTable.assign("this/${subject.type().name}", subject)
+            if (subject.type() is ObjectType) {
+                var clazz: ClassDefinition? = (subject.type() as ObjectType).clazz
+                while (clazz != null) {
+                    symbolTable.declareProperty("this/${clazz.name}", subject.type().toTypeNode(), false)
+                    symbolTable.assign("this/${clazz.name}", subject)
+                    clazz = clazz.superClass
+                }
+            } else {
+                symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
+                symbolTable.assign("this/${subject.type().name}", subject)
+            }
             if (function.receiver != null && function.receiver!!.descriptiveName() != subject.type().name) {
                 symbolTable.declareProperty("this/${function.receiver!!.descriptiveName()}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${function.receiver!!.descriptiveName()}", subject)
