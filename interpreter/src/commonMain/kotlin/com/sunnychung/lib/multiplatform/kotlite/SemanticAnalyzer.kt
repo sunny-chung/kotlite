@@ -547,7 +547,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         currentScope.declareTypeAliasResolution(it.name, receiver.arguments!![index])
                     }
                 }
-                clazz.memberProperties.forEach {
+                clazz.getAllMemberProperties().forEach {
                     currentScope.declareProperty(
                         name = it.key,
                         type = it.value.type.toTypeNode(),
@@ -643,17 +643,24 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         var extraTypeResolutions = emptyMap<String, TypeNode>()
 
         val functionArgumentAndReturnTypeDeclarations = when (function) {
-            is VariableReferenceNode -> {
+            is VariableReferenceNode /* f(x) or constructor */, is TypeNode /* Superclass constructor */ -> {
+                val functionName = when (function) {
+                    is VariableReferenceNode -> function.variableName
+                    is TypeNode -> function.name
+                    else -> throw UnsupportedOperationException()
+                }
                 val resolution = currentScope.findMatchingCallables(
                     currentSymbolTable = currentScope,
-                    originalName = function.variableName,
+                    originalName = functionName,
                     receiverType = null,
                     arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
-                    modifierFilter = modifierFilter!!,
+                    modifierFilter = if (function is TypeNode) SearchFunctionModifier.ConstructorOnly else modifierFilter!!,
                 )
                     .firstOrNull()
-                    ?: throw SemanticException("No matching function `${function.variableName}` found")
-                function.ownerRef = resolution.owner?.let { PropertyOwnerInfo(it) }
+                    ?: throw SemanticException("No matching function `${functionName}` found")
+                if (function is VariableReferenceNode) {
+                    function.ownerRef = resolution.owner?.let { PropertyOwnerInfo(it) }
+                }
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
 
@@ -1104,14 +1111,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         val memberName = member.name
         val clazz = subjectType.nameWithNullable.let { currentScope.findClass(it) ?: throw RuntimeException("Cannot find class `$it`") }.first
         if (lookupType == IdentifierClassifier.Property) {
-            if (clazz.memberProperties.containsKey(memberName)) {
-                if (isCheckWriteAccess && !clazz.memberProperties[memberName]!!.isMutable) {
+            clazz.findMemberPropertyWithoutAccessor(memberName)?.let { property ->
+                if (isCheckWriteAccess && !property.isMutable) {
                     throw SemanticException("val `$memberName` cannot be reassigned")
                 }
                 return
             }
-            if (clazz.memberPropertyCustomAccessors.containsKey(memberName)) {
-                val accessor = clazz.memberPropertyCustomAccessors[memberName]!!
+            clazz.findMemberPropertyCustomAccessor(memberName)?.let { accessor ->
                 if (isCheckWriteAccess) {
                     if (accessor.setter == null) {
                         throw SemanticException("Setter for `$memberName` is not declared")
@@ -1213,6 +1219,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 currentScope.declareTypeAlias(it.name, it.typeUpperBound)
             }
             primaryConstructor?.visit(modifier = modifier)
+            superClassInvocation?.visit(modifier = modifier)
             val nonPropertyArguments = primaryConstructor?.parameters
                 ?.filter { !it.isProperty }
                 ?.map { it.parameter }
@@ -1228,36 +1235,40 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     currentScope.assign(p.name, SemanticDummyRuntimeValue(currentScope.getPropertyType(p.name).first.type))
                 }
 
-            currentScope.parentScope!!.declareClass(
-                ClassDefinition(
-                    currentScope = currentScope!!,
-                    name = name,
-                    fullQualifiedName = fullQualifiedName,
-                    typeParameters = typeParameters,
-                    isInstanceCreationAllowed = true,
-                    primaryConstructor = primaryConstructor,
-                    rawMemberProperties = ((primaryConstructor?.parameters
-                        ?.filter { it.isProperty }
-                        ?.map {
-                            val p = it.parameter
-                            PropertyDeclarationNode(
-                                name = p.name,
-                                typeParameters = emptyList(),
-                                receiver = classType,
-                                declaredType = p.type,
-                                isMutable = it.isMutable,
-                                initialValue = p.defaultValue,
-                                transformedRefName = p.transformedRefName,
-                            )
-                        } ?: emptyList()) +
-                            declarations.filterIsInstance<PropertyDeclarationNode>()),
-                    memberFunctions = declarations
-                        .filterIsInstance<FunctionDeclarationNode>()
-                        .associateBy { it.toSignature(currentScope as SemanticAnalyzerSymbolTable) },
-                    orderedInitializersAndPropertyDeclarations = declarations
-                        .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
-                )
+            val superClass = (superClassInvocation?.function as? TypeNode)
+                ?.let { currentScope.parentScope!!.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
+                ?.first
+
+            val classDefinition = ClassDefinition(
+                currentScope = currentScope!!,
+                name = name,
+                fullQualifiedName = fullQualifiedName,
+                typeParameters = typeParameters,
+                isInstanceCreationAllowed = true,
+                primaryConstructor = primaryConstructor,
+                rawMemberProperties = primaryConstructor?.parameters
+                    ?.filter { it.isProperty }
+                    ?.map {
+                        val p = it.parameter
+                        PropertyDeclarationNode(
+                            name = p.name,
+                            typeParameters = emptyList(),
+                            receiver = classType,
+                            declaredType = p.type,
+                            isMutable = it.isMutable,
+                            initialValue = p.defaultValue,
+                            transformedRefName = p.transformedRefName,
+                        )
+                    } ?: emptyList() /* intentionally exclude non-constructor property declarations, in order to allow inferring types */,
+                memberFunctions = declarations
+                    .filterIsInstance<FunctionDeclarationNode>()
+                    .associateBy { it.toSignature(currentScope as SemanticAnalyzerSymbolTable) },
+                orderedInitializersAndPropertyDeclarations = declarations
+                    .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
+                superClass = superClass,
             )
+
+            currentScope.parentScope!!.declareClass(classDefinition)
 
             // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()
             val pseudoTypeArguments = typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull()
@@ -1284,6 +1295,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     if (it is PropertyDeclarationNode) {
                         it.visit(modifier = modifier, isVisitInitialValue = false, isClassProperty = true)
                         currentScope.declarePropertyOwner(it.transformedRefName!!, "this/$fullQualifiedClassName")
+                        classDefinition.addProperty(currentScope, it)
                     }
                 }
 
@@ -1520,10 +1532,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
 
         if (lookupType == IdentifierClassifier.Property) {
-            clazz.memberPropertyCustomAccessors[memberName]?.let {
+            clazz.findMemberPropertyCustomAccessor(memberName)?.let {
                 return it.type(modifier = modifier).resolveMemberType().also { type = it }
             }
-            clazz.memberProperties[memberName]?.let {
+            clazz.findMemberPropertyWithoutAccessor(memberName)?.let {
                 return it.type.toTypeNode().resolveMemberType().also { type = it }
             }
             transformedRefName?.let {

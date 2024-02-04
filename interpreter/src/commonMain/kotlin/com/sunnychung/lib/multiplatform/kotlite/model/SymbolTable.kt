@@ -292,7 +292,7 @@ open class SymbolTable(
                 throw RuntimeException("Provided type parameter `${tp.name}` of the class `${receiverType.name}` is out of bound (Upper bound: `${tp.typeUpperBoundOrAny().descriptiveName()}`)")
             }
         }
-        if (receiverClass.memberPropertyNameToTransformedName.containsKey(extensionProperty.declaredName)) {
+        if (receiverClass.findMemberPropertyTransformedName(extensionProperty.declaredName) != null) {
             throw DuplicateIdentifierException(name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
         }
         val resolvedReceiverType = extensionProperty.receiverType!!.resolveGenericParameterTypeToUpperBound(extensionTypeParameters)

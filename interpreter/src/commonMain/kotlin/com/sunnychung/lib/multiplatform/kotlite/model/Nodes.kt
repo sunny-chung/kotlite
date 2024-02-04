@@ -266,6 +266,7 @@ data class FunctionCallNode(
     val arguments: List<FunctionCallArgumentNode>,
     val declaredTypeArguments: List<TypeNode>,
     val position: SourcePosition,
+    val isSuperclassConstruction: Boolean = false,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
     @ModifyByAnalyzer var callableType: CallableType? = null,
@@ -344,6 +345,7 @@ data class ClassDeclarationNode(
     val name: String,
     val typeParameters: List<TypeParameterNode>,
     val primaryConstructor: ClassPrimaryConstructorNode?,
+    val superClassInvocation: FunctionCallNode?,
     val declarations: List<ASTNode>,
     @ModifyByAnalyzer var fullQualifiedName: String = name,
 ) : ASTNode {

@@ -37,7 +37,7 @@ class SemanticAnalyzerSymbolTable(
     private fun findAllMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverClass: ClassDefinition?, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>, modifierFilter: SearchFunctionModifier): List<FindCallableResult> {
         var thisScopeCandidates = mutableListOf<FindCallableResult>()
         if (receiverClass == null) {
-            findFunctionsByOriginalName(originalName, isThisScopeOnly = true).map {
+            if (modifierFilter != SearchFunctionModifier.ConstructorOnly) findFunctionsByOriginalName(originalName, isThisScopeOnly = true).map {
                 val owner = findFunctionOwner(functionNameTransform(originalName, it.first))
                 FindCallableResult(
                     transformedName = it.first.transformedRefName!!,
@@ -66,7 +66,7 @@ class SemanticAnalyzerSymbolTable(
                     scope = this
                 )
             }
-            getPropertyTypeOrNull(originalName, isThisScopeOnly = true)?.let {
+            if (modifierFilter != SearchFunctionModifier.ConstructorOnly) getPropertyTypeOrNull(originalName, isThisScopeOnly = true)?.let {
                 if (it.first.type !is FunctionType || it.first.type.isNullable) {
                     return@let
                 }
@@ -84,7 +84,7 @@ class SemanticAnalyzerSymbolTable(
                     scope = this
                 )
             }
-        } else {
+        } else if (modifierFilter != SearchFunctionModifier.ConstructorOnly) {
             receiverClass.findMemberFunctionsByDeclaredName(originalName).map {
                 val it = it.value
                 FindCallableResult(
@@ -126,7 +126,7 @@ class SemanticAnalyzerSymbolTable(
                         }
                     }
 
-                    SearchFunctionModifier.NoRestriction -> true
+                    SearchFunctionModifier.NoRestriction, SearchFunctionModifier.ConstructorOnly -> true
                 }
             }
             .filter { callable ->
@@ -266,5 +266,6 @@ fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable
 
 enum class SearchFunctionModifier {
     OperatorFunctionOnly,
+    ConstructorOnly,
     NoRestriction,
 }

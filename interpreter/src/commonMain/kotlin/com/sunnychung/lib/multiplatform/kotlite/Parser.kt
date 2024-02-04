@@ -1706,6 +1706,43 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * delegationSpecifiers:
+     *     annotatedDelegationSpecifier {{NL} ',' {NL} annotatedDelegationSpecifier}
+     *
+     * annotatedDelegationSpecifier:
+     *     {annotation} {NL} delegationSpecifier
+     *
+     * delegationSpecifier:
+     *     constructorInvocation
+     *     | explicitDelegation
+     *     | userType
+     *     | functionType
+     *     | ('suspend' {NL} functionType)
+     *
+     */
+    fun delegationSpecifiers(): FunctionCallNode {
+        /* only support exactly one constructorInvocation */
+        return constructorInvocation()
+    }
+    /**
+     * constructorInvocation:
+     *     userType {NL} valueArguments
+     *
+     */
+    fun constructorInvocation(): FunctionCallNode {
+        val type = typeReference()
+        repeatedNL()
+        val arguments = valueArguments()
+        return FunctionCallNode(
+            function = type,
+            arguments = arguments,
+            declaredTypeArguments = type.arguments ?: emptyList(),
+            position = currentToken.position,
+            isSuperclassConstruction = true,
+        )
+    }
+
+    /**
      * classDeclaration:
      *     [modifiers]
      *     ('class' | (['fun' {NL}] 'interface'))
@@ -1733,6 +1770,12 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             primaryConstructor().also { token = currentTokenExcludingNL() }
         } else null
+        val superClassInvocation = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
+            repeatedNL()
+            eat(TokenType.Symbol, ":")
+            repeatedNL()
+            delegationSpecifiers()
+        } else null
         val declarations = if (token.type == TokenType.Symbol && token.value == "{") {
             repeatedNL()
             classBody()
@@ -1741,6 +1784,7 @@ class Parser(protected val lexer: Lexer) {
             name = name,
             typeParameters = typeParameters,
             primaryConstructor = primaryConstructor,
+            superClassInvocation = superClassInvocation as FunctionCallNode?,
             declarations = declarations
         )
     }

@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+import com.sunnychung.lib.multiplatform.kotlite.extension.merge
 
 open class ClassDefinition(
     currentScope: SymbolTable?,
@@ -24,16 +25,19 @@ open class ClassDefinition(
     val memberFunctions: Map<String, FunctionDeclarationNode>,
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
+    val superClassInvocation: FunctionCallNode? = null,
+    private var superClass: ClassDefinition? = null
 ) {
+
     // key = original name
     // does not include properties with custom accessors
-    val memberProperties: Map<String, PropertyType> = mutableMapOf()
+    private val memberProperties: Map<String, PropertyType> = mutableMapOf()
     // key = original name
-    val memberPropertyTypes: Map<String, PropertyType> = mutableMapOf()
+    private val memberPropertyTypes: Map<String, PropertyType> = mutableMapOf()
     // key = original name
-    val memberPropertyCustomAccessors: Map<String, PropertyAccessorsNode> = mutableMapOf()
-    val memberTransformedNameToPropertyName: Map<String, String> = mutableMapOf()
-    val memberPropertyNameToTransformedName: Map<String, String> = mutableMapOf()
+    private val memberPropertyCustomAccessors: Map<String, PropertyAccessorsNode> = mutableMapOf()
+    private val memberTransformedNameToPropertyName: Map<String, String> = mutableMapOf()
+    private val memberPropertyNameToTransformedName: Map<String, String> = mutableMapOf()
 
     init {
         rawMemberProperties.forEach { addProperty(currentScope, it) }
@@ -61,6 +65,33 @@ open class ClassDefinition(
             (memberPropertyNameToTransformedName as MutableMap)[it.name] = it.transformedRefName!!
         }
     }
+
+    fun getAllMemberProperties(): Map<String, PropertyType> {
+        return memberProperties merge (superClass?.getAllMemberProperties() ?: emptyMap())
+    }
+
+    fun getDeclaredPropertiesInThisClass() = memberProperties
+    fun getDeclaredPropertyAccessorsInThisClass() = memberPropertyCustomAccessors
+
+    fun findMemberProperty(declaredName: String, inThisClassOnly: Boolean = false) : PropertyType? =
+        memberPropertyTypes[declaredName] ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberProperty(declaredName, inThisClassOnly) }
+
+    fun findMemberPropertyWithoutAccessor(declaredName: String, inThisClassOnly: Boolean = false): PropertyType? =
+        memberProperties[declaredName] ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyWithoutAccessor(declaredName, inThisClassOnly) }
+
+    fun findMemberPropertyCustomAccessor(declaredName: String, inThisClassOnly: Boolean = false): PropertyAccessorsNode? =
+        memberPropertyCustomAccessors[declaredName] ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyCustomAccessor(declaredName, inThisClassOnly) }
+
+    fun findMemberPropertyTransformedName(declaredName: String, inThisClassOnly: Boolean = false): String? =
+        memberPropertyNameToTransformedName[declaredName] ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyTransformedName(declaredName, inThisClassOnly) }
+
+    fun findMemberPropertyDeclaredName(transformedName: String, inThisClassOnly: Boolean = false): String? =
+        memberTransformedNameToPropertyName[transformedName] ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyDeclaredName(transformedName, inThisClassOnly) }
 
     fun findMemberFunctionsByDeclaredName(declaredName: String) =
         memberFunctions.filter { it.value.name == declaredName }
