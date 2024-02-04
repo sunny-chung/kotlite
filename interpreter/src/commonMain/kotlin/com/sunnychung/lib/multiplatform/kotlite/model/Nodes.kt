@@ -111,6 +111,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
 data class PropertyDeclarationNode(
     val name: String,
+    val modifiers: Set<PropertyModifier>,
     val typeParameters: List<TypeParameterNode>,
     val receiver: TypeNode?,
     val declaredType: TypeNode?,
@@ -159,6 +160,10 @@ enum class FunctionValueParameterModifier {
 
 enum class ClassModifier {
     open
+}
+
+enum class PropertyModifier {
+    open, override
 }
 
 data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, val modifiers: Set<FunctionValueParameterModifier>, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
@@ -328,6 +333,7 @@ data class WhileNode(val condition: ASTNode, val body: BlockNode?) : ASTNode {
 data class ClassParameterNode(
     val isProperty: Boolean,
     val isMutable: Boolean,
+    val modifiers: Set<PropertyModifier>,
     val parameter: FunctionValueParameterNode,
 
     /**

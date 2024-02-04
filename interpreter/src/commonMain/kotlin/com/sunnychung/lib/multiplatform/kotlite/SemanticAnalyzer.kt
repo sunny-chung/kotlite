@@ -56,6 +56,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NullType
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyOwnerInfo
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
@@ -548,7 +549,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         currentScope.declareTypeAliasResolution(it.name, receiver.arguments!![index])
                     }
                 }
-                clazz.getAllMemberProperties().forEach {
+                clazz.getAllMemberPropertiesExcludingCustomAccessors().forEach {
                     currentScope.declareProperty(
                         name = it.key,
                         type = it.value.type.toTypeNode(),
@@ -1229,7 +1230,24 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
         superClass?.currentScope?.let { currentScope.mergeDeclarationsFrom(it) }
         val superClassFunctions = superClass?.getAllMemberFunctions()
-        // TODO handle override super class members
+        val superClassProperties = superClass?.getAllMemberProperties()
+
+        fun checkForOverriddenProperties(property: PropertyDeclarationNode) {
+            if (superClassProperties?.containsKey(property.name) == true) {
+                if (PropertyModifier.override !in property.modifiers) {
+                    throw SemanticException("A property cannot override anything without the `override` modifier")
+                }
+                if (superClass.findDeclarations { _, it ->
+                    it is PropertyDeclarationNode && it.name == property.name
+                }.any { PropertyModifier.open !in (it as PropertyDeclarationNode).modifiers }) {
+                    throw SemanticException("A property can only override another property marked as `open`")
+                }
+            } else {
+                if (PropertyModifier.override in property.modifiers) {
+                    throw SemanticException("Property `${property.name}` overrides nothing")
+                }
+            }
+        }
 
         pushScope(name, ScopeType.Class)
         run {
@@ -1266,18 +1284,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         val p = it.parameter
                         PropertyDeclarationNode(
                             name = p.name,
+                            modifiers = it.modifiers,
                             typeParameters = emptyList(),
                             receiver = classType,
                             declaredType = p.type,
                             isMutable = it.isMutable,
                             initialValue = p.defaultValue,
                             transformedRefName = p.transformedRefName,
-                        )
+                        ).also { checkForOverriddenProperties(it) }
                     } ?: emptyList() /* intentionally exclude non-constructor property declarations, in order to allow inferring types */,
                 memberFunctions = declarations
                     .filterIsInstance<FunctionDeclarationNode>()
                     .associateBy {
                         it.toSignature(currentScope as SemanticAnalyzerSymbolTable).also { signature ->
+                            log.v { "Class `$name` member function `${it.name}` signature = `$signature`" }
                             val superClassFunction = superClassFunctions?.get(signature)
                             if (superClassFunction != null) {
                                 if (FunctionModifier.open !in superClassFunction.modifiers) {
@@ -1285,6 +1305,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                                 }
                                 if (FunctionModifier.override !in it.modifiers) {
                                     throw SemanticException("A function cannot override anything without the modifier `override`")
+                                }
+                            } else {
+                                if (FunctionModifier.override in it.modifiers) {
+                                    throw SemanticException("Function `${it.name}` overrides nothing")
                                 }
                             }
                         }
@@ -1325,6 +1349,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     popScope()
                     if (it is PropertyDeclarationNode) {
                         it.visit(modifier = modifier, isVisitInitialValue = false, isClassProperty = true)
+                        checkForOverriddenProperties(it)
                         currentScope.declarePropertyOwner(it.transformedRefName!!, "this/$fullQualifiedClassName")
                         classDefinition.addProperty(currentScope, it)
                     }

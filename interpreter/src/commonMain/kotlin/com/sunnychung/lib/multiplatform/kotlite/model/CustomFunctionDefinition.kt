@@ -15,7 +15,7 @@ data class CustomFunctionDefinition(
     val executable: (receiver: RuntimeValue?, args: List<RuntimeValue>, typeArgs: Map<String, DataType>) -> RuntimeValue,
 )
 
-class CustomFunctionParameter(val name: String, val type: String, val defaultValueExpression: String? = null, val modifiers: Set<FunctionValueParameterModifier> = emptySet())
+class CustomFunctionParameter(val name: String, val type: String, val defaultValueExpression: String? = null, val modifiers: Set<String> = emptySet())
 
 class TypeParameter(val name: String, val typeUpperBound: String?)
 fun TypeParameter.toTypeParameterNode() = TypeParameterNode(this.name, this.typeUpperBound?.toTypeNode())

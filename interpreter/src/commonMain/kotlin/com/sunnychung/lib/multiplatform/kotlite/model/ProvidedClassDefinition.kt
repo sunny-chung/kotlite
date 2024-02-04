@@ -22,9 +22,11 @@ class ProvidedClassDefinition(
     rawMemberProperties = emptyList(),
     memberFunctions = emptyMap(),
     primaryConstructor = ClassPrimaryConstructorNode(primaryConstructorParameters.map {
+        val modifiers = with(Parser(Lexer(""))) { it.modifiers.toClassParameterModifiers() }
         ClassParameterNode(
             isProperty = false,
             isMutable = false,
+            modifiers = modifiers.filterIsInstance<PropertyModifier>().toSet(),
             parameter = FunctionValueParameterNode(
                 name = it.name,
                 declaredType = it.type.toTypeNode(),
@@ -32,7 +34,7 @@ class ProvidedClassDefinition(
                     Parser(Lexer(it)).expression()
                 },
                 transformedRefName = it.name,
-                modifiers = emptySet(),
+                modifiers = modifiers.filterIsInstance<FunctionValueParameterModifier>().toSet(),
             )
         )
     })

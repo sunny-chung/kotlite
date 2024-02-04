@@ -173,4 +173,31 @@ class ClassInheritanceTest {
         assertEquals(13, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(6, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun overrideMemberProperty() {
+        val interpreter = interpreter("""
+            open class A {
+                open var x = 1
+                fun f() = x
+            }
+            class B : A() {
+                override var x = 2
+            }
+            val x = B()
+            val a = x.x
+            val b = x.f()
+            x.x += 10
+            val c = x.x
+            val d = x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
 }

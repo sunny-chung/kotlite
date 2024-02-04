@@ -48,7 +48,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
-import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
@@ -215,7 +214,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
             } else ""
         }${
             if (modifiers.isNotEmpty()) {
-                ", modifiers = setOf(${modifiers.joinToString(", ") { "FunctionValueParameterModifier.$it" }})"
+                ", modifiers = setOf(${modifiers.joinToString(", ") { "\"$it\"" }})"
             } else ""
         })"""
     }

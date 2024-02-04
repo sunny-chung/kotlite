@@ -1,7 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
-import com.sunnychung.lib.multiplatform.kotlite.extension.merge
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 
 open class ClassDefinition(
@@ -73,8 +72,19 @@ open class ClassDefinition(
         }
     }
 
+
+    /**
+     * Key: Original declared name
+     */
+    fun getAllMemberPropertiesExcludingCustomAccessors(): Map<String, PropertyType> {
+        return memberProperties mergeIfNotExists (superClass?.getAllMemberPropertiesExcludingCustomAccessors() ?: emptyMap())
+    }
+
+    /**
+     * Key: Original declared name
+     */
     fun getAllMemberProperties(): Map<String, PropertyType> {
-        return memberProperties mergeIfNotExists (superClass?.getAllMemberProperties() ?: emptyMap())
+        return memberPropertyTypes mergeIfNotExists (superClass?.getAllMemberProperties() ?: emptyMap())
     }
 
     fun getDeclaredPropertiesInThisClass() = memberProperties
@@ -114,6 +124,11 @@ open class ClassDefinition(
     fun findMemberFunctionByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): FunctionDeclarationNode? =
         memberFunctions[transformedName] ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionByTransformedName(transformedName, inThisClassOnly) }
+
+    fun findDeclarations(filter: (clazz: ClassDefinition, declaration: ASTNode) -> Boolean): List<ASTNode> {
+        return declarations.filter { filter(this, it) } +
+            (superClass?.findDeclarations(filter) ?: emptyList())
+    }
 
     open fun construct(interpreter: Interpreter, callArguments: Array<RuntimeValue>, typeArguments: Array<DataType>, callPosition: SourcePosition): ClassInstance {
         return interpreter.constructClassInstance(callArguments, callPosition, typeArguments, this@ClassDefinition)
