@@ -82,6 +82,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
     val builtinSymbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
@@ -159,13 +160,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     fun TypeNode.toDataType(): DataType {
         return try {
-            currentScope.typeNodeToPropertyType(this, false)?.type
+            currentScope.assertToDataType(this)
         } catch (e: SemanticException) {
             throw e
         } catch (e: RuntimeException) {
             throw SemanticException(e.message!!)
         }
-                ?: throw SemanticException("Unknown type `$name`")
     }
 
     fun TypeNode.unboxClassTypeAsCompanion() = if (this is ClassTypeNode) {
@@ -176,6 +176,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     protected fun isLocalAndNotCurrentScope(scopeLevel: Int): Boolean {
         return scopeLevel > 1 && scopeLevel <= (symbolRecorders.lastOrNull()?.scopeLevel ?: currentScope.scopeLevel)
+    }
+
+    fun temporarilySwitchToScopeAndRun(scope: SemanticAnalyzerSymbolTable, executable: () -> Unit) {
+        val oldScope = currentScope
+        currentScope = scope
+        try {
+            executable()
+        } finally {
+            currentScope = oldScope
+        }
     }
 
     data class Modifier(
@@ -274,7 +284,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun TypeNode.visit(modifier: Modifier = Modifier()) {
-        currentScope.typeNodeToDataType(this)
+        try {
+            currentScope.typeNodeToDataType(this)
+        } catch (e: RuntimeException) {
+            throw SemanticException(e.message ?: e::class.qualifiedName ?: "")
+        }
             ?: throw SemanticException("Unknown type `${this.descriptiveName()}`")
     }
 
@@ -807,6 +821,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             throw SemanticException("Number of type arguments does not match with number of type parameters of the matched callable")
         }
 
+        declaredTypeArguments.forEach {
+            it.visit(modifier = modifier)
+        }
+
         functionArgumentAndReturnTypeDeclarations.typeParameters.forEach {
             currentScope.declareTypeAlias(it.name, it.typeUpperBound)
         }
@@ -1222,13 +1240,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         )
 
         pushScope(name, ScopeType.Class)
+        val superClassScope = currentScope
         val superClass = (superClassInvocation?.function as? TypeNode)
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
         if (superClass != null && ClassModifier.open !in superClass.modifiers) {
             throw SemanticException("A class can only extend from an open class")
         }
-        superClass?.currentScope?.let { currentScope.mergeDeclarationsFrom(it) }
         val superClassFunctions = superClass?.getAllMemberFunctions()
         val superClassProperties = superClass?.getAllMemberProperties()
 
@@ -1256,6 +1274,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
             primaryConstructor?.visit(modifier = modifier)
             superClassInvocation?.visit(modifier = modifier)
+            if (superClassInvocation != null) {
+                temporarilySwitchToScopeAndRun(superClassScope) {
+                    val type = superClassInvocation.type()
+                    val typeArguments = superClass!!.typeParameters.mapIndexed { index, tp ->
+                        tp.name to type.arguments!![index]
+                    }.toMap()
+                    superClass.currentScope?.let { currentScope.mergeDeclarationsFrom(it, typeArguments) }
+                }
+            }
+
             val nonPropertyArguments = primaryConstructor?.parameters
                 ?.filter { !it.isProperty }
             primaryConstructor?.parameters?.forEach {
@@ -1316,6 +1344,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 orderedInitializersAndPropertyDeclarations = declarations
                     .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
                 declarations = declarations,
+                superClassInvocation = superClassInvocation,
                 superClass = superClass,
             )
 
@@ -1593,11 +1622,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
 
         if (lookupType == IdentifierClassifier.Property) {
-            clazz.findMemberPropertyCustomAccessor(memberName)?.let {
-                return it.type(modifier = modifier).resolveMemberType().also { type = it }
+            val resolver = ClassMemberResolver(clazz, subjectType.arguments)
+            resolver.findMemberPropertyCustomAccessorWithType(memberName)?.let {
+                return it.second.also { type = it }
             }
-            clazz.findMemberPropertyWithoutAccessor(memberName)?.let {
-                return it.type.toTypeNode().resolveMemberType().also { type = it }
+            resolver.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
+                return it.second.also { type = it }
             }
             transformedRefName?.let {
                 currentScope.findExtensionProperty(it)

@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -199,5 +200,77 @@ class ClassInheritanceTest {
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(12, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
         assertEquals(12, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
+
+    @Test
+    fun inheritPropertyInClassExtendedWithTypeParameter() {
+        val interpreter = interpreter("""
+            open class A<T> {
+                var a: T? = null
+            }
+            class B : A<String>()
+            class C : A<Int>()
+            val x = B()
+            val y = C()
+            x.a = "abc"
+            y.a = 123
+            val a = x.a!!
+            val b = y.a!!
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun inheritPropertyInClassDeeplyExtendedWithTypeParameter1() {
+        val interpreter = interpreter("""
+            open class A<T> {
+                var a: T? = null
+            }
+            open class B<T> : A<T>()
+            open class C<T> : B<T>()
+            class D<T> : C<T>()
+            val x = D<String>()
+            val y = D<Int>()
+            x.a = "abc"
+            y.a = 123
+            val a = x.a!!
+            val b = y.a!!
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun inheritPropertyInClassDeeplyExtendedWithTypeParameter2() {
+        val interpreter = interpreter("""
+            open class A<T> {
+                var a: T? = null
+            }
+            open class B<T> : A<T>()
+            open class C<T> : B<Int>()
+            open class D<T> : C<T>()
+            class E<T> : D<T>()
+            val x = E<String>()
+            val y = E<Int>()
+            x.a = 456
+            y.a = 123
+            val a = x.a!!
+            val b = y.a!!
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(456, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
 }

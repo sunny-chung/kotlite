@@ -45,6 +45,13 @@ open class ClassDefinition(
     private val memberTransformedNameToPropertyName: Map<String, String> = mutableMapOf()
     private val memberPropertyNameToTransformedName: Map<String, String> = mutableMapOf()
 
+    private fun findIndex(): Int {
+        if (superClass == null) return 0
+        return superClass.findIndex() + 1
+    }
+
+    val index = findIndex()
+
     init {
         rawMemberProperties.forEach { addProperty(currentScope, it) }
     }
@@ -90,17 +97,26 @@ open class ClassDefinition(
     fun getDeclaredPropertiesInThisClass() = memberProperties
     fun getDeclaredPropertyAccessorsInThisClass() = memberPropertyCustomAccessors
 
-    fun findMemberProperty(declaredName: String, inThisClassOnly: Boolean = false) : PropertyType? =
-        memberPropertyTypes[declaredName] ?:
-            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberProperty(declaredName, inThisClassOnly) }
+    fun findMemberPropertyWithIndex(declaredName: String, inThisClassOnly: Boolean = false) : Pair<PropertyType, Int>? =
+        memberPropertyTypes[declaredName]?.let { it to index } ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyWithIndex(declaredName, inThisClassOnly) }
 
-    fun findMemberPropertyWithoutAccessor(declaredName: String, inThisClassOnly: Boolean = false): PropertyType? =
-        memberProperties[declaredName] ?:
-            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyWithoutAccessor(declaredName, inThisClassOnly) }
+    fun findMemberProperty(declaredName: String, inThisClassOnly: Boolean = false) =
+        findMemberPropertyWithIndex(declaredName, inThisClassOnly)?.first
+
+    fun findMemberPropertyWithoutAccessorWithIndex(declaredName: String, inThisClassOnly: Boolean = false): Pair<PropertyType, Int>? =
+        memberProperties[declaredName]?.let { it to index } ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyWithoutAccessorWithIndex(declaredName, inThisClassOnly) }
+
+    fun findMemberPropertyWithoutAccessor(declaredName: String, inThisClassOnly: Boolean = false) =
+        findMemberPropertyWithoutAccessorWithIndex(declaredName, inThisClassOnly)?.first
+
+    fun findMemberPropertyCustomAccessorWithIndex(declaredName: String, inThisClassOnly: Boolean = false): Pair<PropertyAccessorsNode, Int>? =
+        memberPropertyCustomAccessors[declaredName]?.let { it to index } ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyCustomAccessorWithIndex(declaredName, inThisClassOnly) }
 
     fun findMemberPropertyCustomAccessor(declaredName: String, inThisClassOnly: Boolean = false): PropertyAccessorsNode? =
-        memberPropertyCustomAccessors[declaredName] ?:
-            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberPropertyCustomAccessor(declaredName, inThisClassOnly) }
+        findMemberPropertyCustomAccessorWithIndex(declaredName, inThisClassOnly)?.first
 
     fun findMemberPropertyTransformedName(declaredName: String, inThisClassOnly: Boolean = false): String? =
         memberPropertyNameToTransformedName[declaredName] ?:

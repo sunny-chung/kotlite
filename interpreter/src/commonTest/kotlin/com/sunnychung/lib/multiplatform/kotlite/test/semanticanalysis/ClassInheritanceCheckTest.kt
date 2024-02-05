@@ -222,4 +222,29 @@ class ClassInheritanceCheckTest {
         """.trimIndent())
     }
 
+    @Test
+    fun simpleSuperClassTypeParameter() {
+        assertSemanticFail("""
+            open class A<T> {
+                var a: T? = null
+            }
+            class B : A<String>()
+            val x = B()
+            x.a = 123
+        """.trimIndent())
+    }
+
+    @Test
+    fun nonexistSuperClassTypeParameter() {
+        assertSemanticFail("""
+            open class A<T> {
+                var a: T? = null
+            }
+            open class B : A<T>()
+            open class C<T> : B()
+            open class D<T> : C<T>()
+            class E<T> : D<T>()
+        """.trimIndent())
+    }
+
 }

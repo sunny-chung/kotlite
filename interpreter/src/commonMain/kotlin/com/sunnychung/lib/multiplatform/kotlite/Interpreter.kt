@@ -663,14 +663,26 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 callArguments[index] = value
             }
 
-            return clazz.construct(this@Interpreter, callArguments as Array<RuntimeValue>, typeArguments.map { symbolTable().typeNodeToDataType(it)!! }.toTypedArray(), position)
+            return clazz.construct(this@Interpreter, callArguments as Array<RuntimeValue>, typeArguments.map { symbolTable().assertToDataType(it) }.toTypedArray(), position)
         } finally {
             callStack.pop(ScopeType.ClassInitializer)
         }
     }
 
     fun constructClassInstance(callArguments: Array<RuntimeValue>, callPosition: SourcePosition, typeArguments: Array<DataType>, clazz: ClassDefinition): ClassInstance {
-        val parentInstance = clazz.superClassInvocation?.eval() as ClassInstance?
+        val parentInstance = clazz.superClassInvocation?.let { superClassInvocation ->
+            callStack.push("super", ScopeType.Class, SourcePosition(1, 1))
+            typeArguments.forEachIndexed { index, dataType ->
+                val typeParameter = clazz.typeParameters[index]
+                symbolTable().declareTypeAlias(typeParameter.name, typeParameter.typeUpperBound)
+                symbolTable().declareTypeAliasResolution(typeParameter.name, dataType)
+            }
+            try {
+                superClassInvocation.eval() as ClassInstance?
+            } finally {
+                callStack.pop(ScopeType.Class)
+            }
+        }
 
         val instance = ClassInstance(clazz.fullQualifiedName, clazz, typeArguments.toList(), parentInstance = parentInstance)
         val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()

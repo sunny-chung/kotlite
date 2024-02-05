@@ -105,14 +105,14 @@ open class SymbolTable(
         type.arguments?.forEachIndexed { index, it ->
             // TODO refactor this repeated logic
             val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode("Any", null, true)
-            if (!typeNodeToDataType(upperBound)!!.isAssignableFrom(typeNodeToDataType(it)!!)) {
+            if (!assertToDataType(upperBound).isAssignableFrom(assertToDataType(it))) {
                 throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
             }
         }
 
         return ObjectType(
             clazz = clazz,
-            arguments = type.arguments?.map { typeNodeToDataType(it)!! } ?: emptyList(),
+            arguments = type.arguments?.map { assertToDataType(it) } ?: emptyList(),
             isNullable = type.isNullable
         )
     }
@@ -446,8 +446,17 @@ open class SymbolTable(
 //        this.transformedSymbols += other.transformedSymbols
     }
 
-    fun mergeDeclarationsFrom(other: SymbolTable) {
+    fun mergeDeclarationsFrom(other: SymbolTable, typeAliasResolution: Map<String, TypeNode>) {
         log.d { "Merge declarations from other SymbolTable" }
+        other.typeAlias
+            .filterKeys { !it.endsWith('?') }
+            .forEach {
+                // TODO handle conflicts with existing scope, e.g. generic functions
+                declareTypeAlias(it.key, it.value.toTypeNode())
+                typeAliasResolution[it.key]?.let { resolution ->
+                    declareTypeAliasResolution(it.key, resolution)
+                }
+            }
         other.propertyDeclarations.forEach {
             declareProperty(it.key, it.value.type.toTypeNode(), it.value.isMutable)
         }
@@ -463,12 +472,6 @@ open class SymbolTable(
         other.classDeclarations.forEach {
             declareClass(it.value)
         }
-        other.typeAlias
-            .filterKeys { !it.endsWith('?') }
-            .forEach {
-                // TODO handle conflicts with existing scope, e.g. generic functions
-                declareTypeAlias(it.key, it.value.toTypeNode())
-            }
     }
 
     override fun toString(): String {
