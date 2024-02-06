@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -142,5 +143,63 @@ class GenericFunctionAndExtensionFunctionWithGenericClassTest {
         println(symbolTable.propertyValues)
         assertEquals("abcdef", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun inheritFunctionUsingUnrelatedTypeParameterAndInClassExtendedWithTypeParameter() {
+        val interpreter = interpreter("""
+            open class A<T> {
+                fun <X> cast(value: X): X? = value as? T as? X
+            }
+            open class A2<T> : A<T>()
+            open class A3<T> : A2<T>()
+            class B : A3<String>()
+            class C : A3<Int>()
+            val x = B()
+            val y = C()
+            val a = x.cast("abc")
+            val b = x.cast(123)
+            val c = y.cast("abc")
+            val d = y.cast(123)
+            val e = y.cast(null)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("c"))
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("e"))
+    }
+
+    @Test
+    fun inheritFunctionUsingUnrelatedTypeParameterWhichHasSameNameWithClassTypeParameter() {
+        val interpreter = interpreter("""
+            open class A<T> {
+                fun <T> cast(value: T): T = value as T
+            }
+            open class A2<T> : A<T>()
+            open class A3<T> : A2<T>()
+            class B : A3<String>()
+            class C : A3<Int>()
+            val x = B()
+            val y = C()
+            val a = x.cast("abc")
+            val b = x.cast(123)
+            val c = y.cast("abc")
+            val d = y.cast(123)
+            val e = y.cast(null)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("e"))
     }
 }

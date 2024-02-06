@@ -70,34 +70,39 @@ class ClassMemberResolver(val clazz: ClassDefinition, val typeArguments: List<Ty
         return property to type
     }
 
-    fun findMemberFunctionWithTypeByTransformedName(memberName: String): FunctionAndTypes? {
-        val (function, index) = clazz.findMemberFunctionWithIndexByTransformedName(memberName) ?: return null
+    private fun Pair<FunctionDeclarationNode, Int>?.resolveTypes(): FunctionAndTypes? {
+        val (function, index) = this ?: return null
+
+        val resolutionTable = genericResolutions[index].second
+            .toMutableMap()
+            .apply {
+                function.typeParameters.forEach {
+                    remove(it.name)
+                }
+            }
+            .toMap()
+
         val type = function.returnType.let { type ->
-            type.resolveGenericParameterTypeArguments(genericResolutions[index].second)
+            type.resolveGenericParameterTypeArguments(resolutionTable)
         }
         return FunctionAndTypes(
             function = function,
             resolvedValueParameterTypes = function.valueParameters.map {
-                it.copy(declaredType = it.declaredType!!.resolveGenericParameterTypeArguments(genericResolutions[index].second))
+                it.copy(declaredType = it.declaredType!!.resolveGenericParameterTypeArguments(resolutionTable))
             },
             resolvedReturnType = type,
             classTreeIndex = index,
         )
     }
 
+    fun findMemberFunctionWithTypeByTransformedName(memberName: String): FunctionAndTypes? {
+        return clazz.findMemberFunctionWithIndexByTransformedName(memberName)
+            .resolveTypes()
+    }
+
     fun findMemberFunctionWithIndexByTransformedNameLinearSearch(memberName: String): FunctionAndTypes? {
-        val (function, index) = clazz.findMemberFunctionWithIndexByTransformedNameLinearSearch(memberName) ?: return null
-        val type = function.returnType.let { type ->
-            type.resolveGenericParameterTypeArguments(genericResolutions[index].second)
-        }
-        return FunctionAndTypes(
-            function = function,
-            resolvedValueParameterTypes = function.valueParameters.map {
-                it.copy(declaredType = it.declaredType!!.resolveGenericParameterTypeArguments(genericResolutions[index].second))
-            },
-            resolvedReturnType = type,
-            classTreeIndex = index,
-        )
+        return clazz.findMemberFunctionWithIndexByTransformedNameLinearSearch(memberName)
+            .resolveTypes()
     }
 
     fun findMemberFunctionsAndTypeUpperBoundsByDeclaredName(memberName: String): Map<String, FunctionAndTypes> {

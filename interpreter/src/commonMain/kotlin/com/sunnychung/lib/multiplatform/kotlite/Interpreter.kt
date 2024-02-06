@@ -553,9 +553,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 classResolver?.findMemberFunctionWithTypeByTransformedName(function.transformedRefName!!)
             }
 
-        val typeParametersReplacedWithArguments = (functionNode.typeParameters.mapIndexed { index, tp ->
-            TypeParameterNode(tp.name, typeArguments[index])
-        } +
+        val typeParametersReplacedWithArguments = (
+                extraTypeResolutions + // add `extraTypeResolutions` at first because class type arguments have a lower precedence
                 (classResolver?.let { resolver ->
                     resolvedFunction?.classTreeIndex?.let { index ->
                         resolver.genericResolutions[index].second.map {
@@ -563,7 +562,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         }
                     }
                 } ?: emptyList()) +
-                extraTypeResolutions) // add `extraTypeResolutions` at last because class type arguments have a lower precedence
+                functionNode.typeParameters.mapIndexed { index, tp ->
+                    TypeParameterNode(tp.name, typeArguments[index])
+                }
+            )
             .associate { it.name to it.typeUpperBound!! }
 
         // resolve type arguments to DataType first, so that
