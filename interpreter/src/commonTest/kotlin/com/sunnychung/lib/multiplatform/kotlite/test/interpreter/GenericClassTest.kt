@@ -656,4 +656,46 @@ class GenericClassTest {
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
     }
+
+    @Test
+    fun memberPropertiesOfTypeParametersInInitOfDeeplyInheritedClass() {
+        val interpreter = interpreter("""
+            open class MyPair<A, B>(first: A, second: B) {
+                var first: A? = null
+                var second: B? = null
+                
+                init {
+                    val a: A = first
+                    val b: B = second
+                    this.first = a
+                    this.second = b
+                }
+                
+                fun concat(): String = "${'$'}first,${'$'}second"
+                fun getFirst(): A = this.first!!
+                fun getSecond(): B {
+                    return second!!
+                }
+            }
+            open class MyPair2<A, B>(first: A, second: B) : MyPair<A, B>(first, second)
+            open class MyPair3<A, B>(first: A, second: B) : MyPair2<A, B>(first, second)
+            open class MyPair4<A, B>(first: A, second: B) : MyPair3<A, B>(first, second)
+            class MyPair5<A, B>(first: A, second: B) : MyPair4<A, B>(first, second)
+            val p1 = MyPair5<Int, Double>(10, 2.345)
+            val a: Int = p1.first!!
+            val b: Double = p1.second!!
+            val c: String = p1.concat()
+            val d: Int = p1.getFirst()
+            val e: Double = p1.getSecond()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(6, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        compareNumber(2.345, symbolTable.findPropertyByDeclaredName("b") as DoubleValue)
+        assertEquals("10,2.345", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        compareNumber(2.345, symbolTable.findPropertyByDeclaredName("e") as DoubleValue)
+    }
 }

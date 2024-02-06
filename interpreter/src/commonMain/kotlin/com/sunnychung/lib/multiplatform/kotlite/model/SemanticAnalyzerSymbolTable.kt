@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.log
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 class SemanticAnalyzerSymbolTable(
     scopeLevel: Int,
@@ -85,21 +86,43 @@ class SemanticAnalyzerSymbolTable(
                 )
             }
         } else if (modifierFilter != SearchFunctionModifier.ConstructorOnly) {
-            receiverClass.findMemberFunctionsByDeclaredName(originalName).map {
-                val it = it.value
-                FindCallableResult(
-                    transformedName = it.transformedRefName!!,
-                    owner = null,
-                    type = CallableType.ClassMemberFunction,
-                    isVararg = it.isVararg,
-                    arguments = it.valueParameters,
-                    typeParameters = it.typeParameters,
-                    receiverType = it.receiver,
-                    returnType = it.returnType,
-                    definition = it,
-                    scope = this
-                )
+//            receiverClass.findMemberFunctionsByDeclaredName(originalName).map {
+//                val it = it.value
+//                FindCallableResult(
+//                    transformedName = it.transformedRefName!!,
+//                    owner = null,
+//                    type = CallableType.ClassMemberFunction,
+//                    isVararg = it.isVararg,
+//                    arguments = it.valueParameters,
+//                    typeParameters = it.typeParameters,
+//                    receiverType = it.receiver,
+//                    returnType = it.returnType,
+//                    definition = it,
+//                    scope = this
+//                )
+//            }.let { thisScopeCandidates += it }
+            ClassMemberResolver(receiverClass, null).findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName).map { lookup ->
+                val it = lookup.value.function
+                // TODO this is slow, O(n^2). optimize this
+                ClassMemberResolver(
+                    receiverClass,
+                    (receiverType as ObjectType).arguments.map { it.toTypeNode() }
+                ).findMemberFunctionWithIndexByTransformedNameLinearSearch(it.transformedRefName!!).let { lookup2 ->
+                    FindCallableResult(
+                        transformedName = it.transformedRefName!!,
+                        owner = null,
+                        type = CallableType.ClassMemberFunction,
+                        isVararg = it.isVararg,
+                        arguments = lookup2!!.resolvedValueParameterTypes,
+                        typeParameters = it.typeParameters,
+                        receiverType = it.receiver,
+                        returnType = lookup2!!.resolvedReturnType,
+                        definition = it,
+                        scope = this
+                    )
+                }
             }.let { thisScopeCandidates += it }
+
             findExtensionFunctions(receiverType!!, originalName, isThisScopeOnly = true).map {
                 FindCallableResult(
                     transformedName = it.first.transformedRefName!!,
@@ -172,7 +195,7 @@ class SemanticAnalyzerSymbolTable(
                             acc && if (callArg == null) {
                                 functionArg.defaultValue != null
                             } else {
-                                currentSymbolTable.typeNodeToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) ))!!.isConvertibleFrom(callArg.type)
+                                currentSymbolTable.assertToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) )).isConvertibleFrom(callArg.type)
                                 // TODO filter whether same type parameter always map to same argument
                             }
                         }

@@ -1621,8 +1621,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //            return subjectArguments[typeParameterIndex]
         }
 
+        val resolver = ClassMemberResolver(clazz, subjectType.arguments)
         if (lookupType == IdentifierClassifier.Property) {
-            val resolver = ClassMemberResolver(clazz, subjectType.arguments)
             resolver.findMemberPropertyCustomAccessorWithType(memberName)?.let {
                 return it.second.also { type = it }
             }
@@ -1635,12 +1635,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 return it.typeNode!!.resolveMemberType()
             }
         } else {
-            clazz.findMemberFunctionByTransformedName(memberName)?.let {
+            resolver.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
                 return FunctionTypeNode(
                     parameterTypes = emptyList(),
-                    returnType = it.returnType,
+                    returnType = it.resolvedReturnType,
                     isNullable = false
-                ).resolveMemberType().also { type = it }
+                ).also { type = it }
             }
             findExtensionFunction(subjectType.toDataType(), memberName)?.let {
                 return FunctionTypeNode(

@@ -79,6 +79,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
 
@@ -538,9 +539,31 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
         }
 
+        val classResolver = (functionNode as? FunctionDeclarationNode)
+            ?.takeIf { it.transformedRefName != null }
+            ?.let { function ->
+                val subjectType = subject?.type() as? ObjectType
+                subjectType?.let { subjectType ->
+                    ClassMemberResolver(subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
+                }
+            }
+        val resolvedFunction = (functionNode as? FunctionDeclarationNode)
+            ?.takeIf { it.transformedRefName != null }
+            ?.let { function ->
+                classResolver?.findMemberFunctionWithTypeByTransformedName(function.transformedRefName!!)
+            }
+
         val typeParametersReplacedWithArguments = (functionNode.typeParameters.mapIndexed { index, tp ->
             TypeParameterNode(tp.name, typeArguments[index])
-        } + extraTypeResolutions) // add `extraTypeResolutions` at last because class type arguments have a lower precedence
+        } +
+                (classResolver?.let { resolver ->
+                    resolvedFunction?.classTreeIndex?.let { index ->
+                        resolver.genericResolutions[index].second.map {
+                            TypeParameterNode(it.key, it.value)
+                        }
+                    }
+                } ?: emptyList()) +
+                extraTypeResolutions) // add `extraTypeResolutions` at last because class type arguments have a lower precedence
             .associate { it.name to it.typeUpperBound!! }
 
         // resolve type arguments to DataType first, so that
@@ -550,16 +573,18 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         }
 
         val scopeType = if (functionNode is FunctionDeclarationNode) ScopeType.Function else ScopeType.Closure
-        val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(
-            type = functionNode.returnType.resolveGenericParameterTypeArguments(
+
+        val returnType = callStack.currentSymbolTable().assertToDataType(
+            // 2nd resolution is needed, because the generic type may not be relevant to the class itself.
+            // see test case GenericFunctionAndExtensionFunctionWithGenericClassTest#unrelatedTypeParameter()
+            type = (resolvedFunction?.resolvedReturnType ?: functionNode.returnType).resolveGenericParameterTypeArguments(
 //                (extraSymbols?.listTypeAliasInThisScope() ?: emptyList()) +
                 typeParametersReplacedWithArguments + // typeParametersReplacedWithArguments has higher precedence
                 (extraSymbols?.listTypeAliasResolutionInThisScope() ?: emptyMap()).mapValues {
                     it.value.toTypeNode()
                 }
             ),
-            isMutable = false
-        )!!.type
+        )
 
         callStack.push(
             functionFullQualifiedName = functionNode.name,
@@ -575,9 +600,6 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 symbolTable.declareProperty(it.key, TypeNode(it.value.type().name, null, false), false) // TODO change to use DataType directly
                 symbolTable.assign(it.key, it.value)
             }
-//            typeParametersReplacedWithArguments.forEach {
-//                symbolTable.declareTypeAlias(it.key, it.value)
-//            }
             functionNode.typeParameters.forEach {
                 symbolTable.declareTypeAlias(it.name, it.typeUpperBound)
             }
@@ -587,9 +609,11 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 }
                 symbolTable.declareTypeAliasResolution(it.key, typeArgumentsInDataType[it.key]!!)
             }
+            val valueParametersWithGenericsResolved = resolvedFunction?.resolvedValueParameterTypes
+                ?: functionNode.valueParameters
             functionNode.valueParameters.forEachIndexed { index, it ->
                 if (!isVararg && !(functionNode is LambdaLiteralNode && it.name == "_")) {
-                    val argumentType = it.type //.resolveGenericParameterTypeArguments(typeParametersReplacedWithArguments)
+                    val argumentType = valueParametersWithGenericsResolved[index].type
                     symbolTable.declareProperty(it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
                         it.transformedRefName!!,
@@ -998,7 +1022,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun AsOpNode.eval(): RuntimeValue {
         val value = expression.eval() as RuntimeValue
-        val targetType = symbolTable().typeNodeToDataType(type) ?: throw RuntimeException("Unknown type `$type`")
+        val targetType = symbolTable().typeNodeToDataType(type) ?: throw RuntimeException("Unknown type `${type.descriptiveName()}`")
         return if (value.type().isAssignableTo(targetType)) {
             value
         } else if (isNullable) {

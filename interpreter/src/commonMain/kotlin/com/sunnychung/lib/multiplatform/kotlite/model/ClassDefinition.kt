@@ -133,13 +133,26 @@ open class ClassDefinition(
         return memberFunctions mergeIfNotExists (superClass?.getAllMemberFunctions() ?: emptyMap())
     }
 
+    fun findMemberFunctionsWithIndexByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, Int>> =
+        memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
+            (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
+
     fun findMemberFunctionsByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, FunctionDeclarationNode> =
-        memberFunctions.filter { it.value.name == declaredName } mergeIfNotExists
-            (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
+        findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly).mapValues { it.value.first }
+
+    fun findMemberFunctionWithIndexByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
+        memberFunctions[transformedName]?.let { it to index } ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly) }
+
+    /**
+     * For semantic analyzer use only. In SA, `memberFunctions` is not indexed by transformedRefName.
+     */
+    fun findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
+        memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to index } ?:
+            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName, inThisClassOnly) }
 
     fun findMemberFunctionByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): FunctionDeclarationNode? =
-        memberFunctions[transformedName] ?:
-            Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionByTransformedName(transformedName, inThisClassOnly) }
+        findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly)?.first
 
     fun findDeclarations(filter: (clazz: ClassDefinition, declaration: ASTNode) -> Boolean): List<ASTNode> {
         return declarations.filter { filter(this, it) } +
