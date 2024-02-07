@@ -202,4 +202,62 @@ class GenericFunctionAndExtensionFunctionWithGenericClassTest {
         assertEquals(123, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
         assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("e"))
     }
+
+    @Test
+    fun extensionFunctionOfSuperClass1() {
+        val interpreter = interpreter("""
+            open class A<T>
+            open class A2<T> : A<T>()
+            open class A3<T> : A2<T>()
+            open class A4<T> : A3<T>()
+            fun <T, X> A2<T>.cast(value: X): X? = value as? T as? X
+            class B : A4<String>()
+            class C : A4<Int>()
+            val x = B()
+            val y = C()
+            val a = x.cast("abc")
+            val b = x.cast(123)
+            val c = y.cast("abc")
+            val d = y.cast(123)
+            val e = y.cast(null)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("c"))
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("e"))
+    }
+
+    @Test
+    fun extensionFunctionOfSuperClass2() {
+        val interpreter = interpreter("""
+            open class A<T>
+            open class A2<T> : A<T>()
+            open class A3<T> : A2<T>()
+            open class A4<T> : A3<T>()
+            fun <X, Y> A2<Y>.cast(value: X): X? = value as? Y as? X
+            class B : A4<String>()
+            class C : A4<Int>()
+            val x = B()
+            val y = C()
+            val a = x.cast("abc")
+            val b = x.cast(123)
+            val c = y.cast("abc")
+            val d = y.cast(123)
+            val e = y.cast(null)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(7, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("c"))
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("e"))
+    }
 }

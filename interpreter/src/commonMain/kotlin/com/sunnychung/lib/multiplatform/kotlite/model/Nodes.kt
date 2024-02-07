@@ -280,11 +280,18 @@ data class FunctionCallNode(
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
     @ModifyByAnalyzer var callableType: CallableType? = null,
-    @ModifyByAnalyzer var inferredTypeArguments: List<TypeNode>? = null,
+    @ModifyByAnalyzer var inferredTypeArguments: List<TypeNode?>? = null,
     @ModifyByAnalyzer var modifierFilter: SearchFunctionModifier? = null,
 ) : ASTNode {
     val typeArguments: List<TypeNode>
-        get() = declaredTypeArguments.emptyToNull() ?: inferredTypeArguments ?: emptyList()
+        get() = declaredTypeArguments.emptyToNull() ?: inferredTypeArguments?.let { args ->
+            val nonNullArgs = args.filterNotNull()
+            if (nonNullArgs.size != args.size) {
+                null
+            } else {
+                nonNullArgs
+            }
+        } ?: emptyList()
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"
         return "$self-- function -->${function.toMermaid()}\n" +

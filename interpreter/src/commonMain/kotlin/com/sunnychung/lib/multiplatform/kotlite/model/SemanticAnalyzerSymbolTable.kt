@@ -123,17 +123,17 @@ class SemanticAnalyzerSymbolTable(
                 }
             }.let { thisScopeCandidates += it }
 
-            findExtensionFunctions(receiverType!!, originalName, isThisScopeOnly = true).map {
+            findExtensionFunctionsIncludingSuperClasses(receiverType!!, originalName, isThisScopeOnly = true).map {
                 FindCallableResult(
-                    transformedName = it.first.transformedRefName!!,
+                    transformedName = it.function.transformedRefName!!,
                     owner = null,
                     type = CallableType.ExtensionFunction,
-                    isVararg = it.first.isVararg,
-                    arguments = it.first.valueParameters,
-                    typeParameters = it.first.typeParameters,
-                    receiverType = it.first.receiver,
-                    returnType = it.first.returnType,
-                    definition = it.first,
+                    isVararg = it.function.isVararg,
+                    arguments = it.function.valueParameters,
+                    typeParameters = it.function.typeParameters,
+                    receiverType = it.function.receiver, //it.resolvedReceiverType.toTypeNode(), //it.function.receiver,
+                    returnType = it.function.returnType,
+                    definition = it.function,
                     scope = this
                 )
             }.let { thisScopeCandidates += it }
@@ -215,6 +215,35 @@ class SemanticAnalyzerSymbolTable(
             ?: emptyList()
     }
 
+    fun findExtensionFunctionsIncludingSuperClasses(receiverType: DataType, functionName: String, isThisScopeOnly: Boolean = false): List<ExtensionFunctionLookupResult> {
+        val result = mutableListOf<ExtensionFunctionLookupResult>()
+
+        var type: DataType? = receiverType
+        val resolver = (type as? ObjectType)?.let { ClassMemberResolver(it.clazz, it.arguments.map { it.toTypeNode() }) }
+        var classTreeIndex = (type as? ObjectType)?.clazz?.index ?: 0
+        while (type != null) {
+            findExtensionFunctions(type, functionName, isThisScopeOnly)
+                .let { lookups ->
+                    result.addAll(lookups.map {
+                        ExtensionFunctionLookupResult(
+                            function = it.first,
+                            resolvedReceiverType = type!!,
+                            symbolTable = it.second,
+                        )
+                    })
+                }
+
+            type = (type as? ObjectType)?.clazz?.superClass?.let {
+                val typeResolutions = resolver!!.genericResolutions[it.index].second
+                ObjectType(it, it.typeParameters.map {
+                    assertToDataType(typeResolutions[it.name]!!)
+                })
+            }
+        }
+
+        return result
+    }
+
     fun findExtensionFunctions(receiverType: DataType, functionName: String, isThisScopeOnly: Boolean = false): List<Pair<FunctionDeclarationNode, SymbolTable>> {
         return extensionFunctionDeclarations.values.filter { func ->
             (func.receiver?.let {
@@ -292,3 +321,9 @@ enum class SearchFunctionModifier {
     ConstructorOnly,
     NoRestriction,
 }
+
+data class ExtensionFunctionLookupResult(
+    val function: FunctionDeclarationNode,
+    val resolvedReceiverType: DataType,
+    val symbolTable: SymbolTable,
+)

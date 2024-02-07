@@ -926,7 +926,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     val parameterType = functionArgumentAndReturnTypeDeclarations.receiverType
                     val argumentType =
                         (function as NavigationNode).subject.type(ResolveTypeModifier(isSkipGenerics = isSkipGenerics))
-                    inferTypeArgumentFromOtherArgument(parameterType = parameterType, argumentType = argumentType)
+
+                    var type = argumentType.toDataType() as? ObjectType
+                    val resolver = type?.let { ClassMemberResolver(it.clazz, it.arguments.map { it.toTypeNode() }) }
+                    while (type != null && type.name != parameterType.name) {
+                        type = (type as? ObjectType)?.clazz?.superClass?.let {
+                            val typeResolutions = resolver!!.genericResolutions[it.index].second
+                            ObjectType(it, it.typeParameters.map {
+                                typeResolutions[it.name]!!.toDataType()
+                            })
+                        }
+                    }
+
+                    if (type != null) {
+                        inferTypeArgumentFromOtherArgument(parameterType = parameterType, argumentType = type.toTypeNode())
+                    }
                 }
                 // check at this point would miss generic lambda resolution
 //            if (tpResolutions.size != tpUpperBounds.size) {
@@ -939,7 +953,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
                 inferredTypeArguments = functionArgumentAndReturnTypeDeclarations.typeParameters.map { tp ->
                     tpResolutions[tp.name]
-                }.filterNotNull()
+                }
                 typeArgumentByName = tpResolutions
             }
         }
@@ -980,7 +994,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
 
         if (typeArguments.size != typeParameters.size) {
-            val missing = typeParameters.map { it.name }.toSet() - typeArguments.map { it.name }.toSet()
+            val missing = (typeParameters.indices - (inferredTypeArguments?.withIndex()?.filter { it.value != null }?.map { it.index }?.toSet() ?: emptySet())).map { typeParameters[it].name }
             throw CannotInferTypeException("type: ${missing.joinToString(", ")}")
         }
         tpResolutions = typeArguments.mapIndexed { index, t ->
@@ -1166,7 +1180,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
         } else {
             if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
-            if (currentScope.findExtensionFunctions(subjectType, memberName).isNotEmpty()) return
+            if (currentScope.findExtensionFunctionsIncludingSuperClasses(subjectType, memberName).isNotEmpty()) return
         }
         throw SemanticException("Type `${subjectType.nameWithNullable}` has no member `$memberName`")
     }
