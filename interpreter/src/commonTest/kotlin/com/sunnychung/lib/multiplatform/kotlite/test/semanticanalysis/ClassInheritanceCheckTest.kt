@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis
 
 import kotlin.test.Test
+import kotlin.test.assertFails
 
 class ClassInheritanceCheckTest {
 
@@ -245,6 +246,26 @@ class ClassInheritanceCheckTest {
             open class D<T> : C<T>()
             class E<T> : D<T>()
         """.trimIndent())
+    }
+
+    @Test
+    fun cannotFormCyclicClassHierarchy1() {
+        assertFails {
+            semanticAnalyzer("""
+                open class A : A()
+            """.trimIndent()).analyze()
+        }
+    }
+
+    @Test
+    fun cannotFormCyclicClassHierarchy2() {
+        assertFails {
+            semanticAnalyzer("""
+                open class A : C()
+                open class B : A()
+                open class C : B()
+            """.trimIndent()).analyze()
+        }
     }
 
 }
