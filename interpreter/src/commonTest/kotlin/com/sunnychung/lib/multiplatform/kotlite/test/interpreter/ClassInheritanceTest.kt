@@ -754,4 +754,54 @@ class ClassInheritanceTest {
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
     }
+
+    @Test
+    fun lambda() {
+        val interpreter = interpreter("""
+            var h = 0
+            var i = 0
+            var j = 0
+            var k = 0
+            
+            open class A {
+                open var a: Int = 1
+            }
+            open class B : A()
+            open class C : B()
+            open class D : C() {
+                open override var a: Int = 10
+                fun getSuperA2() = super.a
+                fun setSuperA2(x: Int) {
+                    super.a += x
+                }
+                
+                fun lambda(): () -> Unit = {
+                    h = super.a
+                    i = a
+                    j = this.a
+                    a += 100
+                    k = a
+                }
+            }
+            class E : D() {
+                override var a: Int = 20
+                fun getSuperA1() = super.a
+                fun setSuperA1(x: Int) {
+                    super.a = x
+                }
+            }
+            val x = E()
+            x.lambda()()
+            val l = x.a
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("h") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("i") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("j") as IntValue).value)
+        assertEquals(120, (symbolTable.findPropertyByDeclaredName("k") as IntValue).value)
+        assertEquals(120, (symbolTable.findPropertyByDeclaredName("l") as IntValue).value)
+    }
 }
