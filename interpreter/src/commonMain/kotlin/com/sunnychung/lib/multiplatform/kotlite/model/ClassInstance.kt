@@ -15,7 +15,7 @@ open class ClassInstance(
      *
      * It can be flattened in the future.
      */
-    private val parentInstance: ClassInstance? = null,
+    val parentInstance: ClassInstance? = null,
 ) : RuntimeValue {
     internal var clazz: ClassDefinition? = null
     internal var hasInitialized: Boolean = false

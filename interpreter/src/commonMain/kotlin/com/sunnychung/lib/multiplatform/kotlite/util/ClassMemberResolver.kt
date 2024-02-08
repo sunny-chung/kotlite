@@ -11,7 +11,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.typeUpperBoundOrAny
 
-class ClassMemberResolver(val clazz: ClassDefinition, val typeArguments: List<TypeNode>?) {
+class ClassMemberResolver(private val clazz: ClassDefinition, private val typeArguments: List<TypeNode>?) {
     // [n-1] = clazz; [n-2] = superclass of clazz; etc.
     val genericResolutions: List<Pair<ClassDefinition, Map<String, TypeNode>>>
     val genericUpperBounds: List<Pair<ClassDefinition, Map<String, TypeNode>>>

@@ -455,7 +455,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
         }
         val l = checkPropertyReadAccess(variableName)
-        if (variableName != "this" && transformedRefName == null) {
+        if (variableName != "this" && variableName != "super" && transformedRefName == null) {
             transformedRefName = "$variableName/$l"
             currentScope.findPropertyOwner(transformedRefName!!)?.let {
                 ownerRef = it
@@ -464,7 +464,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 val symbols = symbolRecorders.last()
                 symbols.properties += ownerRef?.ownerRefName ?: transformedRefName!!
             }
-        } else if (variableName == "this") {
+        } else if (variableName == "this" || variableName == "super") {
             if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(l)) {
                 val symbols = symbolRecorders.last()
                 symbols.properties += variableName
@@ -556,6 +556,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             currentScope.declareProperty(name = "this", type = typeNode, isMutable = false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
             val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException("Class `${receiver.descriptiveName()}` not found")
+            if (clazz.superClass != null) {
+                val superClassTypeResolutions = ClassMemberResolver(clazz, typeNode.arguments).genericResolutions.let { it[it.lastIndex - 1] }.second
+                val superClassType = TypeNode(
+                    clazz.superClass.name,
+                    clazz.superClass.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
+                    isNullable = false,
+                )
+                currentScope.declareProperty(name = "super", type = superClassType, isMutable = false)
+                currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "super", "super")
+            }
             if (!typeNode.isNullable) {
                 clazz.typeParameters.forEachIndexed { index, it ->
                     currentScope.declareTypeAlias(it.name, it.typeUpperBound)
@@ -1378,6 +1388,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
             currentScope.declareProperty("this/${fullQualifiedClassName}", TypeNode(name, pseudoTypeArguments, false), false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this/${fullQualifiedClassName}", "this")
+
+            superClassInvocation?.let { superClassInvocation ->
+                currentScope.declareProperty("super", superClassInvocation.type(), false)
+                currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "super", "super")
+            }
+
             primaryConstructor?.parameters
                 ?.filter { it.isProperty }
                 ?.map { it.parameter }

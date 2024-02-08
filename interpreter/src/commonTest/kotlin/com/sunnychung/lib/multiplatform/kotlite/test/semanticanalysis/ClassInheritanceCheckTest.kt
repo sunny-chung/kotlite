@@ -290,4 +290,50 @@ class ClassInheritanceCheckTest {
         """.trimIndent())
     }
 
+    @Test
+    fun superCannotBeAccessedWhenThereIsNoParent1() {
+        assertSemanticFail("""
+            open class A {
+                open fun f() {
+                    super.f()
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun superCannotBeAccessedWhenThereIsNoParent2() {
+        assertSemanticFail("""
+            open class A {
+                open fun f() {
+                    super.f()
+                }
+            }
+            class B : A() {
+                override fun f() {
+                    super.f()
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun accessNonExistSuperProperty() {
+        assertSemanticFail("""
+            open class A
+            open class B : A() {
+                open var a: Int = 1
+                fun f() {
+                    super.a
+                }
+            }
+            open class C : B() {
+                open override var a: Int = 2
+            }
+            class D : C() {
+                override var a: Int = 3
+            }
+        """.trimIndent())
+    }
+
 }

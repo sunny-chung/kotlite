@@ -294,7 +294,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             is NavigationNode -> {
-                val subject = this.subject.eval() as RuntimeValue
+                val subject = (this.subject.eval() as RuntimeValue)
+                    .let { resolveSuperKeyword(it) }
 
                 if (transformedRefName != null) { // extension property
                     (symbolTable().findExtensionProperty(transformedRefName!!)?.setter
@@ -315,6 +316,20 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             else -> throw UnsupportedOperationException()
+        }
+    }
+
+    fun NavigationNode.resolveSuperKeyword(subjectValue: RuntimeValue): RuntimeValue {
+        // a hack to resolve the "super" keyword. See documentation
+        return if (subject is VariableReferenceNode && subject.variableName == "super") {
+            var instance: ClassInstance? = subjectValue as ClassInstance
+            val typeOfSuper = subject.type!!
+            while (instance != null && instance.clazz!!.fullQualifiedName != typeOfSuper.name) {
+                instance = instance.parentInstance
+            }
+            instance!!
+        } else {
+            subjectValue
         }
     }
 
@@ -744,6 +759,16 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //                symbolTable.putPropertyHolder(instance.clazz!!.memberPropertyNameToTransformedName[it.key]!!, it.value)
 //            }
 
+        if (instance.clazz?.superClass != null) {
+            // a hack to resolve the "super" keyword. See documentation
+            symbolTable.declareProperty(
+                "super",
+                TypeNode(instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
+                false
+            )
+            symbolTable.assign("super", instance)
+        }
+
         val typeParametersAndArguments = clazz.typeParameters.mapIndexed { index, tp ->
             TypeParameterNode(tp.name, typeArguments[index].toTypeNode())
         }
@@ -829,6 +854,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             symbolTable.assign("this", subject)
             symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
             symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this/${subject.type().name}", "this")
+
+            if (subject is ClassInstance && subject.parentInstance != null) {
+                // a hack to resolve "super". See documentation
+                val parentInstance = subject.parentInstance
+                symbolTable.declareProperty("super", subject.type().toTypeNode(), false)
+                symbolTable.assign("super", subject)
+                symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "super", "super")
+            }
 
 //            // TODO optimize to only copy needed members
 //            if (subject is ClassInstance) {
@@ -987,7 +1020,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun NavigationNode.eval(): RuntimeValue {
-        val obj = subject.eval() as RuntimeValue
+        val obj = (subject.eval() as RuntimeValue)
+            .let { resolveSuperKeyword(it) }
 //        return obj.memberPropertyValues[member.transformedRefName!!]!!
 
         if (transformedRefName != null) {
