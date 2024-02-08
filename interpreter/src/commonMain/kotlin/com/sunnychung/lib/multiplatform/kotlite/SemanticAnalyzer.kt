@@ -1254,6 +1254,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         )
 
         pushScope(name, ScopeType.Class)
+        // copy this class's type parameter to superclass scope, so that
+        // generic types in superclass can be resolved when it returns to this class.
+        // declared type parameters here will be overwritten in this class's scope
+        typeParameters.forEach {
+            currentScope.declareTypeAlias(it.name, it.typeUpperBound)
+        }
+
+        pushScope(name, ScopeType.Class)
         val superClassScope = currentScope
         val superClass = (superClassInvocation?.function as? TypeNode)
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
@@ -1409,6 +1417,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     it.visit(modifier = modifier, isClassMemberFunction = true)
                 }
         }
+        popScope()
         popScope()
         popScope()
 

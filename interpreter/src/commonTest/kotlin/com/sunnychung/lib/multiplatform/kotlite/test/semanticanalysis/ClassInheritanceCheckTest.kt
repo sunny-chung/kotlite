@@ -249,6 +249,16 @@ class ClassInheritanceCheckTest {
     }
 
     @Test
+    fun nonexistTypeParameterInSuperClass() {
+        assertSemanticFail("""
+            open class A<T> {
+                var a: T2? = null
+            }
+            class B<T1, T2> : A<T2>()
+        """.trimIndent())
+    }
+
+    @Test
     fun cannotFormCyclicClassHierarchy1() {
         assertFails {
             semanticAnalyzer("""
@@ -266,6 +276,18 @@ class ClassInheritanceCheckTest {
                 open class C : B()
             """.trimIndent()).analyze()
         }
+    }
+
+    @Test
+    fun cannotOverrideGenericFunctionWithoutOverrideModifier() {
+        assertSemanticFail("""
+            open class A<T> {
+                open fun f(x: T) {}
+            }
+            class B<T1, T2> : A<T2>() {
+                open fun f(x: T1) {}
+            }
+        """.trimIndent())
     }
 
 }

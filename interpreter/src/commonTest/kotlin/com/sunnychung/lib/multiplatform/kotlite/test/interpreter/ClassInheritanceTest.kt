@@ -276,6 +276,82 @@ class ClassInheritanceTest {
     }
 
     @Test
+    fun inheritPropertyInClassExtendedWithDifferentTypeParameters() {
+        val interpreter = interpreter("""
+            open class A<T> {
+                var a: T? = null
+            }
+            class B<T1, T2> : A<T2>()
+            val x = B<Int, String>()
+            val y = B<Double, Int>()
+            x.a = "abc"
+            y.a = 123
+            val a: String = x.a!!
+            val b: Int = y.a!!
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun inheritPropertyInClassDeeplyExtendedWithDifferentTypeParameters() {
+        val interpreter = interpreter("""
+            open class A<T> {
+                var a: T? = null
+            }
+            open class B<Y, Z> : A<Z>()
+            open class C<BB, AA> : B<AA, BB>()
+            open class D<X, Y> : C<Y, X>()
+            class E<T1, T2> : D<T1, T2>()
+            val x = E<Int, String>()
+            val y = E<Double, Int>()
+            x.a = "abc"
+            y.a = 123
+            val a: String = x.a!!
+            val b: Int = y.a!!
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun inheritPropertyInClassExtendedWithDifferentNestedTypeParameters() {
+        val interpreter = interpreter("""
+            open class A<T>(v: T) {
+                var value: T? = null
+                
+                init {
+                    value = v
+                }
+            }
+            class MyPair<T1, T2>(val first: T1, val second: T2)
+            class B<T1, T2>(x: MyPair<T1, T2>) : A<MyPair<T1, T2>>(x)
+            val x = B<Int, String>(MyPair(123, "abc"))
+            val y = B<String, Int>(MyPair("def", 456))
+            val a: Int = x.value!!.first
+            val b: String = x.value!!.second
+            val c: String = y.value!!.first
+            val d: Int = y.value!!.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals(456, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
+
+    @Test
     fun inheritFunctionInClassExtendedWithTypeParameter() {
         val interpreter = interpreter("""
             open class A<T> {

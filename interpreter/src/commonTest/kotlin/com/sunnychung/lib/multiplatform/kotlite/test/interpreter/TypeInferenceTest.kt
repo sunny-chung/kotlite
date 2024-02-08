@@ -983,4 +983,33 @@ class TypeInferenceTest {
         assertEquals(234, (symbolTable.findPropertyByDeclaredName("fv2") as IntValue).value)
         assertEquals("bcd", (symbolTable.findPropertyByDeclaredName("fv3") as StringValue).value)
     }
+
+    @Test
+    fun nestedGenericsInClassTypeParameters() {
+        val interpreter = interpreter("""
+            open class A<T>(v: T) {
+                var value: T? = null
+                
+                init {
+                    value = v
+                }
+            }
+            class MyPair<T1, T2>(val first: T1, val second: T2)
+            class B<T1, T2>(x: MyPair<T1, T2>) : A<MyPair<T1, T2>>(x)
+            val x = B(MyPair(123, "abc"))
+            val y = B(MyPair("def", 456))
+            val a: Int = x.value!!.first
+            val b: String = x.value!!.second
+            val c: String = y.value!!.first
+            val d: Int = y.value!!.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals("def", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals(456, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
 }

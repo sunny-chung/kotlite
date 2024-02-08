@@ -54,8 +54,8 @@ open class SymbolTable(
         if (typeAliasResolution.containsKey(name) || typeAliasResolution.containsKey("$name?")) {
             throw DuplicateIdentifierException(name, IdentifierClassifier.TypeResolution)
         }
-        typeAliasResolution[name] = referenceSymbolTable.typeNodeToDataType(type)!!
-        typeAliasResolution["$name?"] = referenceSymbolTable.typeNodeToDataType(type.copy(isNullable = true))!!
+        typeAliasResolution[name] = referenceSymbolTable.assertToDataType(type)
+        typeAliasResolution["$name?"] = referenceSymbolTable.assertToDataType(type.copy(isNullable = true))
     }
 
     fun declareTypeAliasResolution(name: String, type: DataType) {
