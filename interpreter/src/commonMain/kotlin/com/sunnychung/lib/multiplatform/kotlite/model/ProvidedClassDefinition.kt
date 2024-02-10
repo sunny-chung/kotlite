@@ -10,6 +10,8 @@ class ProvidedClassDefinition(
     isInstanceCreationAllowed: Boolean,
     private val primaryConstructorParameters: List<CustomFunctionParameter>,
     private val constructInstance: (interpreter: Interpreter, callArguments: Array<RuntimeValue>, callPosition: SourcePosition) -> ClassInstance,
+    superClassInvocation: String? = null,
+    superClass: ClassDefinition? = null,
 ) : ClassDefinition(
     currentScope = null,
     name = fullQualifiedName.substringAfterLast('.'),
@@ -37,7 +39,11 @@ class ProvidedClassDefinition(
                 modifiers = modifiers.filterIsInstance<FunctionValueParameterModifier>().toSet(),
             )
         )
-    })
+    }),
+    superClassInvocation = superClassInvocation?.let {
+        Parser(Lexer(it)).delegationSpecifiers()
+    },
+    superClass = superClass,
 ) {
     override fun construct(
         interpreter: Interpreter,

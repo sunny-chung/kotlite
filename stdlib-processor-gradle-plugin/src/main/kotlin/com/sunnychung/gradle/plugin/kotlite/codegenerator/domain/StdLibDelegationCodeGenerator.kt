@@ -44,6 +44,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
+import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
@@ -120,7 +121,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             if (receiver != null && !receiver!!.name.endsWith(".Companion")) {
                 val isReceiverNullable = receiver!!.isNullable
                 val question = if (isReceiverNullable) "?" else ""
-                "val unwrappedReceiver = (receiver as$question ${receiver!!.name}Value)$question.value"
+                "val unwrappedReceiver = ${unwrap("receiver", receiver!!)}"
             } else ""
         }
     ${valueParameters.mapIndexed { i, it ->
@@ -183,7 +184,15 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         } else if (type.name == "Any") {
             "$variableName as RuntimeValue"
         } else {
-            "($variableName as$question ${type.name}Value)$question.value"
+            if (type.isPrimitive()) {
+                "($variableName as$question ${type.name}Value)$question.value"
+            } else {
+                "($variableName as$question DelegatedValue<*>)$question.value as ${type.name}${
+                    type.arguments?.let {
+                        "<${it.joinToString(", ") { "RuntimeValue" }}>"
+                    } ?: ""
+                }$question"
+            }
         }
     }
 
@@ -235,14 +244,15 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
         return """ExtensionProperty(
     declaredName = "${name.escape()}",
     typeParameters = listOf<TypeParameter>(${typeParameters.joinToString("") {
-        "\n${it.generate(indent(8))}," }
-    }${indent(4)}),
+        "\n${it.generate(indent(8))},"
+    }}
+    ${indent(4)}),
     receiver = "${receiver!!.descriptiveName().escape()}",
     type = "${type.descriptiveName().escape()}",
     getter = ${accessors?.getter?.let { """{ interpreter, receiver ->
         ${
             if (!receiver!!.name.endsWith(".Companion")) {
-                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.name}Value)$receiverQuestion.value"
+                "val unwrappedReceiver = ${unwrap("receiver", receiver!!)}"
             } else ""
         }
         val result = ${if (receiver!!.name.endsWith(".Companion")) receiver!!.name else "unwrappedReceiver"}.$name
@@ -251,7 +261,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
     setter = ${accessors?.setter?.let { """{ interpreter, receiver, value ->
         ${
             if (!receiver!!.name.endsWith(".Companion")) {
-                "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.name}Value)$receiverQuestion.value"
+                "val unwrappedReceiver = ${unwrap("receiver", receiver!!)}"
             } else ""
         }
         val unwrappedValue = ${unwrap("value", type)}

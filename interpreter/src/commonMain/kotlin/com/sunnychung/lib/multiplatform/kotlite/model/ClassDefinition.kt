@@ -35,6 +35,12 @@ open class ClassDefinition(
     val superClass: ClassDefinition? = null
 ) {
 
+    init {
+        if (superClass != null && superClassInvocation == null) {
+            throw RuntimeException("superClassInvocation must be provided if there is a supper class")
+        }
+    }
+
     // key = original name
     // does not include properties with custom accessors
     private val memberProperties: Map<String, PropertyType> = mutableMapOf()
