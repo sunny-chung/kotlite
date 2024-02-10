@@ -3,6 +3,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -19,7 +20,7 @@ class ListTest {
             install(CollectionsLibModule())
         }
         val interpreter = interpreter("""
-            val l = listOf(1, 2, 3, 4, 5)
+            val l: List<Int> = listOf(1, 2, 3, 4, 5)
             l.forEach { println(it) }
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
@@ -140,5 +141,27 @@ class ListTest {
         assertEquals(16, (symbolTable.findPropertyByDeclaredName("a2") as IntValue).value)
         assertEquals(8, (symbolTable.findPropertyByDeclaredName("a3") as IntValue).value)
         assertEquals(30, (symbolTable.findPropertyByDeclaredName("a4") as IntValue).value)
+    }
+
+    @Test
+    @Ignore
+    fun ifEmpty() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            fun f(l: List<Int>): Int {
+                return l.ifEmpty { listOf(4) }
+                    .fold(0) { acc, it -> acc + it }
+            }
+            val a = f(mutableListOf(1, 2, 3, 4, 5))
+            val b = f(mutableListOf<Int>())
+            val c = f(listOf<Int>())
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
 }

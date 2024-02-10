@@ -137,6 +137,9 @@ fun <T> List<T>.single(predicate: (T) -> Boolean): T
 fun <T> List<T>.singleOrNull(): T?
 fun <T> List<T>.singleOrNull(predicate: (T) -> Boolean): T?
 fun <T> List<T>.subList(fromIndex: Int, toIndex: Int): List<T>
+//fun <T> List<Int>.sum(): Int
+//fun <T> List<Long>.sum(): Long
+//fun <T> List<Double>.sum(): Double
 fun <T> List<T>.take(n: Int): List<T>
 fun <T> List<T>.takeLast(n: Int): List<T>
 fun <T> List<T>.takeLastWhile(predicate: (T) -> Boolean): List<T>
