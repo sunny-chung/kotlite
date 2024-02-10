@@ -18,10 +18,35 @@ class SemanticAnalyzerSymbolTable(
     parentScope = parentScope,
     returnType = returnType
 ) {
+    /**
+     * For resolving type parameters in function declarations only
+     */
+    private val tempTypeAlias = mutableListOf<Map<String, DataType>>()
 
     fun TypeNode.toClass(): ClassDefinition {
         return (findClass(name) ?: throw RuntimeException("Could not find class `$name`"))
             .first
+    }
+
+    private fun declareTempTypeAlias(typeAliasAndUpperBounds: List<Pair<String, TypeNode>>) {
+        val alias = mutableMapOf<String, DataType>()
+        // update tempTypeAlias first, because other type parameters may depend on previous type parameters in the same event
+        // e.g. `<T, L : List<T>>`
+        tempTypeAlias += alias
+        typeAliasAndUpperBounds.forEach {
+            alias[it.first] = assertToDataType(it.second)
+        }
+    }
+
+    private fun popTempTypeAlias() {
+        tempTypeAlias.removeLast()
+    }
+
+    override fun findTypeAlias(name: String): Pair<DataType, SymbolTable>? {
+        tempTypeAlias.indices.reversed().forEach {  index ->
+            tempTypeAlias[index][name]?.let { return it to this }
+        }
+        return super.findTypeAlias(name)
     }
 
     override fun functionNameTransform(name: String, function: FunctionDeclarationNode) = function.toSignature(this)
@@ -153,54 +178,61 @@ class SemanticAnalyzerSymbolTable(
                 }
             }
             .filter { callable ->
-                if (callable.isVararg) {
-                    val functionArgType = currentSymbolTable.typeNodeToDataType(
-                        (callable.arguments.first() as FunctionValueParameterNode).type.resolveGenericParameterTypeToUpperBound(
-                            callable.typeParameters + (receiverClass?.typeParameters ?: emptyList())
-                        )
-                    )!!
-                    return@filter arguments.all { functionArgType.isConvertibleFrom(it.type) }
-                }
-
-                if (callable.arguments.isEmpty()) {
-                    return@filter arguments.isEmpty()
-                }
-                when (callable.arguments.first()) {
-                    is DataType /* is a lambda */ -> return@filter arguments.size == callable.arguments.size &&
-                            arguments.all { it.name == null } &&
-                            callable.arguments.foldIndexed(true) { i, acc, it -> acc && (it as DataType).isAssignableFrom(arguments[i].type) }
-                    is FunctionValueParameterNode -> {
-                        if (arguments.size > callable.arguments.size) return@filter false
-                        val argumentsReordered = arrayOfNulls<FunctionCallArgumentInfo>(callable.arguments.size)
-                        val typeParameterMapping = mutableMapOf<String, DataType>()
-                        arguments.forEachIndexed { i, arg ->
-                            val newIndex = if (arg.name == null) {
-                                if (i == arguments.lastIndex && arg.type is FunctionType) {
-                                    callable.arguments.lastIndex
-                                } else {
-                                    i
-                                }
-                            } else {
-                                val findIndex = callable.arguments.indexOfFirst { (it as FunctionValueParameterNode).name == arg.name }
-                                if (findIndex < 0) {
-                                    return@filter false
-                                }
-                                findIndex
-                            }
-                            argumentsReordered[newIndex] = arg
-                        }
-                        callable.arguments.foldIndexed(true) { i, acc, it ->
-                            val functionArg = it as FunctionValueParameterNode
-                            val callArg = argumentsReordered[i]
-                            acc && if (callArg == null) {
-                                functionArg.defaultValue != null
-                            } else {
-                                currentSymbolTable.assertToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) )).isConvertibleFrom(callArg.type)
-                                // TODO filter whether same type parameter always map to same argument
-                            }
-                        }
+                declareTempTypeAlias(callable.typeParameters.map {
+                    it.name to it.typeUpperBoundOrAny()
+                })
+                try {
+                    if (callable.isVararg) {
+                        val functionArgType = currentSymbolTable.typeNodeToDataType(
+                            (callable.arguments.first() as FunctionValueParameterNode).type.resolveGenericParameterTypeToUpperBound(
+                                callable.typeParameters + (receiverClass?.typeParameters ?: emptyList())
+                            )
+                        )!!
+                        return@filter arguments.all { functionArgType.isConvertibleFrom(it.type) }
                     }
-                    else -> throw UnsupportedOperationException()
+
+                    if (callable.arguments.isEmpty()) {
+                        return@filter arguments.isEmpty()
+                    }
+                    when (callable.arguments.first()) {
+                        is DataType /* is a lambda */ -> return@filter arguments.size == callable.arguments.size &&
+                                arguments.all { it.name == null } &&
+                                callable.arguments.foldIndexed(true) { i, acc, it -> acc && (it as DataType).isAssignableFrom(arguments[i].type) }
+                        is FunctionValueParameterNode -> {
+                            if (arguments.size > callable.arguments.size) return@filter false
+                            val argumentsReordered = arrayOfNulls<FunctionCallArgumentInfo>(callable.arguments.size)
+                            val typeParameterMapping = mutableMapOf<String, DataType>()
+                            arguments.forEachIndexed { i, arg ->
+                                val newIndex = if (arg.name == null) {
+                                    if (i == arguments.lastIndex && arg.type is FunctionType) {
+                                        callable.arguments.lastIndex
+                                    } else {
+                                        i
+                                    }
+                                } else {
+                                    val findIndex = callable.arguments.indexOfFirst { (it as FunctionValueParameterNode).name == arg.name }
+                                    if (findIndex < 0) {
+                                        return@filter false
+                                    }
+                                    findIndex
+                                }
+                                argumentsReordered[newIndex] = arg
+                            }
+                            callable.arguments.foldIndexed(true) { i, acc, it ->
+                                val functionArg = it as FunctionValueParameterNode
+                                val callArg = argumentsReordered[i]
+                                acc && if (callArg == null) {
+                                    functionArg.defaultValue != null
+                                } else {
+                                    currentSymbolTable.assertToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) )).isConvertibleFrom(callArg.type)
+                                    // TODO filter whether same type parameter always map to same argument
+                                }
+                            }
+                        }
+                        else -> throw UnsupportedOperationException()
+                    }
+                } finally {
+                    popTempTypeAlias()
                 }
             }.toMutableList()
         return thisScopeCandidates + ((parentScope as? SemanticAnalyzerSymbolTable)?.findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter) ?: emptyList())

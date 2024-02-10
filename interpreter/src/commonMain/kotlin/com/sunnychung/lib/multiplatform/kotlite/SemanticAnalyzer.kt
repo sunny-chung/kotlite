@@ -923,16 +923,33 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             if (declaredTypeArguments.isEmpty() && functionArgumentAndReturnTypeDeclarations.typeParameters.isNotEmpty()) {
                 // infer type arguments from value arguments
 
+                fun inferNestedTypeArgument(resolvedArgumentTypeName: String) {
+                    if (tpUpperBounds[resolvedArgumentTypeName] !is ObjectType) return
+
+                    var t: DataType? = currentScope.assertToDataType(tpResolutions[resolvedArgumentTypeName]!!)
+                    while (t is ObjectType && t.name != tpUpperBounds[resolvedArgumentTypeName]!!.name) {
+                        t = t.superType
+                    }
+                    (tpUpperBounds[resolvedArgumentTypeName] as? ObjectType)?.arguments?.forEachIndexed { i, it ->
+                        if (tpUpperBounds.containsKey(it.name)) {
+                            val resolvedArgumentType = (t as ObjectType).arguments[i].toTypeNode()
+                            tpResolutions[it.name] = superTypeOf(tpResolutions[it.name] ?: resolvedArgumentType, resolvedArgumentType)
+                        }
+                    }
+                }
+
                 fun inferTypeArgumentFromOtherArgument(parameterType: TypeNode, argumentType: TypeNode) {
                     if (tpUpperBounds.containsKey(parameterType.name)) {
                         tpResolutions[parameterType.name] =
                             superTypeOf(tpResolutions.getOrElse(parameterType.name) { argumentType }, argumentType)
+                        inferNestedTypeArgument(parameterType.name)
                     } else if (parameterType.arguments?.any { tpUpperBounds.containsKey(it.name) } == true) {
                         parameterType.arguments.withIndex().filter { tpUpperBounds.containsKey(it.value.name) }
                             .forEach {
                                 val tp = it.value.name
                                 val argType = (argumentType.arguments ?: return@forEach)[it.index]
                                 tpResolutions[tp] = superTypeOf(tpResolutions.getOrElse(tp) { argType }, argType)
+                                inferNestedTypeArgument(tp)
                             }
                     }
                 }

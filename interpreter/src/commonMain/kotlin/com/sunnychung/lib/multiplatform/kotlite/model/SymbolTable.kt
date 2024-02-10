@@ -41,7 +41,7 @@ open class SymbolTable(
             ?: throw RuntimeException("Unknown type ${type.name}")
     }
 
-    fun findTypeAlias(name: String): Pair<DataType, SymbolTable>? {
+    open fun findTypeAlias(name: String): Pair<DataType, SymbolTable>? {
         return typeAlias[name]?.let { it to this } ?: parentScope?.findTypeAlias(name)
     }
 

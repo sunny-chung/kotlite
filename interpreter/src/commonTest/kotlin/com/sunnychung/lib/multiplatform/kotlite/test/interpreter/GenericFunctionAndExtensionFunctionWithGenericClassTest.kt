@@ -260,4 +260,110 @@ class GenericFunctionAndExtensionFunctionWithGenericClassTest {
         assertEquals(123, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
         assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("e"))
     }
+
+    @Test
+    fun baseClassExtensionFunction1() {
+        val interpreter = interpreter("""
+            open class MyStringListBase<T> {
+                var elements = ""
+                fun add(element: T) {
+                    elements += "${'$'}element,"
+                }
+            }
+            
+            class StringList : MyStringListBase<String>()
+            class IntList : MyStringListBase<Int>()
+            
+            fun <O : MyStringListBase<*>> MyStringListBase<*>.addAll(list: O) {
+                elements += list.elements
+            }
+            val x = StringList()
+            val y = IntList()
+            x.add("abc")
+            x.add("def")
+            y.add(123)
+            y.add(45)
+            x.add("bcd")
+            x.addAll(y)
+            val a = x.elements
+            val b = y.elements
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("abc,def,bcd,123,45,", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("123,45,", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
+
+    @Test
+    fun baseClassExtensionFunction2() {
+        val interpreter = interpreter("""
+            open class MyStringListBase<T> {
+                var elements = ""
+                fun add(element: T) {
+                    elements += "${'$'}element,"
+                }
+            }
+            
+            class StringList : MyStringListBase<String>()
+            class IntList : MyStringListBase<Int>()
+            
+            fun <A, B, O : MyStringListBase<B>> MyStringListBase<A>.addAll(list: O) {
+                elements += list.elements
+            }
+            val x = StringList()
+            val y = IntList()
+            x.add("abc")
+            x.add("def")
+            y.add(123)
+            y.add(45)
+            x.add("bcd")
+            x.addAll(y)
+            val a = x.elements
+            val b = y.elements
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("abc,def,bcd,123,45,", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("123,45,", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
+
+    @Test
+    fun nestedTypeParametersInExtensionFunction() {
+        val interpreter = interpreter("""
+            open class MyStringListBase<T> {
+                var elements = ""
+                fun add(element: T) {
+                    elements += "${'$'}element,"
+                }
+            }
+            
+            class StringList : MyStringListBase<String>()
+            class IntList : MyStringListBase<Int>()
+            class Value<T>(val value: T)
+            
+            fun <A, B, O : MyStringListBase<B>> MyStringListBase<A>.addAll(list: Value<O>) {
+                elements += list.value.elements
+            }
+            val x = StringList()
+            val y = IntList()
+            x.add("abc")
+            x.add("def")
+            y.add(123)
+            y.add(45)
+            x.add("bcd")
+            x.addAll(Value(y))
+            val a = x.elements
+            val b = y.elements
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("abc,def,bcd,123,45,", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("123,45,", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
 }
