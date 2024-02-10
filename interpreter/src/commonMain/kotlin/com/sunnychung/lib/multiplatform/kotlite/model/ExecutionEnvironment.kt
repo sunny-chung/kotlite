@@ -14,6 +14,13 @@ class ExecutionEnvironment(
     private val extensionProperties: MutableList<ExtensionProperty> = mutableListOf()
     private val providedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
 
+    init {
+        registerClass(PairValue.clazz)
+        PairValue.properties.forEach {
+            registerExtensionProperty(it)
+        }
+    }
+
     fun registerFunction(function: CustomFunctionDefinition) {
         if (functionRegistrationFilter(function)) {
             builtinFunctions += function.let {

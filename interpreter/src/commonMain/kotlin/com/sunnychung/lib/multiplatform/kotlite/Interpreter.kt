@@ -46,6 +46,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModi
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
@@ -58,6 +59,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
+import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
@@ -139,6 +141,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is AsOpNode -> this.eval()
             is TypeParameterNode -> TODO()
             is IndexOpNode -> this.eval()
+            is InfixFunctionCallNode -> this.eval()
         }
     }
 
@@ -1112,6 +1115,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //        processTypeParameter(lambdaType)
 
         return LambdaValue(this, lambdaType, runtimeRefs, this@Interpreter)
+    }
+
+    fun InfixFunctionCallNode.eval(): PairValue {
+        val n1 = node1.eval() as RuntimeValue
+        val n2 = node2.eval() as RuntimeValue
+        return PairValue(n1 to n2, n1.type(), n2.type(), symbolTable())
     }
 
     fun StringNode.eval(): StringValue {

@@ -550,3 +550,16 @@ class IndexOpNode(val subject: ASTNode, val arguments: List<ASTNode>): ASTNode {
                 }.joinToString("\n")
     }
 }
+
+data class InfixFunctionCallNode(
+    val node1: ASTNode,
+    val node2: ASTNode,
+    val functionName: String,
+    @ModifyByAnalyzer var type: TypeNode? = null,
+) : ASTNode {
+    @ModifyByAnalyzer var call: FunctionCallNode? = null
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Infix Function Call ${functionName}\"]"
+        return "$self-->${node1.toMermaid()}\n$self-->${node2.toMermaid()}\n"
+    }
+}

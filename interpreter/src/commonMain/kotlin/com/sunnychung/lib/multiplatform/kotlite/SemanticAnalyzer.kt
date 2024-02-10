@@ -45,6 +45,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModi
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
@@ -246,6 +247,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is LambdaLiteralNode -> this.visit(modifier = modifier)
             is CharNode -> {}
             is AsOpNode -> this.visit(modifier = modifier)
+            is InfixFunctionCallNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -1576,6 +1578,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         this.type.visit(modifier = modifier)
     }
 
+    fun InfixFunctionCallNode.visit(modifier: Modifier = Modifier()) {
+        if (functionName !in setOf("to")) {
+            throw SemanticException("Infix function `$functionName` is not supported")
+        }
+        this.node1.visit(modifier = modifier)
+        this.node2.visit(modifier = modifier)
+
+        type()
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -1622,6 +1634,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is StringNode -> typeRegistry["String"]!!
             is LambdaLiteralNode -> this.type(modifier = modifier)
             is CharNode -> typeRegistry["Char"]!!
+            is InfixFunctionCallNode -> this.type(modifier = modifier)
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {
@@ -1778,6 +1791,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         if (modifier.isSkipGenerics) return FunctionTypeNode(parameterTypes = null, returnType = null, isNullable = false)
         type?.let { return it }
         return FunctionTypeNode(parameterTypes = valueParameters.map { it.type(modifier = modifier) }, returnType = body.type(), isNullable = false)
+            .also { type = it }
+    }
+
+    fun InfixFunctionCallNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        type?.let { return it }
+        return TypeNode("Pair", arguments = listOf(node1.type(modifier), node2.type(modifier)), isNullable = false)
             .also { type = it }
     }
 

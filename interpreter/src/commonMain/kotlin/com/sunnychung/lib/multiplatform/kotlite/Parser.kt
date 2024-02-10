@@ -32,6 +32,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModi
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
@@ -802,12 +803,27 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun comparison(): ASTNode {
-        var n = additiveExpression()
+        var n = infixFunctionCall()
         while (currentToken.type == TokenType.Operator && currentToken.value in setOf("<", ">", "<=", ">=")) {
             val t = eat(TokenType.Operator)
             repeatedNL()
-            val n2 = additiveExpression()
+            val n2 = infixFunctionCall()
             n = BinaryOpNode(node1 = n, node2 = n2, operator = t.value as String)
+        }
+        return n
+    }
+
+    /**
+     * infixFunctionCall:
+     *     rangeExpression {simpleIdentifier {NL} rangeExpression}
+     */
+    fun infixFunctionCall(): ASTNode {
+        var n = additiveExpression()
+        while (currentToken.type == TokenType.Identifier && currentToken.value !in setOf("else")) {
+            val t = eat(TokenType.Identifier)
+            repeatedNL()
+            val n2 = additiveExpression()
+            n = InfixFunctionCallNode(node1 = n, node2 = n2, functionName = t.value as String)
         }
         return n
     }

@@ -23,6 +23,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
@@ -96,6 +97,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is LambdaLiteralNode -> this.generate()
             is AsOpNode -> this.generate()
             is IndexOpNode -> this.generate()
+            is InfixFunctionCallNode -> this.generate()
         }
 
     protected fun AssignmentNode.generate()
@@ -224,5 +226,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
     protected fun AsOpNode.generate() = "(${expression.generate()} as${if (isNullable) "?" else ""} ${type.generate()})"
 
     protected fun IndexOpNode.generate() = "${subject.generate()}[${arguments.joinToString(", ") { it.generate() }}]"
+
+    protected fun InfixFunctionCallNode.generate() = "${node1.generate()} $functionName ${node2.generate()}"
 
 }
