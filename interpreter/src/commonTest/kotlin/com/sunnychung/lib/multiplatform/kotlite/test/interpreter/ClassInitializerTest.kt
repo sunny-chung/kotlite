@@ -20,7 +20,7 @@ class ClassInitializerTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(2, o.memberPropertyValues.size)
+        assertEquals(2, o.getAllMemberProperties().size)
         assertFails { o.findPropertyByDeclaredName("a") }
         assertFails { o.findPropertyByDeclaredName("b") }
         assertEquals(2, (o.findPropertyByDeclaredName("c") as IntValue).value)
@@ -42,7 +42,7 @@ class ClassInitializerTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(4, o.memberPropertyValues.size)
+        assertEquals(4, o.getAllMemberProperties().size)
         assertEquals(23, (o.findPropertyByDeclaredName("a") as IntValue).value)
         assertFails { o.findPropertyByDeclaredName("b") }
         assertEquals(2, (o.findPropertyByDeclaredName("c") as IntValue).value)
@@ -67,7 +67,7 @@ class ClassInitializerTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(1, o.memberPropertyValues.size)
+        assertEquals(1, o.getAllMemberProperties().size)
         assertEquals(25, (o.findPropertyByDeclaredName("a") as IntValue).value)
     }
 
@@ -88,7 +88,7 @@ class ClassInitializerTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(1, o.memberPropertyValues.size)
+        assertEquals(1, o.getAllMemberProperties().size)
         assertEquals(25, (o.findPropertyByDeclaredName("a") as IntValue).value)
     }
 
@@ -109,7 +109,7 @@ class ClassInitializerTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(1, o.memberPropertyValues.size)
+        assertEquals(1, o.getAllMemberProperties().size)
         assertEquals(25, (o.findPropertyByDeclaredName("a") as IntValue).value)
     }
 
@@ -133,7 +133,7 @@ class ClassInitializerTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(1, o.memberPropertyValues.size)
+        assertEquals(1, o.getAllMemberProperties().size)
         assertEquals(29, (o.findPropertyByDeclaredName("a") as IntValue).value)
     }
 
@@ -162,7 +162,7 @@ class ClassInitializerTest {
         assertEquals(2, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(6, o.memberPropertyValues.size)
+        assertEquals(6, o.getAllMemberProperties().size)
         assertEquals(1, (o.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(4, (o.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(3, (o.findPropertyByDeclaredName("c") as IntValue).value)
@@ -207,7 +207,7 @@ class ClassInitializerTest {
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(7, o.memberPropertyValues.size)
+        assertEquals(7, o.getAllMemberProperties().size)
         assertEquals(30, (o.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(20, (o.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(40, (o.findPropertyByDeclaredName("c") as IntValue).value)
@@ -235,7 +235,7 @@ class ClassInitializerTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertTrue(symbolTable.findPropertyByDeclaredName("o") is ClassInstance)
         val o = symbolTable.findPropertyByDeclaredName("o") as ClassInstance
-        assertEquals(6, o.memberPropertyValues.size)
+        assertEquals(6, o.getAllMemberProperties().size)
         assertEquals(12, (o.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(13, (o.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(24, (o.findPropertyByDeclaredName("c") as IntValue).value)

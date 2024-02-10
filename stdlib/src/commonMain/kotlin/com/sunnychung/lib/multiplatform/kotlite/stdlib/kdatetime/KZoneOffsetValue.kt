@@ -5,8 +5,9 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
-class KZoneOffsetValue(value: KZoneOffset) : DelegatedValue<KZoneOffset>(value, clazz) {
+class KZoneOffsetValue(value: KZoneOffset, symbolTable: SymbolTable) : DelegatedValue<KZoneOffset>(value, clazz, symbolTable = symbolTable) {
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KZoneOffset",
@@ -20,7 +21,7 @@ class KZoneOffsetValue(value: KZoneOffset) : DelegatedValue<KZoneOffset>(value, 
                 KZoneOffsetValue(KZoneOffset(
                     hours = (callArguments[0] as IntValue).value,
                     minutes = (callArguments[1] as IntValue).value,
-                ))
+                ), interpreter.symbolTable())
             }
         )
     }

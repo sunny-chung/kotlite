@@ -24,14 +24,19 @@ class CustomFunctionDeclarationNode(
         TypeParameterNode(it.name, it.typeUpperBound?.toTypeNode())
     },
     valueParameters = valueParameters ?: def.parameterTypes.map {
-        FunctionValueParameterNode(it.name, it.type.toTypeNode(), it.defaultValueExpression?.let { Parser(Lexer(it)).expression() }, it.modifiers)
+        FunctionValueParameterNode(
+            name = it.name,
+            declaredType = it.type.toTypeNode(),
+            defaultValue = it.defaultValueExpression?.let { Parser(Lexer(it)).expression() },
+            modifiers = with(Parser(Lexer(""))) { it.modifiers.toFunctionValueParameterModifiers() }
+        )
     },
-    modifiers = modifiers ?: def.modifiers,
+    declaredModifiers = modifiers ?: def.modifiers,
     body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode()),
     transformedRefName = transformedRefName,
 ) {
     override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>, typeArguments: Map<String, DataType>): RuntimeValue {
-        return def.executable(receiver, arguments, typeArguments)
+        return def.executable(interpreter, receiver, arguments, typeArguments)
     }
 
     override fun copy(

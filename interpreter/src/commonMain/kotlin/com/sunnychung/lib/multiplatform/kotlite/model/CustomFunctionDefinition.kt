@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+
 data class CustomFunctionDefinition(
     val receiverType: String?,
     val functionName: String,
@@ -12,10 +14,10 @@ data class CustomFunctionDefinition(
     val parameterTypes: List<CustomFunctionParameter>,
     val modifiers: Set<FunctionModifier> = emptySet(),
 
-    val executable: (receiver: RuntimeValue?, args: List<RuntimeValue>, typeArgs: Map<String, DataType>) -> RuntimeValue,
+    val executable: (interpreter: Interpreter, receiver: RuntimeValue?, args: List<RuntimeValue>, typeArgs: Map<String, DataType>) -> RuntimeValue,
 )
 
-class CustomFunctionParameter(val name: String, val type: String, val defaultValueExpression: String? = null, val modifiers: Set<FunctionValueParameterModifier> = emptySet())
+class CustomFunctionParameter(val name: String, val type: String, val defaultValueExpression: String? = null, val modifiers: Set<String> = emptySet())
 
 class TypeParameter(val name: String, val typeUpperBound: String?)
 fun TypeParameter.toTypeParameterNode() = TypeParameterNode(this.name, this.typeUpperBound?.toTypeNode())

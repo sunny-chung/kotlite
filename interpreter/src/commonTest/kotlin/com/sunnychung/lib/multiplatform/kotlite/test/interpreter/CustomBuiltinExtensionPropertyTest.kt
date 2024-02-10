@@ -30,7 +30,7 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "f",
                 receiver = "String",
                 type = "Int",
-                getter = { subject ->
+                getter = { interpreter, subject ->
                     IntValue((subject as StringValue).value.length * 10)
                 }
             ))
@@ -56,7 +56,7 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "f",
                 receiver = "String",
                 type = "Int",
-                setter = { subject, value ->
+                setter = { interpreter, subject, value ->
                     hostScopeVariable += (value as IntValue).value
                 }
             ))
@@ -81,10 +81,10 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "f",
                 receiver = "String",
                 type = "Int",
-                getter = { subject ->
+                getter = { interpreter, subject ->
                     IntValue(hostScopeVariable)
                 },
-                setter = { subject, value ->
+                setter = { interpreter, subject, value ->
                     hostScopeVariable += (value as IntValue).value
                 }
             ))
@@ -112,7 +112,7 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "f",
                 receiver = "String",
                 type = "Int",
-                getter = { subject ->
+                getter = { interpreter, subject ->
                     IntValue((subject as StringValue).value.length * 10)
                 }
             ))
@@ -130,7 +130,7 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "f",
                 receiver = "String",
                 type = "Int",
-                setter = { subject, value ->
+                setter = { interpreter, subject, value ->
 
                 }
             ))
@@ -148,13 +148,13 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "prop",
                 receiver = "String",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "String",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -168,13 +168,13 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "prop",
                 receiver = "List<Any>",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "List<Any>",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -189,14 +189,14 @@ class CustomBuiltinExtensionPropertyTest {
                 typeParameters = listOf(TypeParameter("T", "Any")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 typeParameters = listOf(TypeParameter("T", "Any")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -210,14 +210,14 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "prop",
                 receiver = "List<Any?>",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 typeParameters = listOf(TypeParameter("T", "Any?")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -232,13 +232,13 @@ class CustomBuiltinExtensionPropertyTest {
                 typeParameters = listOf(TypeParameter("T", "Any?")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { subject -> IntValue(1) }
+                getter = { interpreter, subject -> IntValue(1) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "List<Int>",
                 type = "Int",
-                getter = { subject -> IntValue(2) }
+                getter = { interpreter, subject -> IntValue(2) }
             ))
         }
         assertSemanticSuccess(code = "", environment = env)

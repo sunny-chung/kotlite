@@ -289,4 +289,46 @@ class FunctionResolutionTest {
         println(symbolTable.propertyValues)
         assertEquals(4, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
     }
+
+    @Test
+    fun extensionFunctionOverride() {
+        val interpreter = interpreter("""
+            open class A
+            class B : A()
+            fun A.f(x: Int): Int = x + 2
+            fun B.f(x: Int): Int = 3 + x
+            val a = A().f(10)
+            val b = B().f(10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(13, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun extensionFunctionOverrideAndOverload() {
+        val interpreter = interpreter("""
+            open class A
+            class B : A()
+            fun A.f(x: Int, s: String): Int = x + 2
+            fun A.f(a: String, x: Int): Int = 3 + x
+            fun B.f(x: Int, s: String): Int = x + 4
+            fun B.f(a: String, x: Int): Int = 5 + x
+            val a1 = A().f(10, "abc")
+            val a2 = A().f("abc", 10)
+            val b1 = B().f(20, "abc")
+            val b2 = B().f("abc", 20)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("a1") as IntValue).value)
+        assertEquals(13, (symbolTable.findPropertyByDeclaredName("a2") as IntValue).value)
+        assertEquals(24, (symbolTable.findPropertyByDeclaredName("b1") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
+    }
 }

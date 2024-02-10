@@ -17,6 +17,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
@@ -37,6 +38,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.PropertyModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
@@ -51,6 +53,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
+
+val ACCEPTED_MODIFIERS = setOf(
+    "open", "override", "operator", "vararg"
+)
 
 /**
  * Reference grammar: https://kotlinlang.org/spec/syntax-and-grammar.html#grammar-rule-expression
@@ -1194,6 +1200,14 @@ class Parser(protected val lexer: Lexer) {
         return name to type
     }
 
+    fun Set<String>.toPropertyModifiers() = this.map {
+        when (it) {
+            "open" -> PropertyModifier.open
+            "override" -> PropertyModifier.override
+            else -> throw ParseException("Modifier `$it` cannot be applied to properties")
+        }
+    }.toSet()
+
     /**
      * propertyDeclaration:
      *     [modifiers]
@@ -1209,7 +1223,8 @@ class Parser(protected val lexer: Lexer) {
      *
      *
      */
-    fun propertyDeclaration(isProcessBody: Boolean = true): PropertyDeclarationNode {
+    fun propertyDeclaration(modifiers: Set<String>, isProcessBody: Boolean = true): PropertyDeclarationNode {
+        val modifiers = modifiers.toPropertyModifiers()
         val isMutable = eat(TokenType.Identifier).let {
             when (it.value) {
                 "val" -> false
@@ -1279,7 +1294,7 @@ class Parser(protected val lexer: Lexer) {
             }
             else -> null
         }
-        return PropertyDeclarationNode(name = name, typeParameters = typeParameters, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
+        return PropertyDeclarationNode(name = name, declaredModifiers = modifiers, typeParameters = typeParameters, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
     }
 
     /**
@@ -1389,6 +1404,13 @@ class Parser(protected val lexer: Lexer) {
         return name to type
     }
 
+    fun Set<String>.toFunctionValueParameterModifiers() = this.map {
+        when (it) {
+            "vararg" -> FunctionValueParameterModifier.vararg
+            else -> throw ParseException("Modifier `$it` cannot be applied to function value parameters")
+        }
+    }.toSet()
+
     /**
      * functionValueParameter:
      *     [parameterModifiers] parameter [{NL} '=' {NL} expression]
@@ -1403,11 +1425,7 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun functionValueParameter(): FunctionValueParameterNode {
-        val modifiers = mutableSetOf<FunctionValueParameterModifier>()
-        if (isCurrentToken(TokenType.Identifier, "vararg")) {
-            eat(TokenType.Identifier, "vararg")
-            modifiers += FunctionValueParameterModifier.vararg
-        }
+        val modifiers = modifiers().toFunctionValueParameterModifiers()
         val (name, type) = parameter()
         repeatedNL()
         val defaultValue = if (currentToken.type == TokenType.Symbol && currentToken.value == "=") {
@@ -1500,6 +1518,15 @@ class Parser(protected val lexer: Lexer) {
         return type.copy(isNullable = isNullable) to name
     }
 
+    fun Set<String>.toFunctionModifiers() = this.map {
+        when (it) {
+            "operator" -> FunctionModifier.operator
+            "open" -> FunctionModifier.open
+            "override" -> FunctionModifier.override
+            else -> throw ParseException("Modifier `$it` cannot be applied to function")
+        }
+    }.toSet()
+
     /**
      *
      * functionDeclaration:
@@ -1516,19 +1543,9 @@ class Parser(protected val lexer: Lexer) {
      *     [{NL} functionBody]
      *
      */
-    fun functionDeclaration(isProcessBody: Boolean = true): FunctionDeclarationNode {
-        val modifiers = mutableSetOf<FunctionModifier>()
-        eat(TokenType.Identifier).also {
-            when (it.value) {
-                "operator" -> {
-                    modifiers += FunctionModifier.operator
-                    repeatedNL()
-                    eat(TokenType.Identifier, "fun")
-                }
-                "fun" -> { /* do nothing */ }
-                else -> throw UnexpectedTokenException(it)
-            }
-        }
+    fun functionDeclaration(modifiers: Set<String>, isProcessBody: Boolean = true): FunctionDeclarationNode {
+        val modifiers = modifiers.toFunctionModifiers()
+        eat(TokenType.Identifier, "fun")
         repeatedNL()
         val typeParameters = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
             typeParameters()
@@ -1554,7 +1571,7 @@ class Parser(protected val lexer: Lexer) {
                 valueParameters = valueParameters,
                 body = dummyBlockNode(),
                 typeParameters = typeParameters,
-                modifiers = modifiers,
+                declaredModifiers = modifiers,
             )
         }
         val body = functionBody()
@@ -1565,11 +1582,20 @@ class Parser(protected val lexer: Lexer) {
             valueParameters = valueParameters,
             body = body,
             typeParameters = typeParameters,
-            modifiers = modifiers,
+            declaredModifiers = modifiers,
         )
     }
 
     fun dummyBlockNode() = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block)
+
+    fun Set<String>.toClassParameterModifiers(): List<Any> = this.map {
+        when (it) {
+            "vararg" -> /*FunctionValueParameterModifier.vararg*/ throw UnsupportedOperationException("vararg in class primary constructor is not supported")
+            "open" -> PropertyModifier.open
+            "override" -> PropertyModifier.override
+            else -> throw ParseException("Modifier `$it` cannot be applied to class parameter")
+        }
+    }
 
     /**
      * classParameter:
@@ -1583,13 +1609,7 @@ class Parser(protected val lexer: Lexer) {
      *     [{NL} '=' {NL} expression]
      */
     fun classParameter(): ClassParameterNode {
-        val modifiers = mutableSetOf<FunctionValueParameterModifier>()
-        if (isCurrentToken(TokenType.Identifier, "vararg")) {
-            throw UnsupportedOperationException("vararg in class primary constructor is not supported")
-
-            eat(TokenType.Identifier, "vararg")
-            modifiers += FunctionValueParameterModifier.vararg
-        }
+        val modifiers = modifiers().toClassParameterModifiers()
         val isMutable = if (currentToken.type == TokenType.Identifier && currentToken.value in setOf("val", "var")) {
             (currentToken.value == "var").also { eat(TokenType.Identifier) }
         } else null
@@ -1607,11 +1627,12 @@ class Parser(protected val lexer: Lexer) {
         return ClassParameterNode(
             isProperty = isMutable != null,
             isMutable = isMutable == true,
+            modifiers = modifiers.filterIsInstance<PropertyModifier>().toSet(),
             parameter = FunctionValueParameterNode(
                 name = name,
                 declaredType = type,
                 defaultValue = defaultValue,
-                modifiers = modifiers,
+                modifiers = modifiers.filterIsInstance<FunctionValueParameterModifier>().toSet(),
             )
         )
     }
@@ -1706,6 +1727,68 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * delegationSpecifiers:
+     *     annotatedDelegationSpecifier {{NL} ',' {NL} annotatedDelegationSpecifier}
+     *
+     * annotatedDelegationSpecifier:
+     *     {annotation} {NL} delegationSpecifier
+     *
+     * delegationSpecifier:
+     *     constructorInvocation
+     *     | explicitDelegation
+     *     | userType
+     *     | functionType
+     *     | ('suspend' {NL} functionType)
+     *
+     */
+    fun delegationSpecifiers(): FunctionCallNode {
+        /* only support exactly one constructorInvocation */
+        return constructorInvocation()
+    }
+    /**
+     * constructorInvocation:
+     *     userType {NL} valueArguments
+     *
+     */
+    fun constructorInvocation(): FunctionCallNode {
+        val type = typeReference()
+        repeatedNL()
+        val arguments = valueArguments()
+        return FunctionCallNode(
+            function = type,
+            arguments = arguments,
+            declaredTypeArguments = type.arguments ?: emptyList(),
+            position = currentToken.position,
+            isSuperclassConstruction = true,
+        )
+    }
+
+    /**
+     * modifiers:
+     *     annotation | modifier {annotation | modifier}
+     *
+     * modifier:
+     *     (classModifier | memberModifier | visibilityModifier | functionModifier | propertyModifier | inheritanceModifier | parameterModifier | platformModifier) {NL}
+     *
+     */
+    fun modifiers(): Set<String> {
+        val modifiers = mutableSetOf<String>()
+        while (currentToken.type == TokenType.Identifier && currentToken.value in ACCEPTED_MODIFIERS) {
+            modifiers += currentToken.value as String
+            eat(TokenType.Identifier)
+            repeatedNL()
+        }
+        return modifiers
+    }
+
+    fun Set<String>.toClassModifiers() = this.map {
+        when (it) {
+            "open" -> ClassModifier.open
+            else -> throw ParseException("Modifier `$it` cannot be applied to class")
+        }
+    }.toSet()
+
+    /**
      * classDeclaration:
      *     [modifiers]
      *     ('class' | (['fun' {NL}] 'interface'))
@@ -1717,7 +1800,8 @@ class Parser(protected val lexer: Lexer) {
      *     [{NL} typeConstraints]
      *     [({NL} classBody) | ({NL} enumClassBody)]
      */
-    fun classDeclaration(): ClassDeclarationNode {
+    fun classDeclaration(modifiers: Set<String>): ClassDeclarationNode {
+        val modifiers = modifiers.toClassModifiers()
         eat(TokenType.Identifier, "class")
         repeatedNL()
         val name = userDefinedIdentifier()
@@ -1733,14 +1817,22 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             primaryConstructor().also { token = currentTokenExcludingNL() }
         } else null
-        val declarations = if (token.type == TokenType.Symbol && token.value == "{") {
+        val superClassInvocation = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
+            repeatedNL()
+            eat(TokenType.Symbol, ":")
+            repeatedNL()
+            delegationSpecifiers()
+        } else null
+        val declarations = if (isCurrentTokenExcludingNL(TokenType.Symbol, "{")) {
             repeatedNL()
             classBody()
         } else listOf()
         return ClassDeclarationNode(
             name = name,
+            declaredModifiers = modifiers,
             typeParameters = typeParameters,
             primaryConstructor = primaryConstructor,
+            superClassInvocation = superClassInvocation as FunctionCallNode?,
             declarations = declarations
         )
     }
@@ -1758,10 +1850,21 @@ class Parser(protected val lexer: Lexer) {
 //            throw ParseException("Expected an identifier but missing")
             throw UnexpectedTokenException(currentToken)
         }
-        when (currentToken.value as String) {
-            "val", "var" -> return propertyDeclaration()
-            "fun", "operator" -> return functionDeclaration()
-            "class" -> return classDeclaration()
+        var modifiers: Set<String>? = null
+        while (true) {
+            when (currentToken.value as String) {
+                "val", "var" -> return propertyDeclaration(modifiers ?: emptySet())
+                "fun" -> return functionDeclaration(modifiers ?: emptySet())
+                "class" -> return classDeclaration(modifiers ?: emptySet())
+                in ACCEPTED_MODIFIERS -> {
+                    if (modifiers == null) {
+                        modifiers = modifiers()
+                    } else {
+                        throw UnexpectedTokenException(currentToken)
+                    }
+                }
+                else -> throw UnexpectedTokenException(currentToken)
+            }
         }
         throw UnexpectedTokenException(currentToken)
     }
@@ -1842,7 +1945,7 @@ class Parser(protected val lexer: Lexer) {
     fun statement(): ASTNode { // TODO complete
         if (currentToken.type == TokenType.Identifier) {
             when (currentToken.value) {
-                "val", "var", "fun", "class" -> return declaration()
+                "val", "var", "fun", "class", in ACCEPTED_MODIFIERS -> return declaration()
                 "for", "while", "do" -> return loopStatement()
             }
         }
@@ -1916,12 +2019,17 @@ class Parser(protected val lexer: Lexer) {
      */
     fun libHeaderFile(): List<ASTNode> {
         val result = mutableListOf<ASTNode>()
+        var modifiers: Set<String>? = null
         while (currentTokenExcludingNL().type != TokenType.EOF) {
             repeatedNL()
             if (isCurrentToken(TokenType.Identifier, "val") || isCurrentToken(TokenType.Identifier, "var")) {
-                result += propertyDeclaration(isProcessBody = false)
-            } else {
-                result += functionDeclaration(isProcessBody = false)
+                result += propertyDeclaration(modifiers ?: emptySet(), isProcessBody = false)
+                modifiers = null
+            } else if (isCurrentToken(TokenType.Identifier, "fun")) {
+                result += functionDeclaration(modifiers ?: emptySet(), isProcessBody = false)
+                modifiers = null
+            } else if (currentToken.type == TokenType.Identifier && currentToken.value in ACCEPTED_MODIFIERS) {
+                modifiers = modifiers()
             }
         }
         eat(TokenType.EOF)

@@ -12,6 +12,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
+import com.sunnychung.lib.multiplatform.kotlite.model.isPrimitive
 
 internal class StdLibDelegationCodeGenerator(val name: String, val code: String, val outputPackage: String, val config: KotliteModuleConfig) {
     val parser = Parser(Lexer(code))
@@ -48,7 +49,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
-import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
@@ -115,7 +115,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     modifiers = setOf<FunctionModifier>(${modifiers.joinToString(", ") {
         "FunctionModifier.${it.name}" }
     }),
-    executable = { receiver, args, typeArgs ->
+    executable = { interpreter, receiver, args, typeArgs ->
         ${
             if (receiver != null && !receiver!!.name.endsWith(".Companion")) {
                 val isReceiverNullable = receiver!!.isNullable
@@ -149,6 +149,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     // kotlin value -> Interpreter runtime value
     fun wrap(variableName: String, _type: TypeNode): String {
         val type = resolve(_type)
+
         val typeArgs = if (_type.arguments.isNullOrEmpty()) {
             ""
         } else {
@@ -160,10 +161,13 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                 }
             }
         }
+        val symbolTableArg = if (!type.isPrimitive()) {
+            ", symbolTable = interpreter.symbolTable()"
+        } else ""
         val wrappedValue = if (type.name == "Any") {
             "it as RuntimeValue"
         } else {
-            "${type.name}Value(it$typeArgs)"
+            "${type.name}Value(it$typeArgs$symbolTableArg)"
         }
         return if (type.name != "Unit") "$variableName?.let { $wrappedValue } ?: NullValue" else "UnitValue"
     }
@@ -215,7 +219,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
             } else ""
         }${
             if (modifiers.isNotEmpty()) {
-                ", modifiers = setOf(${modifiers.joinToString(", ") { "FunctionValueParameterModifier.$it" }})"
+                ", modifiers = setOf(${modifiers.joinToString(", ") { "\"$it\"" }})"
             } else ""
         })"""
     }
@@ -235,7 +239,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
     }${indent(4)}),
     receiver = "${receiver!!.descriptiveName().escape()}",
     type = "${type.descriptiveName().escape()}",
-    getter = ${accessors?.getter?.let { """{ receiver ->
+    getter = ${accessors?.getter?.let { """{ interpreter, receiver ->
         ${
             if (!receiver!!.name.endsWith(".Companion")) {
                 "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.name}Value)$receiverQuestion.value"
@@ -244,7 +248,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
         val result = ${if (receiver!!.name.endsWith(".Companion")) receiver!!.name else "unwrappedReceiver"}.$name
         ${wrap("result", type)}
     }""" } ?: "null"},
-    setter = ${accessors?.setter?.let { """{ receiver, value ->
+    setter = ${accessors?.setter?.let { """{ interpreter, receiver, value ->
         ${
             if (!receiver!!.name.endsWith(".Companion")) {
                 "val unwrappedReceiver = (receiver as$receiverQuestion ${receiver!!.name}Value)$receiverQuestion.value"

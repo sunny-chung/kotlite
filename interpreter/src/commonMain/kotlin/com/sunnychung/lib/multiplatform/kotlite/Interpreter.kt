@@ -79,6 +79,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
 
@@ -293,18 +294,19 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             is NavigationNode -> {
-                val subject = this.subject.eval() as RuntimeValue
+                val subject = (this.subject.eval() as RuntimeValue)
+                    .let { resolveSuperKeyword(it) }
 
                 if (transformedRefName != null) { // extension property
                     (symbolTable().findExtensionProperty(transformedRefName!!)?.setter
-                        ?: throw RuntimeException("Setter not found"))(subject, value)
+                        ?: throw RuntimeException("Setter not found"))(this@Interpreter, subject, value)
                     return
                 }
 
                 val obj = subject as ClassInstance
 //                    obj.assign((subject.member as ClassMemberReferenceNode).transformedRefName!!, value)
                 // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-                obj.assign(interpreter = this@Interpreter, name = obj.clazz!!.memberPropertyNameToTransformedName[(this.member as ClassMemberReferenceNode).name]!!, value = value)/*?.also {
+                obj.assign(interpreter = this@Interpreter, name = obj.clazz!!.findMemberPropertyTransformedName((this.member as ClassMemberReferenceNode).name)!!, value = value)/*?.also {
                     FunctionCallNode(
                         it,
                         listOf(FunctionCallArgumentNode(index = 0, value = ValueNode(value))),
@@ -314,6 +316,20 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             else -> throw UnsupportedOperationException()
+        }
+    }
+
+    fun NavigationNode.resolveSuperKeyword(subjectValue: RuntimeValue): RuntimeValue {
+        // a hack to resolve the "super" keyword. See documentation
+        return if (subject is VariableReferenceNode && subject.variableName == "super") {
+            var instance: ClassInstance? = subjectValue as ClassInstance
+            val typeOfSuper = subject.type!!
+            while (instance != null && instance.clazz!!.fullQualifiedName != typeOfSuper.name) {
+                instance = instance.parentInstance
+            }
+            instance!!
+        } else {
+            subjectValue
         }
     }
 
@@ -371,6 +387,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             // TODO return singleton
             val companionClassName = "${(type as ClassTypeNode).clazz.name}.Companion"
             return ClassInstance(
+                symbolTable(),
                 companionClassName,
                 symbolTable().findClass(companionClassName)!!.first,
                 emptyList(),
@@ -390,10 +407,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     fun FunctionCallNode.eval(replaceArguments: Map<Int, RuntimeValue> = emptyMap()): RuntimeValue {
         // TODO move to semantic analyzer
         when (function) {
-            is VariableReferenceNode -> {
-                val directName = function.variableName
+            is VariableReferenceNode, is TypeNode -> {
+                val directName = when (function) {
+                    is VariableReferenceNode -> function.variableName
+                    is TypeNode -> function.name
+                    else -> throw UnsupportedOperationException()
+                }
 
-                if (this.function.ownerRef != null) {
+                if (function is VariableReferenceNode && function.ownerRef != null) {
                     return this.copy(
                         function = NavigationNode(
                             subject = VariableReferenceNode(this.function.ownerRef!!.ownerRefName),
@@ -442,9 +463,13 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         if (subject == NullValue) {
                             throw EvaluateNullPointerException()
                         }
-                        (subject as? ClassInstance)?.clazz?.memberFunctions?.get(functionRefName)?.let { function ->
-                            return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
-                        }
+                        (subject as? ClassInstance)
+                            ?.let { function.resolveSuperKeyword(it) as? ClassInstance }
+                            ?.clazz
+                            ?.findMemberFunctionByTransformedName(functionRefName!!)
+                            ?.let { function ->
+                                return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
+                            }
                     }
                     CallableType.ExtensionFunction -> {
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
@@ -534,9 +559,33 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
         }
 
-        val typeParametersReplacedWithArguments = (functionNode.typeParameters.mapIndexed { index, tp ->
-            TypeParameterNode(tp.name, typeArguments[index])
-        } + extraTypeResolutions) // add `extraTypeResolutions` at last because class type arguments have a lower precedence
+        val classResolver = (functionNode as? FunctionDeclarationNode)
+            ?.takeIf { it.transformedRefName != null }
+            ?.let { function ->
+                val subjectType = subject?.type() as? ObjectType
+                subjectType?.let { subjectType ->
+                    ClassMemberResolver(subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
+                }
+            }
+        val resolvedFunction = (functionNode as? FunctionDeclarationNode)
+            ?.takeIf { it.transformedRefName != null }
+            ?.let { function ->
+                classResolver?.findMemberFunctionWithTypeByTransformedName(function.transformedRefName!!)
+            }
+
+        val typeParametersReplacedWithArguments = (
+                extraTypeResolutions + // add `extraTypeResolutions` at first because class type arguments have a lower precedence
+                (classResolver?.let { resolver ->
+                    resolvedFunction?.classTreeIndex?.let { index ->
+                        resolver.genericResolutions[index].second.map {
+                            TypeParameterNode(it.key, it.value)
+                        }
+                    }
+                } ?: emptyList()) +
+                functionNode.typeParameters.mapIndexed { index, tp ->
+                    TypeParameterNode(tp.name, typeArguments[index])
+                }
+            )
             .associate { it.name to it.typeUpperBound!! }
 
         // resolve type arguments to DataType first, so that
@@ -546,16 +595,18 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         }
 
         val scopeType = if (functionNode is FunctionDeclarationNode) ScopeType.Function else ScopeType.Closure
-        val returnType = callStack.currentSymbolTable().typeNodeToPropertyType(
-            type = functionNode.returnType.resolveGenericParameterTypeArguments(
+
+        val returnType = callStack.currentSymbolTable().assertToDataType(
+            // 2nd resolution is needed, because the generic type may not be relevant to the class itself.
+            // see test case GenericFunctionAndExtensionFunctionWithGenericClassTest#unrelatedTypeParameter()
+            type = (resolvedFunction?.resolvedReturnType ?: functionNode.returnType).resolveGenericParameterTypeArguments(
 //                (extraSymbols?.listTypeAliasInThisScope() ?: emptyList()) +
                 typeParametersReplacedWithArguments + // typeParametersReplacedWithArguments has higher precedence
                 (extraSymbols?.listTypeAliasResolutionInThisScope() ?: emptyMap()).mapValues {
                     it.value.toTypeNode()
                 }
             ),
-            isMutable = false
-        )!!.type
+        )
 
         callStack.push(
             functionFullQualifiedName = functionNode.name,
@@ -571,9 +622,6 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 symbolTable.declareProperty(it.key, TypeNode(it.value.type().name, null, false), false) // TODO change to use DataType directly
                 symbolTable.assign(it.key, it.value)
             }
-//            typeParametersReplacedWithArguments.forEach {
-//                symbolTable.declareTypeAlias(it.key, it.value)
-//            }
             functionNode.typeParameters.forEach {
                 symbolTable.declareTypeAlias(it.name, it.typeUpperBound)
             }
@@ -583,9 +631,11 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 }
                 symbolTable.declareTypeAliasResolution(it.key, typeArgumentsInDataType[it.key]!!)
             }
+            val valueParametersWithGenericsResolved = resolvedFunction?.resolvedValueParameterTypes
+                ?: functionNode.valueParameters
             functionNode.valueParameters.forEachIndexed { index, it ->
                 if (!isVararg && !(functionNode is LambdaLiteralNode && it.name == "_")) {
-                    val argumentType = it.type //.resolveGenericParameterTypeArguments(typeParametersReplacedWithArguments)
+                    val argumentType = valueParametersWithGenericsResolved[index].type
                     symbolTable.declareProperty(it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
                         it.transformedRefName!!,
@@ -596,7 +646,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             val arguments = if (isVararg) {
-                arrayOf(ListValue(arguments.filterNotNull().toList(), symbolTable().assertToDataType(functionNode.valueParameters.first().type)))
+                arrayOf(ListValue(arguments.filterNotNull().toList(), symbolTable().assertToDataType(functionNode.valueParameters.first().type), symbolTable()))
             } else {
                 arguments
             }
@@ -614,7 +664,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
-            if (!returnType.isAssignableFrom(returnValue.type())) {
+            if (!returnType.isConvertibleFrom(returnValue.type())) {
                 throw RuntimeException("Type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName}")
             }
 
@@ -659,25 +709,39 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 callArguments[index] = value
             }
 
-            return clazz.construct(this@Interpreter, callArguments as Array<RuntimeValue>, typeArguments.map { symbolTable().typeNodeToDataType(it)!! }.toTypedArray(), position)
+            return clazz.construct(this@Interpreter, callArguments as Array<RuntimeValue>, typeArguments.map { symbolTable().assertToDataType(it) }.toTypedArray(), position)
         } finally {
             callStack.pop(ScopeType.ClassInitializer)
         }
     }
 
     fun constructClassInstance(callArguments: Array<RuntimeValue>, callPosition: SourcePosition, typeArguments: Array<DataType>, clazz: ClassDefinition): ClassInstance {
-        val instance = ClassInstance(clazz.fullQualifiedName, clazz, typeArguments.toList())
-        val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
+        val parentInstance = clazz.superClassInvocation?.let { superClassInvocation ->
+            callStack.push("super", ScopeType.Class, SourcePosition(1, 1))
+            typeArguments.forEachIndexed { index, dataType ->
+                val typeParameter = clazz.typeParameters[index]
+                symbolTable().declareTypeAlias(typeParameter.name, typeParameter.typeUpperBound)
+                symbolTable().declareTypeAliasResolution(typeParameter.name, dataType)
+            }
+            try {
+                superClassInvocation.eval() as ClassInstance?
+            } finally {
+                callStack.pop(ScopeType.Class)
+            }
+        }
 
         val symbolTable = callStack.currentSymbolTable()
-        val nonPropertyArguments = mutableMapOf<String, Pair<TypeNode, RuntimeValue>>()
+        val instance = ClassInstance(symbolTable, clazz.fullQualifiedName, clazz, typeArguments.toList(), parentInstance = parentInstance)
+        val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
+
+        val nonPropertyArguments = mutableMapOf<String, Pair<ClassParameterNode, RuntimeValue>>()
         clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
             val value = callArguments[index]
             if (it.isProperty) {
                 instance.assign(name = it.parameter.transformedRefName!!, value = value)
 //                    instance.memberPropertyValues[it.parameter.transformedRefName!!] = value
             } else {
-                nonPropertyArguments[it.parameter.transformedRefName!!] = Pair(it.parameter.type, value)
+                nonPropertyArguments[it.parameter.transformedRefName!!] = Pair(it, value)
             }
         }
 
@@ -700,6 +764,16 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //                symbolTable.putPropertyHolder(instance.clazz!!.memberPropertyNameToTransformedName[it.key]!!, it.value)
 //            }
 
+        if (instance.clazz?.superClass != null) {
+            // a hack to resolve the "super" keyword. See documentation
+            symbolTable.declareProperty(
+                "super",
+                TypeNode(instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
+                false
+            )
+            symbolTable.assign("super", instance)
+        }
+
         val typeParametersAndArguments = clazz.typeParameters.mapIndexed { index, tp ->
             TypeParameterNode(tp.name, typeArguments[index].toTypeNode())
         }
@@ -716,10 +790,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             try {
                 val innerSymbolTable = callStack.currentSymbolTable()
                 nonPropertyArguments.forEach {
-                    val keyWithIncreasedScope = it.key.replaceAfterLast("/", innerSymbolTable.scopeLevel.toString())
-                    log.v("keyWithIncreasedScope = $keyWithIncreasedScope")
-                    innerSymbolTable.declareProperty(keyWithIncreasedScope, it.value.first.resolveGenericParameterTypeArguments(typeArgumentByName), false)
-                    innerSymbolTable.assign(keyWithIncreasedScope, it.value.second)
+                    innerSymbolTable.declareProperty(it.value.first.transformedRefNameInBody!!, it.value.first.parameter.type.resolveGenericParameterTypeArguments(typeArgumentByName), false)
+                    innerSymbolTable.assign(it.value.first.transformedRefNameInBody!!, it.value.second)
                 }
                 when (it) {
                     is PropertyDeclarationNode -> {
@@ -768,8 +840,17 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
-            symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
-            symbolTable.assign("this/${subject.type().name}", subject)
+            if (subject.type() is ObjectType) {
+                var clazz: ClassDefinition? = (subject.type() as ObjectType).clazz
+                while (clazz != null) {
+                    symbolTable.declareProperty("this/${clazz.name}", subject.type().toTypeNode(), false)
+                    symbolTable.assign("this/${clazz.name}", subject)
+                    clazz = clazz.superClass
+                }
+            } else {
+                symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
+                symbolTable.assign("this/${subject.type().name}", subject)
+            }
             if (function.receiver != null && function.receiver!!.descriptiveName() != subject.type().name) {
                 symbolTable.declareProperty("this/${function.receiver!!.descriptiveName()}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${function.receiver!!.descriptiveName()}", subject)
@@ -778,6 +859,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             symbolTable.assign("this", subject)
             symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
             symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this/${subject.type().name}", "this")
+
+            if (subject is ClassInstance && subject.parentInstance != null) {
+                // a hack to resolve "super". See documentation
+                val parentInstance = subject.parentInstance
+                symbolTable.declareProperty("super", subject.type().toTypeNode(), false)
+                symbolTable.assign("super", subject)
+                symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "super", "super")
+            }
 
 //            // TODO optimize to only copy needed members
 //            if (subject is ClassInstance) {
@@ -865,6 +954,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             isNullable = false,
         )
 
+        val superClass = (superClassInvocation?.function as? TypeNode)
+            ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
+            ?.first
+
         callStack.push(fullQualifiedName, ScopeType.Class, SourcePosition(1, 1))
         try {
             typeParameters.forEach {
@@ -874,6 +967,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             declarationScope.declareClass(ClassDefinition(
                 currentScope = callStack.currentSymbolTable(),
                 name = name,
+                modifiers = modifiers,
                 fullQualifiedName = fullQualifiedName,
                 typeParameters = typeParameters,
                 isInstanceCreationAllowed = true,
@@ -884,6 +978,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         val p = it.parameter
                         PropertyDeclarationNode(
                             name = p.name,
+                            declaredModifiers = it.modifiers,
                             typeParameters = emptyList(),
                             receiver = classType,
                             declaredType = p.type,
@@ -899,6 +994,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     .associateBy { it.transformedRefName!! },
                 orderedInitializersAndPropertyDeclarations = declarations
                     .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
+                declarations = declarations,
+                superClassInvocation = superClassInvocation,
+                superClass = superClass,
             ))
             // register extension functions in global scope
             declarations
@@ -915,9 +1013,11 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             currentScope = callStack.currentSymbolTable(),
             name = "$name.Companion",
             fullQualifiedName = "$fullQualifiedName.Companion",
+            modifiers = emptySet(),
             typeParameters = emptyList(),
             isInstanceCreationAllowed = false,
             orderedInitializersAndPropertyDeclarations = emptyList(),
+            declarations = emptyList(),
             rawMemberProperties = emptyList(),
             memberFunctions = emptyMap(),
             primaryConstructor = null
@@ -925,21 +1025,22 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun NavigationNode.eval(): RuntimeValue {
-        val obj = subject.eval() as RuntimeValue
+        val obj = (subject.eval() as RuntimeValue)
+            .let { resolveSuperKeyword(it) }
 //        return obj.memberPropertyValues[member.transformedRefName!!]!!
 
         if (transformedRefName != null) {
             val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!)
                 ?: throw RuntimeException("Extension property `${member.name}` on receiver `${obj.type().nameWithNullable}` could not be found")
             extensionProperty.getter?.let { getter ->
-                return getter(obj)
+                return getter(this@Interpreter, obj)
             }
         }
 
         if (obj == NullValue) throw EvaluateNullPointerException()
         obj as? ClassInstance ?: throw RuntimeException("Cannot access member `${member.name}` for type `${obj.type().nameWithNullable}`")
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
-        return when (val r = obj.read(interpreter = this@Interpreter, name = obj.clazz!!.memberPropertyNameToTransformedName[member.name]!!)) {
+        return when (val r = obj.read(interpreter = this@Interpreter, name = obj.clazz!!.findMemberPropertyTransformedName(member.name)!!)) {
             is RuntimeValue -> r
             /*is FunctionDeclarationNode -> {
                 FunctionCallNode(
@@ -962,13 +1063,13 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun AsOpNode.eval(): RuntimeValue {
         val value = expression.eval() as RuntimeValue
-        val targetType = symbolTable().typeNodeToDataType(type) ?: throw RuntimeException("Unknown type `$type`")
-        return if (value.type().isAssignableTo(targetType)) {
+        val targetType = symbolTable().typeNodeToDataType(type) ?: throw RuntimeException("Unknown type `${type.descriptiveName()}`")
+        return if (targetType.isConvertibleFrom(value.type())) {
             value
         } else if (isNullable) {
             NullValue
         } else {
-            throw EvaluateTypeCastException(value.type().nameWithNullable, targetType.nameWithNullable)
+            throw EvaluateTypeCastException(value.type().descriptiveName, targetType.descriptiveName)
         }
     }
 

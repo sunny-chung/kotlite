@@ -111,6 +111,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
 data class PropertyDeclarationNode(
     val name: String,
+    val declaredModifiers: Set<PropertyModifier>,
     val typeParameters: List<TypeParameterNode>,
     val receiver: TypeNode?,
     val declaredType: TypeNode?,
@@ -119,9 +120,12 @@ data class PropertyDeclarationNode(
     val accessors: PropertyAccessorsNode? = null,
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredType: TypeNode? = null,
+    @ModifyByAnalyzer val inferredModifiers: MutableSet<PropertyModifier> = mutableSetOf(),
 ) : ASTNode {
     val type: TypeNode
         get() = declaredType ?: inferredType ?: throw SemanticException("Could not infer type for property `$name`")
+    val modifiers: Set<PropertyModifier>
+        get() = declaredModifiers + inferredModifiers
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self\n" +
@@ -150,20 +154,29 @@ open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var
  * Member names are the exact identifiers in Kotlin code
  */
 enum class FunctionModifier {
-    operator
+    operator, open, override
 }
 
 enum class FunctionValueParameterModifier {
     vararg
 }
 
+enum class ClassModifier {
+    open
+}
+
+enum class PropertyModifier {
+    open, override
+}
+
 data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, val modifiers: Set<FunctionValueParameterModifier>, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
-    @ModifyByAnalyzer var inferredType: TypeNode? = null
+    @ModifyByAnalyzer
+    var inferredType: TypeNode? = null
     val type: TypeNode get() = declaredType ?: inferredType
         ?: throw CannotInferTypeException("function value parameter type $name")
 
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Function Value Parameter Node `$name`\"]"
+        val self = "${generateId()}[\"Function Value Parameter Node `$name` modifiers=[${modifiers.joinToString(", ")}] \"]"
         return "$self\n" + (if (declaredType != null) "$self-- declared type -->${declaredType.toMermaid()}\n" else "") +
                 if (defaultValue != null) "$self-->${defaultValue.toMermaid()}\n" else ""
     }
@@ -199,16 +212,19 @@ open class FunctionDeclarationNode(
     override val valueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
     override val typeParameters: List<TypeParameterNode> = emptyList(),
-    val modifiers: Set<FunctionModifier> = emptySet(),
+    val declaredModifiers: Set<FunctionModifier> = emptySet(),
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,
-    @ModifyByAnalyzer var isVararg: Boolean = false
+    @ModifyByAnalyzer var isVararg: Boolean = false,
+    @ModifyByAnalyzer val inferredModifiers: MutableSet<FunctionModifier> = mutableSetOf(),
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
         get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException("return type of function $name")
+    val modifiers: Set<FunctionModifier>
+        get() = declaredModifiers + inferredModifiers
 
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Function Node `$name`\"]"
+        val self = "${generateId()}[\"Function Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
         return (declaredReturnType?.let { "$self-- type -->${it.toMermaid()}\n" } ?: "") +
                 (receiver?.let { "$self-- receiver -->${it.toMermaid()}\n" } ?: "") +
                 "$self-->${body.toMermaid()}\n"
@@ -244,7 +260,7 @@ open class FunctionDeclarationNode(
             declaredReturnType = declaredReturnType,
             typeParameters = typeParameters,
             valueParameters = valueParameters,
-            modifiers = modifiers,
+            declaredModifiers = modifiers,
             body = body,
             transformedRefName = transformedRefName,
             inferredReturnType = inferredReturnType,
@@ -266,14 +282,22 @@ data class FunctionCallNode(
     val arguments: List<FunctionCallArgumentNode>,
     val declaredTypeArguments: List<TypeNode>,
     val position: SourcePosition,
+    val isSuperclassConstruction: Boolean = false,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
     @ModifyByAnalyzer var callableType: CallableType? = null,
-    @ModifyByAnalyzer var inferredTypeArguments: List<TypeNode>? = null,
+    @ModifyByAnalyzer var inferredTypeArguments: List<TypeNode?>? = null,
     @ModifyByAnalyzer var modifierFilter: SearchFunctionModifier? = null,
 ) : ASTNode {
     val typeArguments: List<TypeNode>
-        get() = declaredTypeArguments.emptyToNull() ?: inferredTypeArguments ?: emptyList()
+        get() = declaredTypeArguments.emptyToNull() ?: inferredTypeArguments?.let { args ->
+            val nonNullArgs = args.filterNotNull()
+            if (nonNullArgs.size != args.size) {
+                null
+            } else {
+                nonNullArgs
+            }
+        } ?: emptyList()
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"
         return "$self-- function -->${function.toMermaid()}\n" +
@@ -319,7 +343,20 @@ data class WhileNode(val condition: ASTNode, val body: BlockNode?) : ASTNode {
     }
 }
 
-data class ClassParameterNode(val isProperty: Boolean, val isMutable: Boolean, val parameter: FunctionValueParameterNode) : ASTNode {
+data class ClassParameterNode(
+    val isProperty: Boolean,
+    val isMutable: Boolean,
+    val modifiers: Set<PropertyModifier>,
+    val parameter: FunctionValueParameterNode,
+
+    /**
+     * Used when this is a non-property class constructor parameter, where this parameter will have
+     * TWO transformedRefName:
+     * 1. While resolving default values of other constructor parameters (the one inside FunctionValueParameterNode is used)
+     * 2. While resolving initializers and default values of property declarations inside class body (this field is used)
+     */
+    @ModifyByAnalyzer var transformedRefNameInBody: String? = null,
+) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Class Primary Constructor Parameter Node isProperty=$isProperty isMutable=$isMutable\"]"
         return "$self-->${parameter.toMermaid()}\n"
@@ -342,13 +379,19 @@ data class ClassInstanceInitializerNode(val block: BlockNode) : ASTNode {
 
 data class ClassDeclarationNode(
     val name: String,
+    val declaredModifiers: Set<ClassModifier>,
     val typeParameters: List<TypeParameterNode>,
     val primaryConstructor: ClassPrimaryConstructorNode?,
+    val superClassInvocation: FunctionCallNode?,
     val declarations: List<ASTNode>,
     @ModifyByAnalyzer var fullQualifiedName: String = name,
 ) : ASTNode {
+    @ModifyByAnalyzer val inferredModifiers: Set<ClassModifier> = mutableSetOf()
+    val modifiers: Set<ClassModifier>
+        get() = declaredModifiers + inferredModifiers
+
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Class Declaration Node `$name`\"]"
+        val self = "${generateId()}[\"Class Declaration Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
         return "$self\n" +
                 (primaryConstructor?.let { "$self-- primary constructor -->${it.toMermaid()}\n" } ?: "") +
                 declarations.joinToString("") { "$self-->${it.toMermaid()}\n" }

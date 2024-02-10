@@ -4,9 +4,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 
-class MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType) : DelegatedValue<MutableList<RuntimeValue>>(value, clazz, listOf(typeArgument)) {
+class MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable) : DelegatedValue<MutableList<RuntimeValue>>(value, clazz, listOf(typeArgument), symbolTable) {
 
     companion object {
         val clazz = ProvidedClassDefinition(

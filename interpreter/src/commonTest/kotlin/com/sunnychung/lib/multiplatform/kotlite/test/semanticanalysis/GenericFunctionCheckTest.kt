@@ -36,4 +36,20 @@ class GenericFunctionCheckTest {
             f()
         """.trimIndent())
     }
+
+    @Test
+    fun nonexistTypeArgument1() {
+        assertSemanticFail("""
+            fun <T> f(): String = "abc"
+            val s = f<ABC>()
+        """.trimIndent())
+    }
+
+    @Test
+    fun nonexistTypeArgument2() {
+        assertSemanticFail("""
+            fun <T> f(): String = "abc"
+            val s = f<T>()
+        """.trimIndent())
+    }
 }

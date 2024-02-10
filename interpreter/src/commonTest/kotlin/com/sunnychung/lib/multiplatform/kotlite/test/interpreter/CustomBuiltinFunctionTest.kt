@@ -22,7 +22,7 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "Int"),
                     CustomFunctionParameter("c", "String"),
                 ),
-                executable = { _, args, typeArgs ->
+                executable = { _, _, args, typeArgs ->
                     val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
                     println(s.value)
                     s
@@ -49,7 +49,7 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
-                executable = { receiver, args, typeArgs ->
+                executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
                 }
             ))
@@ -75,7 +75,7 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int", defaultValueExpression = "1")),
-                executable = { receiver, args, typeArgs ->
+                executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
                 }
             ))
@@ -109,7 +109,7 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "Int"),
                     CustomFunctionParameter("c", "Int", defaultValueExpression = "a + b + this")
                 ),
-                executable = { receiver, args, typeArgs ->
+                executable = { _, receiver, args, typeArgs ->
                     IntValue(((args[0] as IntValue).value + (args[1] as IntValue).value) * (args[2] as IntValue).value)
                 }
             ))
@@ -144,7 +144,7 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "Int"),
                     CustomFunctionParameter("c", "String"),
                 ),
-                executable = { _, args, typeArgs ->
+                executable = { _, _, args, typeArgs ->
                     val s = StringValue("A|${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
                     s
                 }
@@ -158,7 +158,7 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "String"),
                     CustomFunctionParameter("c", "String"),
                 ),
-                executable = { _, args, typeArgs ->
+                executable = { _, _, args, typeArgs ->
                     val s = StringValue("B|${(args[0] as StringValue).value}|${(args[1] as StringValue).value}|${(args[2] as StringValue).value}")
                     s
                 }
@@ -184,7 +184,7 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
-                executable = { receiver, args, typeArgs ->
+                executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
                 }
             ))
@@ -193,7 +193,7 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int"), CustomFunctionParameter("factor2", "Int")),
-                executable = { receiver, args, typeArgs ->
+                executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * ((args[0] as IntValue).value + (args[1] as IntValue).value))
                 }
             ))

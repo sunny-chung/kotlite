@@ -19,3 +19,8 @@ class Cls(var a: Int = 60) {
     var b: Int = a++
 }
 ```
+
+
+== The "super" keyword
+
+A hack is implemented in Interpreter to resolve the "super" keyword. The "super" variable resolves to the "this" instance. While evaluating `NavigationNode`, get the actual class name of "super", that was resolved properly in Semantic Analyzer, and lookup `parentInstance` of the "this" instance until reaching the actual class of "super". Both read and write operations have this hack implemented.
