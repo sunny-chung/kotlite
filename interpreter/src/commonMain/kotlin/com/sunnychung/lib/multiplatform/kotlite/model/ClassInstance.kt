@@ -4,6 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.extension.merge
 
 open class ClassInstance(
+    currentScope: SymbolTable,
     protected val fullClassName: String,
     clazz: ClassDefinition? = null,
     val typeArguments: List<DataType>,
@@ -20,16 +21,17 @@ open class ClassInstance(
     internal var clazz: ClassDefinition? = null
     internal var hasInitialized: Boolean = false
     internal var typeArgumentByName: Map<String, DataType> = emptyMap()
+    internal var type: DataType? = null
 
     init {
         if (clazz != null) {
-            attach(clazz)
+            attach(clazz, currentScope)
         }
     }
 
-    final override fun type(): DataType = ObjectType(clazz ?: throw RuntimeException("This object has not been initialized"), typeArguments)
+    final override fun type(): DataType = type ?: throw RuntimeException("This object has not been initialized")
 
-    internal fun attach(clazz: ClassDefinition) {
+    internal fun attach(clazz: ClassDefinition, currentScope: SymbolTable) {
         if (clazz.fullQualifiedName != fullClassName) throw RuntimeException("The class to attach does not match with class name")
         if (this.clazz != null) throw RuntimeException("This object has already been initialized")
         this.clazz = clazz
@@ -69,6 +71,8 @@ open class ClassInstance(
                 }
             )
         }
+
+        type = currentScope.resolveObjectType(clazz, typeArguments.map { it.toTypeNode() }, false)
 
         hasInitialized = true
     }

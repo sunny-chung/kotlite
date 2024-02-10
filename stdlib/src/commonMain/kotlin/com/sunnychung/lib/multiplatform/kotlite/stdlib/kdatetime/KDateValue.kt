@@ -5,8 +5,9 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
-class KDateValue(value: KDate) : DelegatedValue<KDate>(value, clazz) {
+class KDateValue(value: KDate, symbolTable: SymbolTable) : DelegatedValue<KDate>(value, clazz, symbolTable = symbolTable) {
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KDate",
@@ -24,7 +25,8 @@ class KDateValue(value: KDate) : DelegatedValue<KDate>(value, clazz) {
                         year = (callArguments[i++] as IntValue).value,
                         month = (callArguments[i++] as IntValue).value,
                         day = (callArguments[i++] as IntValue).value,
-                    )
+                    ),
+                    interpreter.symbolTable(),
                 )
             }
         )

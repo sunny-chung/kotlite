@@ -18,7 +18,7 @@ open class IOLibModule : LibraryModule("IO") {
             functionName = "println",
             returnType = "Unit",
             parameterTypes = listOf(CustomFunctionParameter("message", "Any?")),
-            executable = { receiver, args, typeArgs ->
+            executable = { interpreter, receiver, args, typeArgs ->
                 val message = args[0]
                 outputToConsole("${message.convertToString()}\n")
                 UnitValue
@@ -29,7 +29,7 @@ open class IOLibModule : LibraryModule("IO") {
             functionName = "print",
             returnType = "Unit",
             parameterTypes = listOf(CustomFunctionParameter("message", "Any?")),
-            executable = { receiver, args, typeArgs ->
+            executable = { interpreter, receiver, args, typeArgs ->
                 val message = args[0]
                 outputToConsole(message.convertToString())
                 UnitValue

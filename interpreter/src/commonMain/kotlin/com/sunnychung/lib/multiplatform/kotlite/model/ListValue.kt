@@ -1,6 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-class ListValue(value: List<RuntimeValue>, typeArgument: DataType) : DelegatedValue<List<RuntimeValue>>(value, clazz, listOf(typeArgument)) {
+class ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable) : DelegatedValue<List<RuntimeValue>>(value, clazz, listOf(typeArgument), symbolTable) {
 
     companion object {
         val clazz = ProvidedClassDefinition(

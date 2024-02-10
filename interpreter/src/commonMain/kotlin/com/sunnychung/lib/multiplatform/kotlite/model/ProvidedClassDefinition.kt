@@ -47,7 +47,7 @@ class ProvidedClassDefinition(
     ): ClassInstance {
         return constructInstance(interpreter, callArguments, callPosition).also {
             if (!it.hasInitialized) {
-                it.attach(this)
+                it.attach(this, interpreter.symbolTable())
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 sealed interface DataType {
 
@@ -93,7 +94,7 @@ data class AnyType(override val isNullable: Boolean = false) : DataType {
         return isNullable || !other.isNullable
     }
 }
-data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>, override val isNullable: Boolean = false) : DataType {
+data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>, override val isNullable: Boolean = false, val superType: ObjectType?) : DataType {
     override val name: String = clazz.fullQualifiedName
     override val descriptiveName: String = "${name}${
         arguments.emptyToNull()?.let { "<${it.joinToString(", ") { it.descriptiveName }}>" } ?: ""
@@ -103,20 +104,85 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NullType && isNullable) return true
-        return other is ObjectType &&
-                other.clazz.fullQualifiedName == clazz.fullQualifiedName &&
-                other.arguments == arguments &&
-                (isNullable || !other.isNullable)
+        if (other !is ObjectType) return false
+        if (other.isNullable && !isNullable) return false
+//        var otherClazz = other.clazz
+//        var upwardOffset = 0
+//        while (otherClazz.fullQualifiedName != clazz.fullQualifiedName && otherClazz.superClass != null) {
+//            otherClazz = otherClazz.superClass!!
+//            upwardOffset += 1
+//        }
+//        if (otherClazz.fullQualifiedName != clazz.fullQualifiedName) return false
+//        if (upwardOffset == 0) { // no re-resolution is needed
+//            return other.arguments == arguments
+//        }
+//
+//        // FIXME resolving super classes with same name as type parameters using `clazz.currentScope` is incorrect
+//        val genericResolverOfOther = ClassMemberResolver(other.clazz, arguments.map { it.toTypeNode() })
+//        val resolutions = genericResolverOfOther.genericResolutions.let { it[it.lastIndex - upwardOffset] }
+//        if (resolutions.first.fullQualifiedName != clazz.fullQualifiedName) {
+//            throw RuntimeException("something wrong 1")
+//        }
+//        if (resolutions.second.size != arguments.size || arguments.size != clazz.typeParameters.size) {
+//            throw RuntimeException("something wrong 2")
+//        }
+//        if (arguments.isEmpty()) return resolutions.second.isEmpty()
+//
+//        val scope = clazz.currentScope ?: throw RuntimeException("Scope is needed to resolve type ${other.descriptiveName}")
+//        return arguments.withIndex().all {
+//            val tp = clazz.typeParameters[it.index]
+//            it.value == scope.assertToDataType(resolutions.second[tp.name]!!)
+//        }
+        var otherType: ObjectType = other
+        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
+            otherType = otherType.superType!!
+        }
+        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) return false
+        if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
+        return arguments.withIndex().all {
+            it.value == otherType.arguments[it.index]
+        }
+//        return other is ObjectType &&
+//                other.clazz.fullQualifiedName == clazz.fullQualifiedName &&
+//                other.arguments == arguments &&
+//                (isNullable || !other.isNullable)
     }
 
     override fun isConvertibleFrom(other: DataType): Boolean {
         if (other is NullType && isNullable) return true
-        return other is ObjectType &&
-                other.clazz.fullQualifiedName == clazz.fullQualifiedName &&
-                other.arguments.withIndex().all {
-                    arguments[it.index].isConvertibleFrom(it.value)
-                } &&
-                (isNullable || !other.isNullable)
+        if (other !is ObjectType) return false
+        if (other.isNullable && !isNullable) return false
+//        var otherClazz = other.clazz
+//        var upwardOffset = 0
+//        while (otherClazz.fullQualifiedName != clazz.fullQualifiedName && otherClazz.superClass != null) {
+//            otherClazz = otherClazz.superClass!!
+//            upwardOffset += 1
+//        }
+//        if (otherClazz.fullQualifiedName != clazz.fullQualifiedName) return false
+//        val genericResolverOfOther = ClassMemberResolver(other.clazz, arguments.map { it.toTypeNode() })
+//        val resolutions = genericResolverOfOther.genericResolutions.let { it[it.lastIndex - upwardOffset] }
+//        if (resolutions.first.fullQualifiedName != clazz.fullQualifiedName) {
+//            throw RuntimeException("something wrong 1")
+//        }
+//        if (resolutions.second.size != arguments.size || arguments.size != clazz.typeParameters.size) {
+//            throw RuntimeException("something wrong 2")
+//        }
+//        if (arguments.isEmpty()) return resolutions.second.isEmpty()
+//
+//        val scope = clazz.currentScope ?: throw RuntimeException("Scope is needed to resolve type ${other.descriptiveName}")
+//        return arguments.withIndex().all {
+//            val tp = clazz.typeParameters[it.index]
+//            it.value.isConvertibleFrom(scope.assertToDataType(resolutions.second[tp.name]!!))
+//        }
+        var otherType: ObjectType = other
+        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
+            otherType = otherType.superType!!
+        }
+        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) return false
+        if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
+        return arguments.withIndex().all {
+            it.value.isConvertibleFrom(otherType.arguments[it.index])
+        }
     }
 
     override fun toTypeNode(): TypeNode {
@@ -144,6 +210,7 @@ data class TypeParameterType(
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
 
     override fun isConvertibleFrom(other: DataType): Boolean {
+        if (isAssignableFrom(other)) return true
         return upperBound.isAssignableFrom(other)
     }
 
@@ -233,3 +300,6 @@ fun DataType.toTypeNode(): TypeNode = when (this) {
         isNullable
     )
 }
+
+fun TypeNode.isPrimitive() =
+    name in setOf("Int", "Double", "Long", "Boolean", "String", "Char", "Unit", "Nothing", "Any")

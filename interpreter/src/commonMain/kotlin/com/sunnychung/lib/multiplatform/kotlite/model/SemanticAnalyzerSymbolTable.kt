@@ -233,12 +233,13 @@ class SemanticAnalyzerSymbolTable(
                     })
                 }
 
-            type = (type as? ObjectType)?.clazz?.superClass?.let {
-                val typeResolutions = resolver!!.genericResolutions[it.index].second
-                ObjectType(it, it.typeParameters.map {
-                    assertToDataType(typeResolutions[it.name]!!)
-                })
-            }
+//            type = (type as? ObjectType)?.clazz?.superClass?.let {
+//                val typeResolutions = resolver!!.genericResolutions[it.index].second
+//                ObjectType(it, it.typeParameters.map {
+//                    assertToDataType(typeResolutions[it.name]!!)
+//                })
+//            }
+            type = (type as? ObjectType)?.superType
         }
 
         return result

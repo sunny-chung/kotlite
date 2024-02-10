@@ -804,4 +804,123 @@ class ClassInheritanceTest {
         assertEquals(120, (symbolTable.findPropertyByDeclaredName("k") as IntValue).value)
         assertEquals(120, (symbolTable.findPropertyByDeclaredName("l") as IntValue).value)
     }
+
+    @Test
+    fun assignAsSuperType() {
+        val interpreter = interpreter("""
+            open class A {
+                open val a: Int = 1
+                open fun f(): Int = 4
+            }
+            class B : A() {
+                override val a: Int = 6
+                override fun f(): Int = 9
+            }
+            class C : A() {
+                override val a: Int = 8
+                override fun f(): Int = 12
+            }
+            val b: A = B()
+            val c: A = C()
+            val s = b.a + c.a
+            val t = b.f() + c.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("s") as IntValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("t") as IntValue).value)
+    }
+
+    @Test
+    fun castGenericTypeParameterToSuper() {
+        val interpreter = interpreter("""
+            open class A {
+                open fun value() = 10
+            }
+            class B : A() {
+                override fun value() = 15
+            }
+
+            class G<T>(val delegate: T)
+
+            val o: G<A> = G<B>(B()) as G<A>
+            val a = o.delegate.value()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
+
+    @Test
+    fun ifExpressionOfSubclasses() {
+        val interpreter = interpreter("""
+            open class A {
+                open val a: Int = 1
+                open fun f(): Int = 4
+            }
+            class B : A() {
+                override val a: Int = 6
+                override fun f(): Int = 9
+            }
+            class C : A() {
+                override val a: Int = 8
+                override fun f(): Int = 12
+            }
+            fun produce(x: Int): A = if (x > 0) {
+                B()
+            } else {
+                C()
+            }
+            val b = produce(-1)
+            val c: A = produce(1)
+            val s = b.a + c.a
+            val t = b.f() + c.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("s") as IntValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("t") as IntValue).value)
+    }
+
+    @Test
+    fun ifExpressionOfGenericSubclasses() {
+        val interpreter = interpreter("""
+            open class A {
+                open val a: Int = 1
+                open fun f(): Int = 4
+            }
+            class B : A() {
+                override val a: Int = 6
+                override fun f(): Int = 9
+            }
+            class C : A() {
+                override val a: Int = 8
+                override fun f(): Int = 12
+            }
+            open class G<T>(val value: T)
+            class GB(x: B) : G<B>(x)
+            class GC(x: C) : G<C>(x)
+            fun produce(x: Int): G<A> = if (x > 0) {
+                GB(B())
+            } else {
+                GC(C())
+            }
+            val b = produce(-1).value
+            val c: A = produce(1).value
+            val s = b.a + c.a
+            val t = b.f() + c.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(14, (symbolTable.findPropertyByDeclaredName("s") as IntValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("t") as IntValue).value)
+    }
 }

@@ -299,7 +299,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
                 if (transformedRefName != null) { // extension property
                     (symbolTable().findExtensionProperty(transformedRefName!!)?.setter
-                        ?: throw RuntimeException("Setter not found"))(subject, value)
+                        ?: throw RuntimeException("Setter not found"))(this@Interpreter, subject, value)
                     return
                 }
 
@@ -387,6 +387,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             // TODO return singleton
             val companionClassName = "${(type as ClassTypeNode).clazz.name}.Companion"
             return ClassInstance(
+                symbolTable(),
                 companionClassName,
                 symbolTable().findClass(companionClassName)!!.first,
                 emptyList(),
@@ -462,9 +463,13 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         if (subject == NullValue) {
                             throw EvaluateNullPointerException()
                         }
-                        (subject as? ClassInstance)?.clazz?.findMemberFunctionByTransformedName(functionRefName!!)?.let { function ->
-                            return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
-                        }
+                        (subject as? ClassInstance)
+                            ?.let { function.resolveSuperKeyword(it) as? ClassInstance }
+                            ?.clazz
+                            ?.findMemberFunctionByTransformedName(functionRefName!!)
+                            ?.let { function ->
+                                return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
+                            }
                     }
                     CallableType.ExtensionFunction -> {
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
@@ -641,7 +646,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             val arguments = if (isVararg) {
-                arrayOf(ListValue(arguments.filterNotNull().toList(), symbolTable().assertToDataType(functionNode.valueParameters.first().type)))
+                arrayOf(ListValue(arguments.filterNotNull().toList(), symbolTable().assertToDataType(functionNode.valueParameters.first().type), symbolTable()))
             } else {
                 arguments
             }
@@ -659,7 +664,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
 
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
-            if (!returnType.isAssignableFrom(returnValue.type())) {
+            if (!returnType.isConvertibleFrom(returnValue.type())) {
                 throw RuntimeException("Type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName}")
             }
 
@@ -725,10 +730,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
         }
 
-        val instance = ClassInstance(clazz.fullQualifiedName, clazz, typeArguments.toList(), parentInstance = parentInstance)
+        val symbolTable = callStack.currentSymbolTable()
+        val instance = ClassInstance(symbolTable, clazz.fullQualifiedName, clazz, typeArguments.toList(), parentInstance = parentInstance)
         val properties = clazz.primaryConstructor?.parameters?.filter { it.isProperty }?.map { it.parameter.transformedRefName!! }?.toMutableSet() ?: mutableSetOf()
 
-        val symbolTable = callStack.currentSymbolTable()
         val nonPropertyArguments = mutableMapOf<String, Pair<ClassParameterNode, RuntimeValue>>()
         clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
             val value = callArguments[index]
@@ -1028,7 +1033,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!)
                 ?: throw RuntimeException("Extension property `${member.name}` on receiver `${obj.type().nameWithNullable}` could not be found")
             extensionProperty.getter?.let { getter ->
-                return getter(obj)
+                return getter(this@Interpreter, obj)
             }
         }
 
@@ -1059,12 +1064,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     fun AsOpNode.eval(): RuntimeValue {
         val value = expression.eval() as RuntimeValue
         val targetType = symbolTable().typeNodeToDataType(type) ?: throw RuntimeException("Unknown type `${type.descriptiveName()}`")
-        return if (value.type().isAssignableTo(targetType)) {
+        return if (targetType.isConvertibleFrom(value.type())) {
             value
         } else if (isNullable) {
             NullValue
         } else {
-            throw EvaluateTypeCastException(value.type().nameWithNullable, targetType.nameWithNullable)
+            throw EvaluateTypeCastException(value.type().descriptiveName, targetType.descriptiveName)
         }
     }
 

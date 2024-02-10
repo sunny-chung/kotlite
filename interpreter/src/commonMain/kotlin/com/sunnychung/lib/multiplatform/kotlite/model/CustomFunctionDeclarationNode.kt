@@ -36,7 +36,7 @@ class CustomFunctionDeclarationNode(
     transformedRefName = transformedRefName,
 ) {
     override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>, typeArguments: Map<String, DataType>): RuntimeValue {
-        return def.executable(receiver, arguments, typeArguments)
+        return def.executable(interpreter, receiver, arguments, typeArguments)
     }
 
     override fun copy(

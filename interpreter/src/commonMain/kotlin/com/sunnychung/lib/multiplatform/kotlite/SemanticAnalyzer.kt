@@ -174,6 +174,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         this
     }
 
+    fun DataType.resolveTypeParameterAsUpperBound(): DataType {
+        var subjectType = this
+        while (subjectType is TypeParameterType) {
+            if (subjectType == subjectType.upperBound) {
+                throw RuntimeException("subjectType upper bound is itself")
+            }
+            subjectType = subjectType.upperBound
+        }
+        return subjectType
+    }
+
     protected fun isLocalAndNotCurrentScope(scopeLevel: Int): Boolean {
         return scopeLevel > 1 && scopeLevel <= (symbolRecorders.lastOrNull()?.scopeLevel ?: currentScope.scopeLevel)
     }
@@ -287,7 +298,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         try {
             currentScope.typeNodeToDataType(this)
         } catch (e: RuntimeException) {
-            throw SemanticException(e.message ?: e::class.qualifiedName ?: "")
+            throw SemanticException(e.message ?: e.toString() ?: "")
         }
             ?: throw SemanticException("Unknown type `${this.descriptiveName()}`")
     }
@@ -940,12 +951,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     var type = argumentType.toDataType() as? ObjectType
                     val resolver = type?.let { ClassMemberResolver(it.clazz, it.arguments.map { it.toTypeNode() }) }
                     while (type != null && type.name != parameterType.name) {
-                        type = (type as? ObjectType)?.clazz?.superClass?.let {
-                            val typeResolutions = resolver!!.genericResolutions[it.index].second
-                            ObjectType(it, it.typeParameters.map {
-                                typeResolutions[it.name]!!.toDataType()
-                            })
-                        }
+//                        type = (type as? ObjectType)?.clazz?.superClass?.let {
+//                            val typeResolutions = resolver!!.genericResolutions[it.index].second
+//                            ObjectType(it, it.typeParameters.map {
+//                                typeResolutions[it.name]!!.toDataType()
+//                            }, superType = null)
+//                        }
+                        type = type.superType
                     }
 
                     if (type != null) {
@@ -1011,8 +1023,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             typeParameters[index].name to t
         }.toMap().toMutableMap()
         if (tpUpperBounds.any {
-                !it.value.isAssignableFrom(tpResolutions[it.key]!!.toDataType())
-            }) throw SemanticException("Given value arguments are out of bound of type parameters")
+                !it.value.isConvertibleFrom(tpResolutions[it.key]!!.toDataType())
+            }) throw SemanticException("Provided value arguments are out of bound of type parameters")
 
         returnType = functionArgumentAndReturnTypeDeclarations.returnType!!.let { returnType ->
             if (callableType == CallableType.Constructor &&
@@ -1153,7 +1165,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         // find member
         val subjectType = subject.type().unboxClassTypeAsCompanion().toDataType()
         val memberName = member.name
-        val clazz = subjectType.nameWithNullable.let { currentScope.findClass(it) ?: throw RuntimeException("Cannot find class `$it`") }.first
+        val clazz = subjectType.resolveTypeParameterAsUpperBound().nameWithNullable
+            .let {
+                currentScope.findClass(it)
+                    ?: throw RuntimeException("Cannot find class `$it`")
+            }
+            .first
         if (lookupType == IdentifierClassifier.Property) {
             clazz.findMemberPropertyWithoutAccessor(memberName)?.let { property ->
                 if (isCheckWriteAccess && !property.isMutable) {
@@ -1424,7 +1441,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
-                    it.transformedRefName = "${it.name}/${++functionDefIndex}"
+//                    it.transformedRefName = "${it.name}/${++functionDefIndex}"
+                    it.transformedRefName = it.toSignature(currentScope)
                     currentScope.declareFunctionOwner(it.name, it, "this/$fullQualifiedClassName")
                 }
 
@@ -1641,7 +1659,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is ClassTypeNode -> type.unboxClassTypeAsCompanion()
             else -> type
         } ?: return typeRegistry["Any"]!!
-        val clazz = currentScope.findClass(subjectType.name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
+        val clazz = currentScope.findClass(subjectType.toDataType().resolveTypeParameterAsUpperBound().name)?.first ?: throw SemanticException("Unknown type `${subjectType.name}`")
         val memberName = member.name
 
         fun TypeNode.resolveMemberType(): TypeNode {
@@ -1742,6 +1760,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         val types = types.filterNotNull()
         if (types.isEmpty()) throw IllegalArgumentException("superTypeOf input cannot be empty")
 
+        fun superTypeTree(type: DataType): List<DataType> {
+            val types = mutableListOf(type)
+            if (type !is ObjectType) return types
+            var type: ObjectType = type
+            while (type.superType != null) {
+                type = type.superType!!
+                types += type
+            }
+            return types
+        }
+
         fun superTypeOf(type1: TypeNode, type2: TypeNode): TypeNode {
             if (type1 == type2) return type1
             if (type1.name == type2.name && (type1.isNullable || type2.isNullable)) {
@@ -1753,8 +1782,34 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             if (type2.name == "Nothing" && type2.name != type1.name) {
                 return type1.toNullable()
             }
-            // TODO check object super type
-//            throw SemanticException("Cannot find super type of ${type1.descriptiveName()} and ${type2.descriptiveName()}")
+
+            val typeTree1 = superTypeTree(currentScope.assertToDataType(type1))
+            val typeTree2 = superTypeTree(currentScope.assertToDataType(type2))
+            val isNullable = type1.isNullable || type2.isNullable
+            run {
+                typeTree1.forEach { superType1 ->
+                    typeTree2.forEach { superType2 ->
+                        if (superType1.name == superType2.name) {
+                            if (superType1 is ObjectType && superType2 is ObjectType) {
+                                if (superType1.arguments.size != superType2.arguments.size) {
+                                    return@run
+                                }
+                                return TypeNode(
+                                    name = superType1.name,
+                                    arguments = superType1.arguments.mapIndexed { index, it ->
+                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode())
+                                    }.emptyToNull(),
+                                    isNullable = isNullable,
+                                )
+                            } else if (superType1 == superType2) {
+                                return TypeNode(superType1.name, null, isNullable = isNullable)
+                            }
+                            return@run
+                        }
+                    }
+                }
+            }
+
             return typeRegistry["Any${if (type1.isNullable || type2.isNullable) "?" else ""}"]!!
         }
 

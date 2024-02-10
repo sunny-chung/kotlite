@@ -194,4 +194,39 @@ class GenericFunctionTest {
         println(symbolTable.propertyValues)
         assertEquals(6, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
     }
+
+    @Test
+    fun nonAnyTypeUpperBound() {
+        val interpreter = interpreter("""
+            open class MyStringListBase<T> {
+                var elements = ""
+                fun add(element: T) {
+                    elements += "${'$'}element,"
+                }
+            }
+            
+            class StringList : MyStringListBase<String>()
+            class IntList : MyStringListBase<Int>()
+            
+            fun <D : MyStringListBase<*>, O : MyStringListBase<*>> addAll(destination: D, list: O) {
+                destination.elements += list.elements
+            }
+            val x = StringList()
+            val y = IntList()
+            x.add("abc")
+            x.add("def")
+            y.add(123)
+            y.add(45)
+            x.add("bcd")
+            addAll(x, y)
+            val a = x.elements
+            val b = y.elements
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(4, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals("abc,def,bcd,123,45,", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("123,45,", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
 }

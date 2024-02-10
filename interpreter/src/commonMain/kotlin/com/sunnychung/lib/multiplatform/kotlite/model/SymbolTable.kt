@@ -4,6 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierExcepti
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.log
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 open class SymbolTable(
     val scopeLevel: Int,
@@ -12,6 +13,12 @@ open class SymbolTable(
     val parentScope: SymbolTable?,
     val returnType: DataType? = null,
 ) {
+    init {
+        if (parentScope == this) {
+            throw RuntimeException("There is a cycle in symbol table hierarchy")
+        }
+    }
+
     private val propertyDeclarations = mutableMapOf<String, PropertyType>()
     internal val propertyValues = mutableMapOf<String, RuntimeValueAccessor>()
     internal val propertyOwners = mutableMapOf<String, PropertyOwnerInfo>() // only use in SemanticAnalyzer
@@ -110,11 +117,36 @@ open class SymbolTable(
             }
         }
 
-        return ObjectType(
-            clazz = clazz,
-            arguments = type.arguments?.map { assertToDataType(it) } ?: emptyList(),
-            isNullable = type.isNullable
-        )
+        val type = resolveObjectType(clazz, type.arguments, type.isNullable)
+        if (type!!.clazz != clazz) {
+            throw RuntimeException("genericResolver.genericResolutions is wrong")
+        }
+
+        return type
+//        return ObjectType(
+//            clazz = clazz,
+//            arguments = type.arguments?.map { assertToDataType(it) } ?: emptyList(),
+//            isNullable = type.isNullable
+//        )
+    }
+
+    fun resolveObjectType(clazz: ClassDefinition, typeArguments: List<TypeNode>?, isNullable: Boolean, upToIndex: Int = -1): ObjectType? {
+        val genericResolver = ClassMemberResolver(clazz, typeArguments ?: emptyList())
+        var superType: ObjectType? = null
+        genericResolver.genericResolutions.forEachIndexed { index, resolutions ->
+            if (upToIndex >= 0 && index > upToIndex) return superType
+            val clazz = resolutions.first
+            superType = ObjectType(
+                clazz = clazz,
+                arguments = clazz.typeParameters.map { tp ->
+                    val argument = resolutions.second[tp.name]!!
+                    assertToDataType(argument)
+                },
+                isNullable = isNullable,
+                superType = superType
+            )
+        }
+        return superType
     }
 
     fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
@@ -178,8 +210,8 @@ open class SymbolTable(
 //            if (!type.isMutable && propertyValues.containsKey(name)) {
 //                throw RuntimeException("val cannot be reassigned")
 //            }
-            if (!type.type.isAssignableFrom(value.type())) {
-                throw RuntimeException("Expected type ${type.type.nameWithNullable} but actual type is ${value.type().nameWithNullable}")
+            if (!type.type.isConvertibleFrom(value.type())) {
+                throw RuntimeException("Expected type ${type.type.descriptiveName} but actual type is ${value.type().descriptiveName}")
             }
             propertyValues.getOrPut(name) { RuntimeValueHolder(type.type, type.isMutable, null) }.assign(value = value)
             return true

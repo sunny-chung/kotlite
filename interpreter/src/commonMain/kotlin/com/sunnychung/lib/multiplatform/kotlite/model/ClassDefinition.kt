@@ -64,7 +64,9 @@ open class ClassDefinition(
             it.type,
             it.isMutable
         ) ?: if (it.type.name == name) {
-            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
+            val superType = currentScope!!.resolveObjectType(this, this.typeParameters.map { TypeNode(it.name, null, false) }, it.type.isNullable, upToIndex = index - 1)
+            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable, superType), it.isMutable)
+//            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
         } else throw RuntimeException("Unknown type ${it.type.name}"))
         (memberPropertyTypes as MutableMap)[it.name] = type
         if (it.accessors == null) {

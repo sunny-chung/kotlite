@@ -5,8 +5,9 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
-class KZonedInstantValue(value: KZonedInstant) : DelegatedValue<KZonedInstant>(value, clazz) {
+class KZonedInstantValue(value: KZonedInstant, symbolTable: SymbolTable) : DelegatedValue<KZonedInstant>(value, clazz, symbolTable = symbolTable) {
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "KZonedInstant",
@@ -20,7 +21,7 @@ class KZonedInstantValue(value: KZonedInstant) : DelegatedValue<KZonedInstant>(v
                 KZonedInstantValue(KZonedInstant(
                     timestampMs = (callArguments[0] as LongValue).value,
                     zoneOffset = (callArguments[1] as KZoneOffsetValue).value,
-                ))
+                ), interpreter.symbolTable())
             }
         )
     }

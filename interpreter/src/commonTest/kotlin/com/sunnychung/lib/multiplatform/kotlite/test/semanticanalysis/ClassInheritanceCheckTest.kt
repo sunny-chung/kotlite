@@ -336,4 +336,16 @@ class ClassInheritanceCheckTest {
         """.trimIndent())
     }
 
+    @Test
+    fun assignNonEqualGenericType() {
+        assertSemanticFail("""
+            open class A
+            class B : A()
+
+            class G<T>
+
+            val a: G<A> = G<B>()
+        """.trimIndent())
+    }
+
 }
