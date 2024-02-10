@@ -508,7 +508,7 @@ class ClassInheritanceTest {
             }
             open class B : A()
             open class C : B() {
-                open override fun f(value: Int) {
+                override fun f(value: Int) {
                     s += "C${'$'}{value + 20},"
                     super.f(value + 2)
                     s += "C${'$'}{value + 30},"
@@ -578,7 +578,7 @@ class ClassInheritanceTest {
             open class B : A()
             open class C : B()
             open class D : C() {
-                open override var a: Int = 10
+                override var a: Int = 10
                 fun getSuperA2() = super.a
                 fun setSuperA2(x: Int) {
                     super.a += x
@@ -665,7 +665,7 @@ class ClassInheritanceTest {
             open class C : B() {
                 val a = super.f(4)
                 val s1 = s
-                open override fun f(value: Int) {
+                override fun f(value: Int) {
                     s += "C${'$'}{value + 20},"
                     super.f(value + 2)
                     s += "C${'$'}{value + 30},"
@@ -723,7 +723,7 @@ class ClassInheritanceTest {
             open class B : A()
             open class C : B()
             open class D : C() {
-                open override var a: Int = 10
+                override var a: Int = 10
                 fun getSuperA2() = super.a
                 fun setSuperA2(x: Int) {
                     super.a += x
@@ -769,7 +769,7 @@ class ClassInheritanceTest {
             open class B : A()
             open class C : B()
             open class D : C() {
-                open override var a: Int = 10
+                override var a: Int = 10
                 fun getSuperA2() = super.a
                 fun setSuperA2(x: Int) {
                     super.a += x

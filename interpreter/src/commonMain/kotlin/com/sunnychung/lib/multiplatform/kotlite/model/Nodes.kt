@@ -111,7 +111,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 
 data class PropertyDeclarationNode(
     val name: String,
-    val modifiers: Set<PropertyModifier>,
+    val declaredModifiers: Set<PropertyModifier>,
     val typeParameters: List<TypeParameterNode>,
     val receiver: TypeNode?,
     val declaredType: TypeNode?,
@@ -120,9 +120,12 @@ data class PropertyDeclarationNode(
     val accessors: PropertyAccessorsNode? = null,
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredType: TypeNode? = null,
+    @ModifyByAnalyzer val inferredModifiers: MutableSet<PropertyModifier> = mutableSetOf(),
 ) : ASTNode {
     val type: TypeNode
         get() = declaredType ?: inferredType ?: throw SemanticException("Could not infer type for property `$name`")
+    val modifiers: Set<PropertyModifier>
+        get() = declaredModifiers + inferredModifiers
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Property Node `$name`\"]"
         return "$self\n" +
@@ -209,13 +212,16 @@ open class FunctionDeclarationNode(
     override val valueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
     override val typeParameters: List<TypeParameterNode> = emptyList(),
-    val modifiers: Set<FunctionModifier> = emptySet(),
+    val declaredModifiers: Set<FunctionModifier> = emptySet(),
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,
-    @ModifyByAnalyzer var isVararg: Boolean = false
+    @ModifyByAnalyzer var isVararg: Boolean = false,
+    @ModifyByAnalyzer val inferredModifiers: MutableSet<FunctionModifier> = mutableSetOf(),
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
         get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException("return type of function $name")
+    val modifiers: Set<FunctionModifier>
+        get() = declaredModifiers + inferredModifiers
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
@@ -254,7 +260,7 @@ open class FunctionDeclarationNode(
             declaredReturnType = declaredReturnType,
             typeParameters = typeParameters,
             valueParameters = valueParameters,
-            modifiers = modifiers,
+            declaredModifiers = modifiers,
             body = body,
             transformedRefName = transformedRefName,
             inferredReturnType = inferredReturnType,

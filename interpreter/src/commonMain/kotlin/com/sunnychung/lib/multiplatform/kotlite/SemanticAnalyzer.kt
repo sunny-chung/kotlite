@@ -410,6 +410,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun PropertyDeclarationNode.visit(modifier: Modifier = Modifier(), isVisitInitialValue: Boolean = true, isClassProperty: Boolean = false, scopeLevel: Int = currentScope.scopeLevel) {
+        if (declaredModifiers.contains(PropertyModifier.override)) {
+            inferredModifiers += PropertyModifier.open
+        }
         if (isVisitInitialValue) {
             if (declaredType is FunctionTypeNode && initialValue is LambdaLiteralNode) {
                 initialValue.parameterTypesUpperBound = declaredType.parameterTypes
@@ -520,6 +523,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             throw SemanticException("Vararg value argument with a default value is not supported")
         }
         this.isVararg = isVararg
+
+        if (declaredModifiers.contains(FunctionModifier.override)) {
+            inferredModifiers += FunctionModifier.open
+        }
 
         if (modifiers.contains(FunctionModifier.operator)) {
             if (!isClassMemberFunction && receiver == null) {
@@ -1361,7 +1368,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         val p = it.parameter
                         PropertyDeclarationNode(
                             name = p.name,
-                            modifiers = it.modifiers,
+                            declaredModifiers = it.modifiers,
                             typeParameters = emptyList(),
                             receiver = classType,
                             declaredType = p.type,

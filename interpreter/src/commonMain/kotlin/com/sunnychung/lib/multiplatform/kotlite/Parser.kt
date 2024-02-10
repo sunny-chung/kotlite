@@ -1294,7 +1294,7 @@ class Parser(protected val lexer: Lexer) {
             }
             else -> null
         }
-        return PropertyDeclarationNode(name = name, modifiers = modifiers, typeParameters = typeParameters, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
+        return PropertyDeclarationNode(name = name, declaredModifiers = modifiers, typeParameters = typeParameters, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
     }
 
     /**
@@ -1571,7 +1571,7 @@ class Parser(protected val lexer: Lexer) {
                 valueParameters = valueParameters,
                 body = dummyBlockNode(),
                 typeParameters = typeParameters,
-                modifiers = modifiers,
+                declaredModifiers = modifiers,
             )
         }
         val body = functionBody()
@@ -1582,7 +1582,7 @@ class Parser(protected val lexer: Lexer) {
             valueParameters = valueParameters,
             body = body,
             typeParameters = typeParameters,
-            modifiers = modifiers,
+            declaredModifiers = modifiers,
         )
     }
 

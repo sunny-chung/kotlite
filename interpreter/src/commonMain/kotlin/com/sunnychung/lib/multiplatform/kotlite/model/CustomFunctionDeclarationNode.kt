@@ -31,7 +31,7 @@ class CustomFunctionDeclarationNode(
             modifiers = with(Parser(Lexer(""))) { it.modifiers.toFunctionValueParameterModifiers() }
         )
     },
-    modifiers = modifiers ?: def.modifiers,
+    declaredModifiers = modifiers ?: def.modifiers,
     body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode()),
     transformedRefName = transformedRefName,
 ) {

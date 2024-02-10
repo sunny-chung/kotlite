@@ -328,7 +328,7 @@ class ClassInheritanceCheckTest {
                 }
             }
             open class C : B() {
-                open override var a: Int = 2
+                override var a: Int = 2
             }
             class D : C() {
                 override var a: Int = 3
