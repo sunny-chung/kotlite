@@ -318,6 +318,17 @@ class SemanticAnalyzerSymbolTable(
         } ?: emptyList())
     }
 
+    fun findExtensionPropertyByDeclarationIncludingSuperClasses(resolvedReceiver: TypeNode, declaredName: String, isThisScopeOnly: Boolean = false): Pair<String, ExtensionProperty>? {
+        var receiverType: DataType? = assertToDataType(resolvedReceiver)
+        while (receiverType != null) {
+            findExtensionPropertyByDeclaration(receiverType.toTypeNode(), declaredName)?.let {
+                return it
+            }
+            receiverType = (receiverType as? ObjectType)?.superType
+        }
+        return null
+    }
+
     fun DataType.toTypeNode(): TypeNode =
         if (this is NullType) {
             TypeNode("Nothing", null, true)

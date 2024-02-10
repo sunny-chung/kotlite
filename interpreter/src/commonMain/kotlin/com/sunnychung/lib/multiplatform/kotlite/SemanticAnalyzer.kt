@@ -164,7 +164,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         } catch (e: SemanticException) {
             throw e
         } catch (e: RuntimeException) {
-            throw SemanticException(e.message!!)
+            e.printStackTrace()
+            throw SemanticException(e.message ?: e.toString())
         }
     }
 
@@ -1220,7 +1221,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //                        it
 //                    }
 //                }
-            currentScope.findExtensionPropertyByDeclaration(resolvedSubjectType, memberName)?.let {
+            currentScope.findExtensionPropertyByDeclarationIncludingSuperClasses(resolvedSubjectType, memberName)?.let {
                 if (isCheckWriteAccess && it.second.setter == null) {
                     throw SemanticException("Setter for `$memberName` is not declared")
                 } else if (!isCheckWriteAccess && it.second.getter == null) {
