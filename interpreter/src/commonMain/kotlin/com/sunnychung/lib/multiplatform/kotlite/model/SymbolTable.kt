@@ -210,7 +210,7 @@ open class SymbolTable(
 //            if (!type.isMutable && propertyValues.containsKey(name)) {
 //                throw RuntimeException("val cannot be reassigned")
 //            }
-            if (!type.type.isConvertibleFrom(value.type())) {
+            if (!type.type.isConvertibleFrom(value.type()) && type.type != value.type()) {
                 throw RuntimeException("Expected type ${type.type.descriptiveName} but actual type is ${value.type().descriptiveName}")
             }
             propertyValues.getOrPut(name) { RuntimeValueHolder(type.type, type.isMutable, null) }.assign(value = value)

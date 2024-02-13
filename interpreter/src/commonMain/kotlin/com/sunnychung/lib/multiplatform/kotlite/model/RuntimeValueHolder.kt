@@ -25,7 +25,7 @@ class RuntimeValueHolder(override val type: DataType, val isMutable: Boolean, va
         if (!isMutable && this.value != null) {
             throw RuntimeException("val cannot be reassigned")
         }
-        if (!type.isConvertibleFrom(value.type())) {
+        if (!type.isConvertibleFrom(value.type()) && type != value.type()) {
             throw RuntimeException("Type ${value.type().descriptiveName} cannot be casted to ${type.descriptiveName}")
         }
         this.value = value

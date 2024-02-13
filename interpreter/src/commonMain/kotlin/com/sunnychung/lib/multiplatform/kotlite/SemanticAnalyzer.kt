@@ -53,7 +53,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongType
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
-import com.sunnychung.lib.multiplatform.kotlite.model.NullType
+import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
@@ -143,7 +143,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun DataType.toTypeNode(): TypeNode =
-        if (this is NullType) {
+        if (this is NothingType) {
             typeRegistry["Null"]!!
         } else if (this !is ObjectType && this !is FunctionType && this !is TypeParameterType) {
             typeRegistry["$name${if (isNullable) "?" else ""}"]!!
@@ -445,8 +445,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 inferredType = initialValue.type()
             }
             val subjectType = type.toDataType()
-            if (!subjectType.isAssignableFrom(valueType)) {
-                throw TypeMismatchException(subjectType.nameWithNullable, valueType.nameWithNullable)
+            if (!subjectType.isAssignableFrom(valueType) && subjectType != valueType) {
+                throw TypeMismatchException(subjectType.descriptiveName, valueType.descriptiveName)
             }
         } else if (declaredType == null) {
             throw SemanticException("Type cannot be inferred for property `$name`")
@@ -1641,7 +1641,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         "+", "-", "*", "/", "%" -> {
             val t1 = node1.type(modifier = modifier).toDataType()
             val t2 = node2.type(modifier = modifier).toDataType()
-            if (t1 is StringType || t1 is NullType || t2 is StringType || t2 is NullType) {
+            if (t1 is StringType || t1 is NothingType || t2 is StringType || t2 is NothingType) {
                 typeRegistry["String"]!!
             } else if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
                 || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())

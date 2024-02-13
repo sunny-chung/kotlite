@@ -15,7 +15,7 @@ data object UnitValue : RuntimeValue {
     override fun convertToString() = "Unit"
 }
 data object NullValue : RuntimeValue {
-    override fun type() = NullType
+    override fun type() = NothingType(isNullable = true)
 
     override fun convertToString() = "null"
 }

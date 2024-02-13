@@ -330,7 +330,7 @@ class SemanticAnalyzerSymbolTable(
     }
 
     fun DataType.toTypeNode(): TypeNode =
-        if (this is NullType) {
+        if (this is NothingType) {
             TypeNode("Nothing", null, true)
         } else if (this !is ObjectType && this !is FunctionType) {
             TypeNode(name, null, isNullable)

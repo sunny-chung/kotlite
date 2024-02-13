@@ -1,7 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
-import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 sealed interface DataType {
 
@@ -21,7 +20,7 @@ sealed interface DataType {
 //        val other = if (other is TypeParameterType) {
 //            other.upperBound
 //        } else other
-        if (other is NullType && isNullable) return true
+        if (other is NothingType && isNullable) return true
         if (other::class == this::class) {
             if (other.isNullable && !this.isNullable) {
                 return false
@@ -79,11 +78,14 @@ data class UnitType(override val isNullable: Boolean = false) : DataType {
     override val name: String = "Unit"
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
 }
-data object NullType : DataType {
+data class NothingType(override val isNullable: Boolean) : DataType {
     override val name: String = "Nothing"
-    override val nameWithNullable: String = "Nothing"
-    override val isNullable: Boolean = true
+
     override fun copyOf(isNullable: Boolean) = this
+
+    override fun isAssignableFrom(other: DataType): Boolean {
+        return isNullable && super.isAssignableFrom(other)
+    }
 }
 data class AnyType(override val isNullable: Boolean = false) : DataType {
     override val name: String = "Any"
@@ -103,7 +105,7 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
 
     override fun isAssignableFrom(other: DataType): Boolean {
-        if (other is NullType && isNullable) return true
+        if (other is NothingType && isNullable) return true
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
 //        var otherClazz = other.clazz
@@ -149,7 +151,7 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     }
 
     override fun isConvertibleFrom(other: DataType): Boolean {
-        if (other is NullType && isNullable) return true
+        if (other is NothingType && isNullable) return true
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
 //        var otherClazz = other.clazz
@@ -215,7 +217,7 @@ data class TypeParameterType(
     }
 
     override fun isAssignableFrom(other: DataType): Boolean {
-        if (other is NullType && isNullable) return true
+        if (other is NothingType && isNullable) return true
         return other is TypeParameterType &&
                 other.name == name &&
                 (isNullable || !other.isNullable) &&
@@ -234,7 +236,7 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
 
     override fun isAssignableFrom(other: DataType): Boolean {
-        if (other is NullType && isNullable) return true
+        if (other is NothingType && isNullable) return true
         if (!super.isAssignableFrom(other) || other !is FunctionType) return false
 
         if (returnType is UnresolvedType || other.returnType is UnresolvedType) return true
@@ -270,7 +272,7 @@ fun TypeNode.toPrimitiveDataType() = when(this.name) {
     "Byte" -> ByteType(isNullable = isNullable)
     "Unit" -> UnitType(isNullable = isNullable)
     "Any" -> AnyType(isNullable = isNullable)
-    "Nothing" -> NullType
+    "Nothing" -> NothingType(isNullable = isNullable)
     else -> null //ObjectType(clazz = clazz!!, isNullable = isNullable)
 }
 
