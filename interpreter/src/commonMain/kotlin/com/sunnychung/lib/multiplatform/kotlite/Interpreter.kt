@@ -1117,10 +1117,20 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         return LambdaValue(this, lambdaType, runtimeRefs, this@Interpreter)
     }
 
-    fun InfixFunctionCallNode.eval(): PairValue {
+    fun InfixFunctionCallNode.eval(): RuntimeValue {
         val n1 = node1.eval() as RuntimeValue
-        val n2 = node2.eval() as RuntimeValue
-        return PairValue(n1 to n2, n1.type(), n2.type(), symbolTable())
+        return when (functionName) {
+            "to" -> {
+                val n2 = node2.eval() as RuntimeValue
+                PairValue(n1 to n2, n1.type(), n2.type(), symbolTable())
+            }
+            "is", "!is" -> {
+                val type = symbolTable().assertToDataType(node2 as TypeNode)
+                val isType = type.isAssignableFrom(n1.type())
+                BooleanValue(if (functionName == "is") isType else !isType)
+            }
+            else -> throw RuntimeException("Unknown infix function `$functionName`")
+        }
     }
 
     fun StringNode.eval(): StringValue {

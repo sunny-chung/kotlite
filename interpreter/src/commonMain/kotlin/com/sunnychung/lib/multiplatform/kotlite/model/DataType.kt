@@ -96,6 +96,16 @@ data class AnyType(override val isNullable: Boolean = false) : DataType {
         return isNullable || !other.isNullable
     }
 }
+data object StarType : DataType {
+    override val name: String = "*"
+    override val isNullable: Boolean = true
+
+    override fun copyOf(isNullable: Boolean): DataType = this
+
+    override fun isAssignableFrom(other: DataType): Boolean {
+        return true
+    }
+}
 data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>, override val isNullable: Boolean = false, val superType: ObjectType?) : DataType {
     override val name: String = clazz.fullQualifiedName
     override val descriptiveName: String = "${name}${
@@ -142,7 +152,7 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
         if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) return false
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
         return arguments.withIndex().all {
-            it.value == otherType.arguments[it.index]
+            it.value == StarType || it.value == otherType.arguments[it.index]
         }
 //        return other is ObjectType &&
 //                other.clazz.fullQualifiedName == clazz.fullQualifiedName &&

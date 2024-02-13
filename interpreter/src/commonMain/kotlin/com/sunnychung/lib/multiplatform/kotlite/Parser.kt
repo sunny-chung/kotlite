@@ -122,7 +122,7 @@ class Parser(protected val lexer: Lexer) {
 
     fun eat(tokenType: TokenType): Token {
         if (currentToken.type != tokenType) throw ExpectTokenMismatchException("$tokenType", currentToken.position)
-        log.v { "ate $tokenType" }
+        log.v { "ate $tokenType: ${currentToken.value}" }
         val t = currentToken
         if (t.type != TokenType.EOF) {
             currentToken = readToken()
@@ -803,12 +803,43 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun comparison(): ASTNode {
-        var n = infixFunctionCall()
+        var n = infixOperation()
         while (currentToken.type == TokenType.Operator && currentToken.value in setOf("<", ">", "<=", ">=")) {
             val t = eat(TokenType.Operator)
             repeatedNL()
-            val n2 = infixFunctionCall()
+            val n2 = infixOperation()
             n = BinaryOpNode(node1 = n, node2 = n2, operator = t.value as String)
+        }
+        return n
+    }
+
+    /**
+     * infixOperation:
+     *     elvisExpression {(inOperator {NL} elvisExpression) | (isOperator {NL} type)}
+     *
+     * isOperator:
+     *     'is'
+     *     | NOT_IS
+     *
+     * NOT_IS:
+     *     '!is' (Hidden | NL)
+     *
+     */
+    fun infixOperation(): ASTNode {
+        var n = infixFunctionCall()
+        while (
+            (currentToken.type == TokenType.Identifier && currentToken.value in setOf("is"))
+            || (currentToken.`is`(TokenType.Operator, "!") && peekNextToken().`is`(TokenType.Identifier, "is"))
+        ) {
+            val t = if (currentToken.type == TokenType.Identifier) {
+                eat(TokenType.Identifier).value as String
+            } else {
+                eat(TokenType.Operator, "!")
+                "!${eat(TokenType.Identifier).value}"
+            }
+            repeatedNL()
+            val n2 = type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
+            n = InfixFunctionCallNode(node1 = n, node2 = n2, functionName = t)
         }
         return n
     }
@@ -819,7 +850,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun infixFunctionCall(): ASTNode {
         var n = additiveExpression()
-        while (currentToken.type == TokenType.Identifier && currentToken.value !in setOf("else")) {
+        while (currentToken.type == TokenType.Identifier && currentToken.value !in setOf("else", "is", "!is", "val", "var", "fun", "class", "for", "while", "do")) {
             val t = eat(TokenType.Identifier)
             repeatedNL()
             val n2 = additiveExpression()

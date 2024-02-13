@@ -1579,7 +1579,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun InfixFunctionCallNode.visit(modifier: Modifier = Modifier()) {
-        if (functionName !in setOf("to")) {
+        if (functionName !in setOf("to", "is", "!is")) {
             throw SemanticException("Infix function `$functionName` is not supported")
         }
         this.node1.visit(modifier = modifier)
@@ -1796,8 +1796,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     fun InfixFunctionCallNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }
-        return TypeNode("Pair", arguments = listOf(node1.type(modifier), node2.type(modifier)), isNullable = false)
-            .also { type = it }
+        return when (functionName) {
+            "to" -> TypeNode("Pair", arguments = listOf(node1.type(modifier), node2.type(modifier)), isNullable = false)
+            "is", "!is" -> typeRegistry["Boolean"]!!
+            else -> throw UnsupportedOperationException("Infix function `$functionName` is not supported")
+        }.also { type = it }
     }
 
     fun superTypeOf(vararg types: TypeNode?): TypeNode {

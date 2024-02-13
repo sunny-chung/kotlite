@@ -421,4 +421,28 @@ class GenericClassCheckTest {
             val b = o.value.value.value.value
         """.trimIndent())
     }
+
+    @Test
+    fun genericClassAgainstIsOperatorWithoutDiamond() {
+        assertSemanticFail("""
+            class A<T>
+            val b = A<Int>() is A
+        """.trimIndent())
+    }
+
+    @Test
+    fun genericClassAgainstIsOperatorWithIncorrectNumArguments1() {
+        assertSemanticFail("""
+            class A<T>
+            val b = A<Int>() is A<*, *>
+        """.trimIndent())
+    }
+
+    @Test
+    fun genericClassAgainstIsOperatorWithIncorrectNumArguments2() {
+        assertSemanticFail("""
+            class A<T1, T2>
+            val b = A<Int, String>() is A<*>
+        """.trimIndent())
+    }
 }

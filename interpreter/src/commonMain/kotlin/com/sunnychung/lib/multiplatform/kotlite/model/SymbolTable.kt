@@ -86,7 +86,7 @@ open class SymbolTable(
 
     fun typeNodeToDataType(type: TypeNode): DataType? {
         if (type.name == "*") {
-            return AnyType(isNullable = true) // TODO any better handling? additional validations of use of type *?
+            return StarType // TODO: additional validations of use of type *?
         }
 
         val alias = findTypeAlias("${type.name}${if (type.isNullable) "?" else ""}")
