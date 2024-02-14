@@ -16,6 +16,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -98,6 +99,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is AsOpNode -> this.generate()
             is IndexOpNode -> this.generate()
             is InfixFunctionCallNode -> this.generate()
+            is ElvisOpNode -> this.generate()
         }
 
     protected fun AssignmentNode.generate()
@@ -228,5 +230,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
     protected fun IndexOpNode.generate() = "${subject.generate()}[${arguments.joinToString(", ") { it.generate() }}]"
 
     protected fun InfixFunctionCallNode.generate() = "${node1.generate()} $functionName ${node2.generate()}"
+
+    protected fun ElvisOpNode.generate() = "${primaryNode.generate()} ?: ${fallbackNode.generate()}"
 
 }

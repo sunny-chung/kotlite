@@ -36,6 +36,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -142,6 +143,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is TypeParameterNode -> TODO()
             is IndexOpNode -> this.eval()
             is InfixFunctionCallNode -> this.eval()
+            is ElvisOpNode -> this.eval()
         }
     }
 
@@ -1131,6 +1133,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
             else -> throw RuntimeException("Unknown infix function `$functionName`")
         }
+    }
+
+    fun ElvisOpNode.eval(): RuntimeValue {
+        val result = primaryNode.eval() as RuntimeValue
+        if (result != NullValue) {
+            return result
+        }
+        return fallbackNode.eval() as RuntimeValue
     }
 
     fun StringNode.eval(): StringValue {

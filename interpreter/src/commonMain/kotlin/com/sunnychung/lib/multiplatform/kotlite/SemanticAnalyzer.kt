@@ -32,6 +32,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
+import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentInfo
@@ -248,6 +249,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is CharNode -> {}
             is AsOpNode -> this.visit(modifier = modifier)
             is InfixFunctionCallNode -> this.visit(modifier = modifier)
+            is ElvisOpNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -1588,6 +1590,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         type()
     }
 
+    fun ElvisOpNode.visit(modifier: Modifier = Modifier()) {
+        this.primaryNode.visit(modifier = modifier)
+        this.fallbackNode.visit(modifier = modifier)
+
+        type()
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -1635,6 +1644,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is LambdaLiteralNode -> this.type(modifier = modifier)
             is CharNode -> typeRegistry["Char"]!!
             is InfixFunctionCallNode -> this.type(modifier = modifier)
+            is ElvisOpNode -> this.type(modifier = modifier)
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {
@@ -1800,6 +1810,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             "to" -> TypeNode("Pair", arguments = listOf(node1.type(modifier), node2.type(modifier)), isNullable = false)
             "is", "!is" -> typeRegistry["Boolean"]!!
             else -> throw UnsupportedOperationException("Infix function `$functionName` is not supported")
+        }.also { type = it }
+    }
+
+    fun ElvisOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        type?.let { return it }
+        val type1 = primaryNode.type(modifier = modifier).copy(isNullable = false)
+        val type2 = fallbackNode.type(modifier = modifier)
+        return if (type1.name == "Nothing") {
+            type2
+        } else {
+            superTypeOf(type1, type2)
         }.also { type = it }
     }
 

@@ -563,3 +563,14 @@ data class InfixFunctionCallNode(
         return "$self-->${node1.toMermaid()}\n$self-->${node2.toMermaid()}\n"
     }
 }
+
+data class ElvisOpNode(
+    val primaryNode: ASTNode,
+    val fallbackNode: ASTNode,
+    @ModifyByAnalyzer var type: TypeNode? = null,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Elvis Op\"]"
+        return "$self--primary-->${primaryNode.toMermaid()}\n$self--fallback-->${fallbackNode.toMermaid()}\n"
+    }
+}

@@ -22,6 +22,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -826,7 +827,7 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun infixOperation(): ASTNode {
-        var n = infixFunctionCall()
+        var n = elvisExpression()
         while (
             (currentToken.type == TokenType.Identifier && currentToken.value in setOf("is"))
             || (currentToken.`is`(TokenType.Operator, "!") && peekNextToken().`is`(TokenType.Identifier, "is"))
@@ -840,6 +841,24 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             val n2 = type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
             n = InfixFunctionCallNode(node1 = n, node2 = n2, functionName = t)
+        }
+        return n
+    }
+
+    /**
+     * elvisExpression:
+     *     infixFunctionCall {{NL} elvis {NL} infixFunctionCall}
+     *
+     * elvis:
+     *     QUEST_NO_WS ':'
+     */
+    fun elvisExpression(): ASTNode {
+        var n = infixFunctionCall()
+        while (currentToken.type == TokenType.Operator && currentToken.value == "?:") {
+            val t = eat(TokenType.Operator, "?:")
+            repeatedNL()
+            val n2 = infixFunctionCall()
+            n = ElvisOpNode(primaryNode = n, fallbackNode = n2)
         }
         return n
     }

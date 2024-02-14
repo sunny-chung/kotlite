@@ -264,7 +264,7 @@ class Lexer(val code: String) {
                         c in setOf('.', '?') -> {
                             val position = makeSourcePosition()
                             when (val withNextChar = "$c${nextChar()}") {
-                                "?." -> {
+                                "?.", "?:" -> {
                                     advanceChar()
                                     return Token(TokenType.Operator, withNextChar, position)
                                 }
