@@ -1,9 +1,11 @@
 package com.sunnychung.lib.multiplatform.kotlite.stdlib
 
+import com.sunnychung.lib.multiplatform.kotlite.model.CollectionInterface
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
+import com.sunnychung.lib.multiplatform.kotlite.model.IterableInterface
 import com.sunnychung.lib.multiplatform.kotlite.model.ListValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
@@ -17,6 +19,8 @@ import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapVal
 
 class CollectionsLibModule : AbstractCollectionsLibModule() {
     override val classes: List<ProvidedClassDefinition> = listOf(
+        IterableInterface.clazz,
+        CollectionInterface.clazz,
         ListValue.clazz,
         MutableListValue.clazz,
         MapValue.clazz,

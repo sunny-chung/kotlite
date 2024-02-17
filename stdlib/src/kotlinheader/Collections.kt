@@ -13,60 +13,60 @@ fun <T : Any> listOfNotNull(vararg elements: T?): List<T>
 fun <T> List(size: Int, init: (index: Int) -> T): List<T>
 fun <T> MutableList(size: Int, init: (index: Int) -> T): MutableList<T>
 
-fun <T> MutableList<T>.addAll(elements: List<T>): Boolean
-fun <T> List<T>.all(predicate: (T) -> Boolean): Boolean
-fun <T> List<T>.any(predicate: (T) -> Boolean): Boolean
+fun <T> MutableList<T>.addAll(elements: Iterable<T>): Boolean
+fun <T> Iterable<T>.all(predicate: (T) -> Boolean): Boolean
+fun <T> Iterable<T>.any(predicate: (T) -> Boolean): Boolean
 fun <T> List<T>.asReversed(): List<T>
 fun <T> List<T>.binarySearch(
     fromIndex: Int = 0,
     toIndex: Int = size,
     comparison: (T) -> Int
 ): Int
-//fun <T> List<T>.chunked(size: Int): List<List<T>>
-fun <T, R> List<T>.chunked(size: Int, transform: (List<T>) -> R): List<R>
-fun <T> List<T>.contains(element: T): Boolean
+//fun <T> Iterable<T>.chunked(size: Int): List<List<T>>
+fun <T, R> Iterable<T>.chunked(size: Int, transform: (List<T>) -> R): List<R>
+fun <T> Iterable<T>.contains(element: T): Boolean
 fun <T> List<T>.containsAll(elements: List<T>): Boolean
-fun <T> List<T>.count(predicate: (T) -> Boolean): Int
-fun <T> List<T>.count(): Int
-fun <T> List<T>.distinct(): List<T>
-fun <T, K> List<T>.distinctBy(selector: (T) -> K): List<T>
-fun <T> List<T>.drop(n: Int): List<T>
+fun <T> Iterable<T>.count(predicate: (T) -> Boolean): Int
+fun <T> Iterable<T>.count(): Int
+fun <T> Iterable<T>.distinct(): List<T>
+fun <T, K> Iterable<T>.distinctBy(selector: (T) -> K): List<T>
+fun <T> Iterable<T>.drop(n: Int): List<T>
 fun <T> List<T>.dropLast(n: Int): List<T>
 fun <T> List<T>.dropLastWhile(predicate: (T) -> Boolean): List<T>
-fun <T> List<T>.dropWhile(predicate: (T) -> Boolean): List<T>
-fun <T> List<T>.elementAt(index: Int): T
-fun <T> List<T>.elementAtOrElse(index: Int, defaultValue: (Int) -> T): T
-fun <T> List<T>.elementAtOrNull(index: Int): T?
+fun <T> Iterable<T>.dropWhile(predicate: (T) -> Boolean): List<T>
+fun <T> Iterable<T>.elementAt(index: Int): T
+fun <T> Iterable<T>.elementAtOrElse(index: Int, defaultValue: (Int) -> T): T
+fun <T> Iterable<T>.elementAtOrNull(index: Int): T?
 fun <T> MutableList<T>.fill(value: T)
-fun <T> List<T>.filter(predicate: (T) -> Boolean): List<T>
-fun <T> List<T>.filterIndexed(predicate: (index: Int, T) -> Boolean): List<T>
-//fun <R> List<*>.filterIsInstance(): List<R>
-fun <T> List<T>.filterNot(predicate: (T) -> Boolean): List<T>
-fun <T : Any> List<T?>.filterNotNull(): List<T>
-fun <T> List<T>.find(predicate: (T) -> Boolean): T?
-fun <T> List<T>.findLast(predicate: (T) -> Boolean): T?
-fun <T> List<T>.first(): T
-fun <T> List<T>.first(predicate: (T) -> Boolean): T
-fun <T, R : Any> List<T>.firstNotNullOf(
+fun <T> Iterable<T>.filter(predicate: (T) -> Boolean): List<T>
+fun <T> Iterable<T>.filterIndexed(predicate: (index: Int, T) -> Boolean): List<T>
+//fun <R> Iterable<*>.filterIsInstance(): List<R>
+fun <T> Iterable<T>.filterNot(predicate: (T) -> Boolean): List<T>
+fun <T : Any> Iterable<T?>.filterNotNull(): List<T>
+fun <T> Iterable<T>.find(predicate: (T) -> Boolean): T?
+fun <T> Iterable<T>.findLast(predicate: (T) -> Boolean): T?
+fun <T> Iterable<T>.first(): T
+fun <T> Iterable<T>.first(predicate: (T) -> Boolean): T
+fun <T, R : Any> Iterable<T>.firstNotNullOf(
     transform: (T) -> R?
 ): R
-fun <T, R : Any> List<T>.firstNotNullOfOrNull(
+fun <T, R : Any> Iterable<T>.firstNotNullOfOrNull(
     transform: (T) -> R?
 ): R?
-fun <T> List<T>.firstOrNull(): T?
-fun <T> List<T>.firstOrNull(predicate: (T) -> Boolean): T?
-fun <T, R> List<T>.flatMap(
-    transform: (T) -> List<R>
+fun <T> Iterable<T>.firstOrNull(): T?
+fun <T> Iterable<T>.firstOrNull(predicate: (T) -> Boolean): T?
+fun <T, R> Iterable<T>.flatMap(
+    transform: (T) -> Iterable<R>
 ): List<R>
-fun <T, R> List<T>.flatMapIndexed(
-    transform: (index: Int, T) -> List<R>
+fun <T, R> Iterable<T>.flatMapIndexed(
+    transform: (index: Int, T) -> Iterable<R>
 ): List<R>
-//fun <T> List<List<T>>.flatten(): List<T>
-fun <T, R> List<T>.fold(
+//fun <T> Iterable<Iterable<T>>.flatten(): List<T>
+fun <T, R> Iterable<T>.fold(
     initial: R,
     operation: (acc: R, T) -> R
 ): R
-fun <T, R> List<T>.foldIndexed(
+fun <T, R> Iterable<T>.foldIndexed(
     initial: R,
     operation: (index: Int, acc: R, T) -> R
 ): R
@@ -78,8 +78,8 @@ fun <T, R> List<T>.foldRightIndexed(
     initial: R,
     operation: (index: Int, T, acc: R) -> R
 ): R
-fun <T> List<T>.forEach(action: (T) -> Unit)
-fun <T> List<T>.forEachIndexed(action: (index: Int, T) -> Unit)
+fun <T> Iterable<T>.forEach(action: (T) -> Unit)
+fun <T> Iterable<T>.forEachIndexed(action: (index: Int, T) -> Unit)
 operator fun <T> List<T>.get(index: Int): T
 fun <T> List<T>.getOrElse(
     index: Int,
@@ -87,13 +87,13 @@ fun <T> List<T>.getOrElse(
 ): T
 fun <T> List<T>.getOrNull(index: Int): T?
 //fun <T, R> List<T>.ifEmpty(defaultValue: () -> R): R
-fun <T> List<T>.indexOf(element: T): Int
-fun <T> List<T>.indexOfFirst(predicate: (T) -> Boolean): Int
-fun <T> List<T>.indexOfLast(predicate: (T) -> Boolean): Int
+fun <T> Iterable<T>.indexOf(element: T): Int
+fun <T> Iterable<T>.indexOfFirst(predicate: (T) -> Boolean): Int
+fun <T> Iterable<T>.indexOfLast(predicate: (T) -> Boolean): Int
 fun <T> List<T>.isEmpty(): Boolean
 fun <T> List<T>.isNotEmpty(): Boolean
 fun <T> List<T>?.isNullOrEmpty(): Boolean
-fun <T> List<T>.joinToString(
+fun <T> Iterable<T>.joinToString(
     separator: String = ", ",
     prefix: String = "",
     postfix: String = "",
@@ -101,29 +101,32 @@ fun <T> List<T>.joinToString(
     truncated: String = "...",
     transform: ((T) -> String)? = null
 ): String
-fun <T> List<T>.last(): T
-fun <T> List<T>.last(predicate: (T) -> Boolean): T
-fun <T> List<T>.lastIndexOf(element: T): Int
-fun <T> List<T>.lastOrNull(): T?
-fun <T> List<T>.lastOrNull(predicate: (T) -> Boolean): T?
-fun <T, R> List<T>.map(transform: (T) -> R): List<R>
-fun <T, R> List<T>.mapIndexed(transform: (index: Int, T) -> R): List<R>
-fun <T, R : Any> List<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
-fun <T, R : Any> List<T>.mapNotNull(transform: (T) -> R?): List<R>
-fun <T> List<T>.minus(element: T): List<T>
+fun <T> Iterable<T>.last(): T
+fun <T> Iterable<T>.last(predicate: (T) -> Boolean): T
+fun <T> Iterable<T>.lastIndexOf(element: T): Int
+fun <T> Iterable<T>.lastOrNull(): T?
+fun <T> Iterable<T>.lastOrNull(predicate: (T) -> Boolean): T?
+fun <T, R> Iterable<T>.map(transform: (T) -> R): List<R>
+fun <T, R> Iterable<T>.mapIndexed(transform: (index: Int, T) -> R): List<R>
+fun <T, R : Any> Iterable<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
+fun <T, R : Any> Iterable<T>.mapNotNull(transform: (T) -> R?): List<R>
+fun <T> Iterable<T>.minus(element: T): List<T>
+fun <T> Iterable<T>.minus(elements: Iterable<T>): List<T>
 fun <T> MutableList<T>.minusAssign(element: T)
-fun <T> List<T>.minusElement(element: T): List<T>
-fun <T> List<T>.none(predicate: (T) -> Boolean): Boolean
-fun <T> List<T>.none(): Boolean
+fun <T> Iterable<T>.minusElement(element: T): List<T>
+fun <T> Iterable<T>.none(predicate: (T) -> Boolean): Boolean
+fun <T> Iterable<T>.none(): Boolean
 fun <T> List<T>.onEach(action: (T) -> Unit): List<T>
 fun <T> List<T>.onEachIndexed(action: (index: Int, T) -> Unit): List<T>
 fun <T> List<T>?.orEmpty(): List<T>
-fun <T> List<T>.plus(element: T): List<T>
-fun <T> List<T>.plus(elements: List<T>): List<T>
+fun <T> Iterable<T>.plus(element: T): List<T>
+fun <T> Iterable<T>.plus(elements: List<T>): List<T>
 fun <T> MutableList<T>.plusAssign(element: T)
-fun <T> List<T>.plusElement(element: T): List<T>
+fun <T> MutableList<T>.plusAssign(elements: Iterable<T>)
+fun <T> Iterable<T>.plusElement(element: T): List<T>
 fun <T> List<T>.random(): T
 fun <T> List<T>.randomOrNull(): T?
+fun <T> MutableList<T>.removeAll(elements: Iterable<T>): Boolean
 fun <T> MutableList<T>.removeAll(predicate: (T) -> Boolean): Boolean
 fun <T> MutableList<T>.removeAt(index: Int): T
 fun <T> MutableList<T>.removeFirst(): T
@@ -131,37 +134,39 @@ fun <T> MutableList<T>.removeFirstOrNull(): T?
 fun <T> MutableList<T>.removeLast(): T
 fun <T> MutableList<T>.removeLastOrNull(): T?
 fun <T> MutableList<T>.retainAll(predicate: (T) -> Boolean): Boolean
-fun <T> List<T>.reversed(): List<T>
+fun <T> Iterable<T>.reversed(): List<T>
 operator fun <T> MutableList<T>.set(index: Int, element: T): T
 fun <T> MutableList<T>.shuffle()
-fun <T> List<T>.shuffled(): List<T>
-fun <T> List<T>.single(): T
-fun <T> List<T>.single(predicate: (T) -> Boolean): T
-fun <T> List<T>.singleOrNull(): T?
-fun <T> List<T>.singleOrNull(predicate: (T) -> Boolean): T?
+fun <T> Iterable<T>.shuffled(): List<T>
+fun <T> Iterable<T>.single(): T
+fun <T> Iterable<T>.single(predicate: (T) -> Boolean): T
+fun <T> Iterable<T>.singleOrNull(): T?
+fun <T> Iterable<T>.singleOrNull(predicate: (T) -> Boolean): T?
+//fun <T> List<T>.slice(indices: Iterable<Int>): List<T>
 fun <T> List<T>.subList(fromIndex: Int, toIndex: Int): List<T>
 //fun <T> List<Int>.sum(): Int
 //fun <T> List<Long>.sum(): Long
 //fun <T> List<Double>.sum(): Double
-fun <T> List<T>.take(n: Int): List<T>
+fun <T> Iterable<T>.take(n: Int): List<T>
 fun <T> List<T>.takeLast(n: Int): List<T>
 fun <T> List<T>.takeLastWhile(predicate: (T) -> Boolean): List<T>
-fun <T> List<T>.takeWhile(predicate: (T) -> Boolean): List<T>
-fun <T> MutableList<T>.toList(): List<T>
-fun <T> List<T>.toMutableList(): MutableList<T>
-//fun <T> List<T>.windowed(
+fun <T> Iterable<T>.takeWhile(predicate: (T) -> Boolean): List<T>
+fun <T> Iterable<T>.toList(): List<T>
+fun <T> Iterable<T>.toMutableList(): MutableList<T>
+fun <T, R> Iterable<Pair<T, R>>.unzip(): Pair<List<T>, List<R>>
+//fun <T> Iterable<T>.windowed(
 //    size: Int,
 //    step: Int = 1,
 //    partialWindows: Boolean = false
 //): List<List<T>>
-fun <T, R> List<T>.windowed(
+fun <T, R> Iterable<T>.windowed(
     size: Int,
     step: Int = 1,
     partialWindows: Boolean = false,
     transform: (List<T>) -> R
 ): List<R>
-fun <T, R, V> List<T>.zip(
-    other: List<R>,
+fun <T, R, V> Iterable<T>.zip(
+    other: Iterable<R>,
     transform: (a: T, b: R) -> V
 ): List<V>
 
@@ -183,15 +188,19 @@ fun <K, V> Map<K, V>.contains(key: K): Boolean
 fun <K> Map<K, *>.containsKey(key: K): Boolean
 fun <K, V> Map<K, V>.containsValue(value: V): Boolean
 
-fun <T, K, V> List<T>.associate(
+fun <T, K, V> Iterable<T>.associate(
     transform: (T) -> Pair<K, V>
 ): Map<K, V>
 
-fun <T, K> List<T>.associateBy(
+fun <T, K> Iterable<T>.associateBy(
     keySelector: (T) -> K
 ): Map<K, T>
 
-fun <K, V> List<K>.associateBy(
+fun <K, V> Iterable<K>.associateBy(
+    valueSelector: (K) -> V
+): Map<K, V>
+
+fun <K, V> Iterable<K>.associateWith(
     valueSelector: (K) -> V
 ): Map<K, V>
 
@@ -207,10 +216,10 @@ operator fun <K, V> Map<K, V>.get(key: K): V?
 fun <K, V> Map<K, V>.getOrElse(key: K, defaultValue: () -> V): V
 fun <K, V> MutableMap<K, V>.getOrPut(key: K, defaultValue: () -> V): V
 fun <K, V> Map<K, V>.getValue(key: K): V
-fun <T, K> List<T>.groupBy(
+fun <T, K> Iterable<T>.groupBy(
     keySelector: (T) -> K
 ): Map<K, List<T>>
-fun <T, K, V> List<T>.groupBy(
+fun <T, K, V> Iterable<T>.groupBy(
     keySelector: (T) -> K,
     valueSelector: (T) -> V,
 ): Map<K, List<V>>
@@ -237,7 +246,7 @@ fun <K, V> MutableMap<K, V>.putAll(pairs: List<Pair<K, V>>)
 fun <K, V> MutableMap<K, V>.remove(key: K): V?
 operator fun <K, V> MutableMap<K, V>.set(key: K, value: V)
 fun <K, V> Map<K, V>.toList(): List<Pair<K, V>>
-fun <K, V> List<Pair<K, V>>.toMap(): Map<K, V>
+fun <K, V> Iterable<Pair<K, V>>.toMap(): Map<K, V>
 fun <K, V> Map<K, V>.toMap(): Map<K, V>
 fun <K, V> Map<K, V>.toMutableMap(): MutableMap<K, V>
 fun <K, V> Map<K, V>.withDefault(defaultValue: (key: K) -> V): Map<K, V>

@@ -190,11 +190,24 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                     else -> ""
                 }
             }
-            "List" -> {
+            "List", "Iterable" -> {
                 when (type.arguments?.get(0)?.name) {
                     "Pair" -> "?.map { PairValue(it, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
                     else -> ""
                 }
+            }
+            "Pair" -> {
+                ".let { " +
+                        when (type.arguments?.get(0)?.name) {
+                            "List" -> "ListValue(it.first, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}$symbolTableArg)"
+                            else -> "it.first"
+                        } +
+                        " to " +
+                        when (type.arguments?.get(1)?.name) {
+                            "List" -> "ListValue(it.second, ${_type.arguments!!.get(1)!!.arguments!!.get(0)!!.toDataTypeCode()}$symbolTableArg)"
+                            else -> "it.second"
+                        } +
+                        " }"
             }
             else -> ""
         }
@@ -227,7 +240,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     fun unwrap(variableName: String, type: TypeNode, isVararg: Boolean = false): String {
         return if (isVararg) {
             "($variableName as ListValue).value.map { ${unwrapOne("it", type)} }"
-        } else if (type.name in setOf("List")) {
+        } else if (type.name in setOf("List", "Iterable")) {
             // do not transform MutableList, otherwise no side effect can be performed
             val postUnwrap = if (type.name == "MutableList") ".toMutableList()" else ""
             "($variableName as DelegatedValue<${type.name}<*>>).value.map { ${unwrapOne("it", type.arguments!!.first())} }$postUnwrap"

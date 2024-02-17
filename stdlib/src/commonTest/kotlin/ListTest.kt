@@ -144,6 +144,31 @@ class ListTest {
     }
 
     @Test
+    fun addAll() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val a = mutableListOf(1, 2, 3, 4, 5)
+            val b = listOf(2, 3, 9)
+            
+            a.addAll(b)
+            
+            val size = a.count()
+            
+            val a3 = a[3]
+            val a5 = a[5]
+            val a7 = a[7]
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(8, (symbolTable.findPropertyByDeclaredName("size") as IntValue).value)
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("a3") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("a5") as IntValue).value)
+        assertEquals(9, (symbolTable.findPropertyByDeclaredName("a7") as IntValue).value)
+    }
+
+    @Test
     @Ignore
     fun ifEmpty() {
         val env = ExecutionEnvironment().apply {
