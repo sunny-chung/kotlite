@@ -10,6 +10,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapValue
@@ -20,5 +21,6 @@ class CollectionsLibModule : AbstractCollectionsLibModule() {
         MutableListValue.clazz,
         MapValue.clazz,
         MutableMapValue.clazz,
+        MapEntryValue.clazz,
     )
 }

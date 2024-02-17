@@ -36,5 +36,6 @@ interface KotliteLibHeaderProcessorPluginExtension {
 }
 
 data class KotliteModuleConfig(
-    val imports: List<String> = emptyList()
+    val imports: List<String> = emptyList(),
+    val typeAliases: Map<String, String> = emptyMap(),
 ) : Serializable

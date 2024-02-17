@@ -72,6 +72,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 
 ${config.imports.joinToString("") { "import $it\n" } }
 
+${config.typeAliases.toList().joinToString { "typealias ${it.first} = ${it.second}\n" }}
+
 abstract class Abstract${name}LibModule : LibraryModule("$name") {
     override val classes = emptyList<ProvidedClassDefinition>()
 
@@ -164,13 +166,15 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             }
         }
 
-        val typeArgs = if (_type.arguments.isNullOrEmpty()) {
-            ""
-        } else {
-            ", " + _type.arguments!!.joinToString(", ") {
-                it.toDataTypeCode()
+        val typeArgs = _type.arguments.let { typeArgs ->
+            if (typeArgs.isNullOrEmpty()) {
+                ""
+            } else {
+                ", " + typeArgs.joinToString(", ") {
+                    it.toDataTypeCode()
+                }
             }
-        }
+        } + " /* _t = ${_type.descriptiveName()}; t = ${type.descriptiveName()} */"
         val symbolTableArg = if (!type.isPrimitive()) {
             ", symbolTable = interpreter.symbolTable()"
         } else ""
@@ -188,7 +192,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             }
             "List" -> {
                 when (type.arguments?.get(0)?.name) {
-                    "Pair" -> "?.map { PairValue(it, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
+                    "Pair" -> "?.map { PairValue(it, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
                     else -> ""
                 }
             }
@@ -198,11 +202,11 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     }
 
     // Interpreter runtime value -> kotlin value
-    fun unwrapOne(variableName: String, type: TypeNode): String {
-        val type = resolve(type)
+    fun unwrapOne(variableName: String, _type: TypeNode): String {
+        val type = resolve(_type)
         val question = if (type.isNullable) "?" else ""
         return if (type is FunctionTypeNode) {
-            generateLambda(variableName, type, 4)
+            generateLambda(variableName, _type as FunctionTypeNode, 4)
         } else if (type.name == "Unit") {
             "Unit"
         } else if (type.name == "Any") {
@@ -237,6 +241,8 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             // TODO don't hardcode
             if (type.name == "Any") {
                 return TypeNode("RuntimeValue", null, false)
+            } else if (type.name in typeParameters.keys) {
+                return replace(typeParameters[type.name]!!)
             }
             return TypeNode(
                 type.name,

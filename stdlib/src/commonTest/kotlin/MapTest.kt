@@ -3,6 +3,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.TextLibModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -259,5 +261,80 @@ class MapTest {
         assertEquals(-1, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
         assertEquals(-5, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+    }
+
+    @Test
+    fun toList() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val m = mutableMapOf(
+                "ab" to 123,
+                "def" to 234,
+            )
+            m as MutableMap<String, Int>
+            var counter = 100
+            m["bcd"] = ++counter
+            m["ab"] = ++counter
+            m["bcd"] = ++counter
+            m["hi"] = ++counter
+            val l = m.toList()
+            val typeCheck = l is List<Pair<String, Int>>
+            l as List<Pair<String, Int>>
+            val size: Int = l.size
+            val a: Int = l.firstOrNull { it.first == "ab" }?.second ?: -10
+            val b: Int = l.firstOrNull { it.first == "bcd" }?.second ?: -10
+            val c: Int = l.firstOrNull { it.first == "def" }?.second ?: -10
+            val d: Int = l.firstOrNull { it.first == "hi" }?.second ?: -10
+            val e: Int = l.firstOrNull { it.first == "jk" }?.second ?: -10
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("size") as IntValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck") as BooleanValue).value)
+        assertEquals(102, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(103, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(234, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(104, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(-10, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+    }
+
+    @Test
+    fun transformWithMapEntry() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(TextLibModule())
+        }
+        val interpreter = interpreter("""
+            var counter = 0
+            val m = mapOf(
+                "abc" to ++counter,
+                "d" to ++counter,
+                "ef" to ++counter,
+            )
+            
+            val m1 = m.mapKeys { it.key.length }
+                .mapValues { it.value + 100 }
+            
+            val typeCheck1: Boolean = m1 is Map<Int, Int>
+            
+            val a = m1.count { it.value <= 102 }
+            
+            m1.forEach {
+                println("${'$'}{it.key}: ${'$'}{it.value}")
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck1") as BooleanValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(listOf("1: 102", "2: 103", "3: 101"), console.split("\n").sorted().filter { it.isNotEmpty() })
     }
 }

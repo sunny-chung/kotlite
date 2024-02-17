@@ -169,7 +169,11 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapValue",
-            )
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryValue",
+            ),
+            typeAliases = mapOf(
+                "MapEntry<K, V>" to "Map.Entry<K, V>"
+            ),
         ),
     )
 }

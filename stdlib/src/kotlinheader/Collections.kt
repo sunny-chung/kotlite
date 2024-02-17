@@ -171,6 +171,11 @@ fun <T, R, V> List<T>.zip(
 val <K, V> Map<K, V>.size: Int
     get()
 
+val <K, V> MapEntry<K, V>.key: K
+    get()
+val <K, V> MapEntry<K, V>.value: V
+    get()
+
 fun <K, V> mapOf(vararg pairs: Pair<K, V>): Map<K, V>
 fun <K, V> mutableMapOf(vararg pairs: Pair<K, V>): MutableMap<K, V>
 
@@ -191,13 +196,13 @@ fun <K, V> List<K>.associateBy(
 ): Map<K, V>
 
 fun <K, V> Map<K, V>.count(): Int
-//fun <K, V> Map<K, V>.count(predicate: (Entry<K, V>) -> Boolean): Int
+fun <K, V> Map<K, V>.count(predicate: (MapEntry<K, V>) -> Boolean): Int
 //fun <K, V> emptyMap(): Map<K, V>
-//fun <K, V> Map<K, V>.filter(predicate: (Entry<K, V>) -> Boolean): Map<K, V>
+fun <K, V> Map<K, V>.filter(predicate: (MapEntry<K, V>) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterKeys(predicate: (K) -> Boolean): Map<K, V>
-//fun <K, V> Map<K, V>.filterNot(predicate: (Entry<K, V>) -> Boolean): Map<K, V>
+fun <K, V> Map<K, V>.filterNot(predicate: (MapEntry<K, V>) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterValues(predicate: (V) -> Boolean): Map<K, V>
-//fun <K, V> Map<K, V>.forEach(action: (Entry<K, V>) -> Unit): Int
+fun <K, V> Map<K, V>.forEach(action: (MapEntry<K, V>) -> Unit)
 operator fun <K, V> Map<K, V>.get(key: K): V?
 fun <K, V> Map<K, V>.getOrElse(key: K, defaultValue: () -> V): V
 fun <K, V> MutableMap<K, V>.getOrPut(key: K, defaultValue: () -> V): V
@@ -211,16 +216,18 @@ fun <T, K, V> List<T>.groupBy(
 ): Map<K, List<V>>
 fun <K, V> Map<K, V>.isNotEmpty(): Boolean
 fun <K, V> Map<K, V>?.isNullOrEmpty(): Boolean
-//fun <K, V, R> Map<K, V>.map(transform: (Entry<K, V>) -> R): List<R>
-//fun <K, V, R> Map<K, V>.mapKeys(transform: (Entry<K, V>) -> R): Map<R, V>
-//fun <K, V, R> Map<K, V>.mapValues(transform: (Entry<K, V>) -> R): Map<K, R>
+fun <K, V, R> Map<K, V>.map(transform: (MapEntry<K, V>) -> R): List<R>
+fun <K, V, R> Map<K, V>.mapKeys(transform: (MapEntry<K, V>) -> R): Map<R, V>
+fun <K, V, R> Map<K, V>.mapValues(transform: (MapEntry<K, V>) -> R): Map<K, R>
 fun <K, V> Map<K, V>.minus(key: K): Map<K, V>
 fun <K, V> Map<K, V>.minus(keys: List<K>): Map<K, V>
 fun <K, V> MutableMap<K, V>.minusAssign(key: K)
 fun <K, V> MutableMap<K, V>.minusAssign(keys: List<K>)
-//fun <K, V> Map<K, V>.none(predicate: (Entry<K, V>) -> Boolean): Boolean
-//fun <K, V, M : Map<K, V>> M.onEach(action: (Entry<K, V>) -> Unit): M
-//fun <K, V, M : Map<K, V>> M.onEachIndexed(action: (index: Int, Entry<K, V>) -> Unit): M
+fun <K, V> Map<K, V>.none(predicate: (MapEntry<K, V>) -> Boolean): Boolean
+fun <K, V> Map<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): Map<K, V>
+fun <K, V> MutableMap<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): MutableMap<K, V>
+fun <K, V> Map<K, V>.onEachIndexed(action: (index: Int, MapEntry<K, V>) -> Unit): Map<K, V>
+fun <K, V> MutableMap<K, V>.onEachIndexed(action: (index: Int, MapEntry<K, V>) -> Unit): MutableMap<K, V>
 fun <K, V> Map<K, V>?.orEmpty(): Map<K, V>
 fun <K, V> Map<K, V>.plus(pair: Pair<K, V>): Map<K, V>
 fun <K, V> Map<K, V>.plus(pairs: List<Pair<K, V>>): Map<K, V>
