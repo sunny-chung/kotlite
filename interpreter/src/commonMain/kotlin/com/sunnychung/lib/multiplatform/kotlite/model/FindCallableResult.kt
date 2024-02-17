@@ -9,6 +9,7 @@ data class FindCallableResult(
     val typeParameters: List<TypeParameterNode>,
     val receiverType: TypeNode?,
     val returnType: TypeNode,
+    val signature: String,
     val definition: Any,
     val scope: SymbolTable,
 )

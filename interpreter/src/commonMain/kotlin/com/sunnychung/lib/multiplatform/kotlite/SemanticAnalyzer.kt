@@ -752,7 +752,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 val receiverType = function.subject.type().unboxClassTypeAsCompanion().toDataType()
                 val lookupReceiverTypes = if (!receiverType.isNullable || function.operator == ".") {
                     listOf(receiverType)
-                } else { // ?.
+                } else { // operator == "?." && receiverType.isNullable
                     listOf(
                         function.subject.type().copy(isNullable = false).toDataType(),
                         function.subject.type().copy(isNullable = true).toDataType(),
@@ -768,7 +768,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         modifierFilter = modifierFilter!!,
                     )
                 }
-                    .distinct()
+                    .distinctBy {
+                        if (it.type == CallableType.ExtensionFunction) {
+                            it.transformedName
+                        } else {
+                            it.signature
+                        }
+                    }
                 if (resolutions.size > 1) {
                     throw SemanticException("Ambiguous function call for `${function.member.name}`. ${resolutions.size} candidates match.")
                 }

@@ -172,7 +172,7 @@ val <K, V> Map<K, V>.size: Int
     get()
 
 fun <K, V> mapOf(vararg pairs: Pair<K, V>): Map<K, V>
-//fun <K, V> mutableMapOf(vararg pairs: Pair<K, V>): MutableMap<K, V>
+fun <K, V> mutableMapOf(vararg pairs: Pair<K, V>): MutableMap<K, V>
 
 fun <K, V> Map<K, V>.contains(key: K): Boolean
 fun <K> Map<K, *>.containsKey(key: K): Boolean
@@ -200,7 +200,7 @@ fun <K, V> Map<K, V>.filterValues(predicate: (V) -> Boolean): Map<K, V>
 //fun <K, V> Map<K, V>.forEach(action: (Entry<K, V>) -> Unit): Int
 operator fun <K, V> Map<K, V>.get(key: K): V?
 fun <K, V> Map<K, V>.getOrElse(key: K, defaultValue: () -> V): V
-//fun <K, V> MutableMap<K, V>.getOrPut(key: K, defaultValue: () -> V): V
+fun <K, V> MutableMap<K, V>.getOrPut(key: K, defaultValue: () -> V): V
 fun <K, V> Map<K, V>.getValue(key: K): V
 fun <T, K> List<T>.groupBy(
     keySelector: (T) -> K
@@ -216,23 +216,23 @@ fun <K, V> Map<K, V>?.isNullOrEmpty(): Boolean
 //fun <K, V, R> Map<K, V>.mapValues(transform: (Entry<K, V>) -> R): Map<K, R>
 fun <K, V> Map<K, V>.minus(key: K): Map<K, V>
 fun <K, V> Map<K, V>.minus(keys: List<K>): Map<K, V>
-//fun <K, V> MutableMap<K, V>.minusAssign(key: K)
-//fun <K, V> MutableMap<K, V>.minusAssign(keys: List<K>)
+fun <K, V> MutableMap<K, V>.minusAssign(key: K)
+fun <K, V> MutableMap<K, V>.minusAssign(keys: List<K>)
 //fun <K, V> Map<K, V>.none(predicate: (Entry<K, V>) -> Boolean): Boolean
 //fun <K, V, M : Map<K, V>> M.onEach(action: (Entry<K, V>) -> Unit): M
 //fun <K, V, M : Map<K, V>> M.onEachIndexed(action: (index: Int, Entry<K, V>) -> Unit): M
 fun <K, V> Map<K, V>?.orEmpty(): Map<K, V>
 fun <K, V> Map<K, V>.plus(pair: Pair<K, V>): Map<K, V>
 fun <K, V> Map<K, V>.plus(pairs: List<Pair<K, V>>): Map<K, V>
-//fun <K, V> MutableMap<K, V>.plusAssign(pair: Pair<K, V>)
-//fun <K, V> MutableMap<K, V>.plusAssign(pairs: List<Pair<K, V>>)
-//fun <K, V> MutableMap<K, V>.putAll(pairs: List<Pair<K, V>>)
-//fun <K, V> MutableMap<K, V>.remove(key: K): V?
-//operator fun <K, V> MutableMap<K, V>.set(key: K, value: V)
+fun <K, V> MutableMap<K, V>.plusAssign(pair: Pair<K, V>)
+fun <K, V> MutableMap<K, V>.plusAssign(pairs: List<Pair<K, V>>)
+fun <K, V> MutableMap<K, V>.putAll(pairs: List<Pair<K, V>>)
+fun <K, V> MutableMap<K, V>.remove(key: K): V?
+operator fun <K, V> MutableMap<K, V>.set(key: K, value: V)
 fun <K, V> Map<K, V>.toList(): List<Pair<K, V>>
 fun <K, V> List<Pair<K, V>>.toMap(): Map<K, V>
 fun <K, V> Map<K, V>.toMap(): Map<K, V>
-//fun <K, V> Map<K, V>.toMutableMap(): MutableMap<K, V>
+fun <K, V> Map<K, V>.toMutableMap(): MutableMap<K, V>
 fun <K, V> Map<K, V>.withDefault(defaultValue: (key: K) -> V): Map<K, V>
-//fun <K, V> MutableMap<K, V>.withDefault(defaultValue: (key: K) -> V): MutableMap<K, V>
+fun <K, V> MutableMap<K, V>.withDefault(defaultValue: (key: K) -> V): MutableMap<K, V>
 

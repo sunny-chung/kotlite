@@ -74,6 +74,7 @@ class SemanticAnalyzerSymbolTable(
                     typeParameters = it.first.typeParameters,
                     receiverType = null,
                     returnType = it.first.returnType,
+                    signature = it.first.toSignature(this),
                     definition = it.first,
                     scope = this
                 )
@@ -88,6 +89,7 @@ class SemanticAnalyzerSymbolTable(
                     typeParameters = it.first.typeParameters,
                     receiverType = null,
                     returnType = TypeNode(it.first.fullQualifiedName, null, false),
+                    signature = it.first.fullQualifiedName,
                     definition = it.first,
                     scope = this
                 )
@@ -97,15 +99,17 @@ class SemanticAnalyzerSymbolTable(
                     return@let
                 }
                 val transformedName = "$originalName/${this.scopeLevel}"
+                val owner = findPropertyOwner(transformedName)?.ownerRefName
                 thisScopeCandidates += FindCallableResult(
                     transformedName = transformedName,
-                    owner = findPropertyOwner(transformedName)?.ownerRefName,
+                    owner = owner,
                     type = CallableType.Property,
                     isVararg = false,
                     arguments = (it.first.type as FunctionType).arguments,
                     typeParameters = emptyList(),
                     receiverType = null,
                     returnType = (it.first.type as FunctionType).returnType.toTypeNode(),
+                    signature = "$owner//$transformedName",
                     definition = it.first,
                     scope = this
                 )
@@ -142,6 +146,7 @@ class SemanticAnalyzerSymbolTable(
                         typeParameters = it.typeParameters,
                         receiverType = it.receiver ?: receiverType.toTypeNode(),
                         returnType = lookup2!!.resolvedReturnType,
+                        signature = it.toSignature(this),
                         definition = it,
                         scope = this
                     )
@@ -158,6 +163,7 @@ class SemanticAnalyzerSymbolTable(
                     typeParameters = it.function.typeParameters,
                     receiverType = it.function.receiver, //it.resolvedReceiverType.toTypeNode(), //it.function.receiver,
                     returnType = it.function.returnType,
+                    signature = it.function.toSignature(this),
                     definition = it.function,
                     scope = this
                 )
@@ -393,7 +399,10 @@ fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable
                 val typeUpperBound = typeParameters[it.type.name]!!.typeUpperBound
                 typeUpperBound?.toClass()?.fullQualifiedName ?: "Any?"
             } else {
-                it.type.toClass().fullQualifiedName
+                it.type
+                    .let { findClass(it.name)?.first }
+                    ?.fullQualifiedName
+                    ?: it.type.descriptiveName() // TODO this is dirty. any way to get upper bound type name?
             }
         }
     }

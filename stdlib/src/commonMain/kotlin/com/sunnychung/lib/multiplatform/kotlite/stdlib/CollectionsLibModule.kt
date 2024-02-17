@@ -12,7 +12,13 @@ import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListValue
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapValue
 
 class CollectionsLibModule : AbstractCollectionsLibModule() {
-    override val classes: List<ProvidedClassDefinition> = listOf(ListValue.clazz, MutableListValue.clazz, MapValue.clazz)
+    override val classes: List<ProvidedClassDefinition> = listOf(
+        ListValue.clazz,
+        MutableListValue.clazz,
+        MapValue.clazz,
+        MutableMapValue.clazz,
+    )
 }
