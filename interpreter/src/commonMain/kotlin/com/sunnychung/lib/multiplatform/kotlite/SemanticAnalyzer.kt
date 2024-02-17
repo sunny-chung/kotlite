@@ -640,7 +640,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 previousScope.declareExtensionFunction("${typeNode.name}?/$name", this)
 //                transformedRefName = "${typeNode.name}?/$name/${++functionDefIndex}"
 
-                previousScope.declareExtensionFunction("Nothing/$name", this.copy(receiver = typeRegistry["Null"]).also { variantsOfThis += it })
+//                previousScope.declareExtensionFunction("Nothing/$name", this.copy(receiver = typeRegistry["Null"]).also { variantsOfThis += it })
 //                transformedRefName = "Nothing/$name/${++functionDefIndex}"
             }
         }
@@ -948,7 +948,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         tpResolutions[parameterType.name] =
                             superTypeOf(tpResolutions.getOrElse(parameterType.name) { argumentType }, argumentType)
                         inferNestedTypeArgument(parameterType.name)
-                    } else if (parameterType.arguments?.any { tpUpperBounds.containsKey(it.name) } == true) {
+                    } /*else if (parameterType.arguments?.any { tpUpperBounds.containsKey(it.name) } == true) {
                         parameterType.arguments.withIndex().filter { tpUpperBounds.containsKey(it.value.name) }
                             .forEach {
                                 val tp = it.value.name
@@ -956,7 +956,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                                 tpResolutions[tp] = superTypeOf(tpResolutions.getOrElse(tp) { argType }, argType)
                                 inferNestedTypeArgument(tp)
                             }
-                    }
+                    }*/
+                    parameterType.arguments?.withIndex()
+                        ?.forEach {
+                            inferTypeArgumentFromOtherArgument(it.value, (argumentType.arguments ?: return@forEach)[it.index])
+                        }
                 }
 
                 arguments.forEachIndexed { i, callArg ->
@@ -1193,31 +1197,39 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         // find member
         val subjectType = subject.type().unboxClassTypeAsCompanion().toDataType()
+        val subjectTypesToSearch = if (operator == "?." && subjectType.isNullable) {
+            listOf(subjectType, subjectType.copyOf(isNullable = false))
+        } else {
+            listOf(subjectType)
+        }
+
         val memberName = member.name
-        val clazz = subjectType.resolveTypeParameterAsUpperBound().nameWithNullable
-            .let {
-                currentScope.findClass(it)
-                    ?: throw RuntimeException("Cannot find class `$it`")
-            }
-            .first
-        if (lookupType == IdentifierClassifier.Property) {
-            clazz.findMemberPropertyWithoutAccessor(memberName)?.let { property ->
-                if (isCheckWriteAccess && !property.isMutable) {
-                    throw SemanticException("val `$memberName` cannot be reassigned")
+
+        for (subjectType in subjectTypesToSearch) {
+            val clazz = subjectType.resolveTypeParameterAsUpperBound().nameWithNullable
+                .let {
+                    currentScope.findClass(it)
+                        ?: throw RuntimeException("Cannot find class `$it`")
                 }
-                return
-            }
-            clazz.findMemberPropertyCustomAccessor(memberName)?.let { accessor ->
-                if (isCheckWriteAccess) {
-                    if (accessor.setter == null) {
-                        throw SemanticException("Setter for `$memberName` is not declared")
+                .first
+            if (lookupType == IdentifierClassifier.Property) {
+                clazz.findMemberPropertyWithoutAccessor(memberName)?.let { property ->
+                    if (isCheckWriteAccess && !property.isMutable) {
+                        throw SemanticException("val `$memberName` cannot be reassigned")
                     }
-                } else if (accessor.getter == null) {
-                    throw SemanticException("Getter for `$memberName` is not declared")
+                    return
                 }
-                return
-            }
-            val resolvedSubjectType = subjectType.toTypeNode()
+                clazz.findMemberPropertyCustomAccessor(memberName)?.let { accessor ->
+                    if (isCheckWriteAccess) {
+                        if (accessor.setter == null) {
+                            throw SemanticException("Setter for `$memberName` is not declared")
+                        }
+                    } else if (accessor.getter == null) {
+                        throw SemanticException("Getter for `$memberName` is not declared")
+                    }
+                    return
+                }
+                val resolvedSubjectType = subjectType.toTypeNode()
 //                .let {
 //                    if (subject is ClassInstance) {
 //                        it.resolveGenericParameterTypeArguments(subject.typeArgumentByName.mapValues { it.value.toTypeNode() })
@@ -1225,20 +1237,24 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 //                        it
 //                    }
 //                }
-            currentScope.findExtensionPropertyByDeclarationIncludingSuperClasses(resolvedSubjectType, memberName)?.let {
-                if (isCheckWriteAccess && it.second.setter == null) {
-                    throw SemanticException("Setter for `$memberName` is not declared")
-                } else if (!isCheckWriteAccess && it.second.getter == null) {
-                    throw SemanticException("Getter for `$memberName` is not declared")
-                }
-                transformedRefName = it.first
-                return
+                currentScope.findExtensionPropertyByDeclarationIncludingSuperClasses(resolvedSubjectType, memberName)
+                    ?.let {
+                        if (isCheckWriteAccess && it.second.setter == null) {
+                            throw SemanticException("Setter for `$memberName` is not declared")
+                        } else if (!isCheckWriteAccess && it.second.getter == null) {
+                            throw SemanticException("Getter for `$memberName` is not declared")
+                        }
+                        transformedRefName = it.first
+                        return
+                    }
+            } else {
+                if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
+                if (currentScope.findExtensionFunctionsIncludingSuperClasses(subjectType, memberName)
+                        .isNotEmpty()
+                ) return
             }
-        } else {
-            if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
-            if (currentScope.findExtensionFunctionsIncludingSuperClasses(subjectType, memberName).isNotEmpty()) return
         }
-        throw SemanticException("Type `${subjectType.nameWithNullable}` has no member `$memberName`")
+        throw SemanticException("Type `${subjectType.descriptiveName}` has no member `$memberName`")
     }
 
     fun IndexOpNode.visit(modifier: Modifier = Modifier(), isWriteOnly: Boolean = false) {

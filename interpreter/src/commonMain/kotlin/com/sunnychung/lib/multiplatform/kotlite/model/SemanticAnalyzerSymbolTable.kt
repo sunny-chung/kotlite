@@ -140,7 +140,7 @@ class SemanticAnalyzerSymbolTable(
                         isVararg = it.isVararg,
                         arguments = lookup2!!.resolvedValueParameterTypes,
                         typeParameters = it.typeParameters,
-                        receiverType = it.receiver,
+                        receiverType = it.receiver ?: receiverType.toTypeNode(),
                         returnType = lookup2!!.resolvedReturnType,
                         definition = it,
                         scope = this
@@ -238,13 +238,44 @@ class SemanticAnalyzerSymbolTable(
         return thisScopeCandidates + ((parentScope as? SemanticAnalyzerSymbolTable)?.findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter) ?: emptyList())
     }
 
+    fun assertToDataTypeWithTypeParameters(type: TypeNode, typeParameters: List<TypeParameterNode>): DataType {
+        declareTempTypeAlias(typeParameters.map {
+            it.name to it.typeUpperBoundOrAny()
+        })
+        try {
+            return assertToDataType(type)
+        } finally {
+            popTempTypeAlias()
+        }
+    }
+
     // only use in semantic analyzer
+    // this operation is expensive
     fun findMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>, modifierFilter: SearchFunctionModifier): List<FindCallableResult> {
         val receiverClass = receiverType?.let { (findClass(it.nameWithNullable) ?: throw RuntimeException("Class ${it.nameWithNullable} not found")).first }
         return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter)
+            .distinctBy { it.definition }
+            .let { callables -> // subclass callables override superclass
+                callables.filterNot { callable ->
+                    if (callable.receiverType != null) {
+                        val callableReceiverType = assertToDataTypeWithTypeParameters(callable.receiverType, callable.typeParameters)
+                        callables.any { it.receiverType != null && assertToDataTypeWithTypeParameters(it.receiverType, it.typeParameters).isSubTypeOf(callableReceiverType) }
+                    } else {
+                        false
+                    }
+                }
+            }
+            .let { callables -> // class member functions override extension methods
+                callables.filterNot { callable ->
+                    if (callable.receiverType != null && callable.type == CallableType.ExtensionFunction) {
+                        val callableReceiverType = assertToDataTypeWithTypeParameters(callable.receiverType, callable.typeParameters)
+                        callables.any { it.receiverType != null && assertToDataTypeWithTypeParameters(it.receiverType, it.typeParameters) == callableReceiverType && it.type == CallableType.ClassMemberFunction }
+                    } else {
+                        false
+                    }
+                }
+            }
             .also { log.v { "Matching functions:\n${it.joinToString("\n")}" } }
-            .firstOrNull()?.let { listOf(it) }
-            ?: emptyList()
     }
 
     fun findExtensionFunctionsIncludingSuperClasses(receiverType: DataType, functionName: String, isThisScopeOnly: Boolean = false): List<ExtensionFunctionLookupResult> {
@@ -280,10 +311,11 @@ class SemanticAnalyzerSymbolTable(
     fun findExtensionFunctions(receiverType: DataType, functionName: String, isThisScopeOnly: Boolean = false): List<Pair<FunctionDeclarationNode, SymbolTable>> {
         return extensionFunctionDeclarations.values.filter { func ->
             (func.receiver?.let {
-                if (it.name != receiverType.name ||
-                    it.isNullable != receiverType.isNullable
+                if (
+                    !(receiverType.name == "Nothing" && receiverType.isNullable && it.isNullable) &&
+                    (it.name != receiverType.name || it.isNullable != receiverType.isNullable)
                 ) return@let false
-                // at here, class name and nullability matched
+                // at here, class name and nullability matched, or receiver is null and nullability matched
                 val objectTypeReceiver = receiverType as? ObjectType
                 if (it.arguments.isNullOrEmpty() && (objectTypeReceiver == null || objectTypeReceiver.arguments.isEmpty())) {
                     return@let true
@@ -295,18 +327,25 @@ class SemanticAnalyzerSymbolTable(
                 if (it.arguments!!.size != objectTypeReceiver.arguments.size) {
                     throw RuntimeException("Number of type arguments mismatch")
                 }
-                it.arguments.forEachIndexed { index, argType ->
-                    if (argType.name == "*") return@forEachIndexed
-                    val typeParameter = func.typeParameters.firstOrNull { it.name == argType.name }
-                    val functionTypeParameterType = if (typeParameter != null) {
-                        typeParameter.typeUpperBound ?: TypeNode("Any", null, true)
-                    } else {
-                        argType
-                    }.let { typeNodeToDataType(it) } // TODO generic type
-                        ?: throw SemanticException("Unknown type ${argType.descriptiveName()}")
-                    if (!functionTypeParameterType.isAssignableFrom(objectTypeReceiver.arguments[index])) {
-                        return@let false // type mismatch
+                declareTempTypeAlias(func.typeParameters.map {
+                    it.name to it.typeUpperBoundOrAny()
+                })
+                try {
+                    it.arguments.forEachIndexed { index, argType ->
+                        if (argType.name == "*") return@forEachIndexed
+                        val typeParameter = func.typeParameters.firstOrNull { it.name == argType.name }
+                        val functionTypeParameterType = if (typeParameter != null) {
+                            typeParameter.typeUpperBound ?: TypeNode("Any", null, true)
+                        } else {
+                            argType
+                        }.let { typeNodeToDataType(it) } // TODO generic type
+                            ?: throw SemanticException("Unknown type ${argType.descriptiveName()}")
+                        if (!functionTypeParameterType.isConvertibleFrom(objectTypeReceiver.arguments[index])) {
+                            return@let false // type mismatch
+                        }
                     }
+                } finally {
+                    popTempTypeAlias()
                 }
                 true
             } ?: false) && func.name == functionName

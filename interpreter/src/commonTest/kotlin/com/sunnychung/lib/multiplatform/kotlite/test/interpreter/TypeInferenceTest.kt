@@ -1012,4 +1012,42 @@ class TypeInferenceTest {
         assertEquals("def", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
         assertEquals(456, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
     }
+
+    @Test
+    fun genericsInLambdaArgument1() {
+        val interpreter = interpreter("""
+            class MyPair<T1, T2>(val first: T1, val second: T2)
+            fun <K, V> MyPair<K, V>.do(operation: (K, V) -> Pair<V, K>): Pair<V, K> {
+                return operation(first, second)
+            }
+            val x = MyPair(123, "abc").do { key, value -> value to key }
+            val a = x.first
+            val b = x.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun genericsInLambdaArgument2() {
+        val interpreter = interpreter("""
+            class A
+            fun <K, V> A.do(operation: () -> Pair<V, K>): Pair<V, K> {
+                return operation()
+            }
+            val x = A().do { "abc" to 123 }
+            val a = x.first
+            val b = x.second
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

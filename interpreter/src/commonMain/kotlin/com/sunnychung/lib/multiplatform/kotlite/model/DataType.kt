@@ -30,6 +30,8 @@ sealed interface DataType {
         return false
     }
 
+    fun isSubTypeOf(other: DataType): Boolean = false
+
     fun isAssignableTo(other: DataType): Boolean {
         return other.isAssignableFrom(this)
     }
@@ -160,6 +162,9 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 //                (isNullable || !other.isNullable)
     }
 
+    // e.g. open class A; class B : A()
+    // A.isConvertibleFrom(B) = true
+    // B.isConvertibleFrom(A) = false
     override fun isConvertibleFrom(other: DataType): Boolean {
         if (other is NothingType && isNullable) return true
         if (other !is ObjectType) return false
@@ -195,6 +200,15 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
         return arguments.withIndex().all {
             it.value.isConvertibleFrom(otherType.arguments[it.index])
         }
+    }
+
+
+    // e.g. open class A; class B : A()
+    // A.isSubTypeOf(B) = false
+    // B.isSubTypeOf(A) = true
+    override fun isSubTypeOf(other: DataType): Boolean {
+        if (other !is ObjectType || other == this) return false
+        return other.isConvertibleFrom(this)
     }
 
     override fun toTypeNode(): TypeNode {
@@ -260,6 +274,24 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
                 return false
             }
         }
+        return true
+    }
+
+    override fun isConvertibleFrom(other: DataType): Boolean {
+        if (other is NothingType && isNullable) return true
+        if (other !is FunctionType) return false
+        if (other.isNullable && !isNullable) return false
+
+        if (returnType is UnresolvedType || other.returnType is UnresolvedType) return true
+
+        if (!returnType.isConvertibleFrom(other.returnType)) return false
+        if (arguments.size != other.arguments.size) return false
+        arguments.forEachIndexed { i, _ ->
+            if (!arguments[i].isConvertibleFrom(other.arguments[i])) {
+                return false
+            }
+        }
+
         return true
     }
 

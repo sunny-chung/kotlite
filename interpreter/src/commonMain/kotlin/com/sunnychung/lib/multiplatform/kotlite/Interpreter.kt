@@ -670,7 +670,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
             if (!returnType.isConvertibleFrom(returnValue.type())) {
-                throw RuntimeException("Type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName}")
+                throw RuntimeException("Return value's type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName} in function `${functionNode.name}`")
             }
 
             return FunctionCallResult(returnValue, symbolTable)
@@ -1037,6 +1037,15 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         if (transformedRefName != null) {
             val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!)
                 ?: throw RuntimeException("Extension property `${member.name}` on receiver `${obj.type().nameWithNullable}` could not be found")
+
+            if (obj == NullValue && !extensionProperty.receiverType!!.isNullable) {
+                if (operator == ".") {
+                    throw EvaluateNullPointerException()
+                } else if (operator == "?.") {
+                    return obj
+                }
+            }
+
             extensionProperty.getter?.let { getter ->
                 return getter(this@Interpreter, obj)
             }

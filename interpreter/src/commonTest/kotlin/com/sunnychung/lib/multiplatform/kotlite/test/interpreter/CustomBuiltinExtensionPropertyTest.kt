@@ -243,4 +243,28 @@ class CustomBuiltinExtensionPropertyTest {
         }
         assertSemanticSuccess(code = "", environment = env)
     }
+
+    @Test
+    fun extensionPropertyOfNull() {
+        val env = ExecutionEnvironment().apply {
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                typeParameters = listOf(TypeParameter("K", "Any?"), TypeParameter("V", "Any?")),
+                receiver = "Pair<K, V>",
+                type = "Int",
+                getter = { interpreter, subject -> IntValue(10) }
+            ))
+        }
+        val interpreter = interpreter("""
+            fun f(x: Int) = if (x > 0) Pair(123.4, "56") else null
+            val a = f(1)?.prop ?: -5
+            val b = f(-1)?.prop ?: -5
+        """.trimIndent(), executionEnvironment = env)
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(-5, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

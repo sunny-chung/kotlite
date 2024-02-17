@@ -46,4 +46,13 @@ class FunctionResolutionErrorTest {
             abc[0] = 2
         """.trimIndent())
     }
+
+    @Test
+    fun nullExtensionMethods() {
+        assertSemanticFail("""
+            fun Int?.happyNumber(): Int = 5
+            fun String?.happyNumber(): Int = 6
+            val x: Int = null.happyNumber()
+        """.trimIndent())
+    }
 }

@@ -277,4 +277,20 @@ class NullTest {
         assertEquals(456, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
         assertEquals(456, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
     }
+
+    @Test
+    fun accessMemberOfNull() {
+        val interpreter = interpreter("""
+            class A {
+                fun f(): Int = 3
+            }
+            fun f(x: Int) = if (x > 0) A() else null
+            val x: Int = f(-1)?.f() ?: -5
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(-5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }

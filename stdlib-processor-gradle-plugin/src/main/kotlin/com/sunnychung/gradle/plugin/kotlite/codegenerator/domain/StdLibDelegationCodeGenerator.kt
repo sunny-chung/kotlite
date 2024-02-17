@@ -44,6 +44,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
+import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
@@ -58,6 +59,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.LongType
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
+import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
@@ -125,7 +128,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             } else ""
         }
     ${valueParameters.mapIndexed { i, it ->
-            "${indent(4)}val ${it.name}_ = ${unwrap("args[$i]", it.type)}\n"
+            "${indent(4)}val ${it.name}_ = ${unwrap("args[$i]", it.type, it.modifiers.contains(FunctionValueParameterModifier.vararg))}\n"
         }.joinToString("")}
         val result = ${
             if (receiver != null) {
@@ -137,7 +140,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             } else ""
         }$name(${
             if (valueParameters.size == 1 && valueParameters.first().modifiers.contains(FunctionValueParameterModifier.vararg)) {
-                "*(args[0] as ListValue).value.toTypedArray()"
+                "*${valueParameters.first().name}_.toTypedArray()"
             } else {
                 valueParameters.joinToString(", ") { it.name + "_" }
             }
@@ -151,15 +154,21 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     fun wrap(variableName: String, _type: TypeNode): String {
         val type = resolve(_type)
 
+        fun TypeNode.toDataTypeCode(): String {
+            return if (typeParameters.containsKey(this.name)) {
+                "typeArgs[\"${this.name}\"]!!.copyOf(isNullable = ${this.isNullable})"
+            } else if (this.isPrimitive()) {
+                "${this.name}Type(isNullable = ${this.isNullable})"
+            } else {
+                "ObjectType(${this.name}Value.clazz, listOf<DataType>(${this.arguments?.joinToString(", ") { it.toDataTypeCode() }}), superType = null)"
+            }
+        }
+
         val typeArgs = if (_type.arguments.isNullOrEmpty()) {
             ""
         } else {
-            _type.arguments!!.joinToString("") {
-                ", " + if (typeParameters.containsKey(it.name)) {
-                    "typeArgs[\"${it.name}\"]!!.copyOf(isNullable = ${it.isNullable})"
-                } else {
-                    "${it.name}Type(isNullable = ${it.isNullable})"
-                }
+            ", " + _type.arguments!!.joinToString(", ") {
+                it.toDataTypeCode()
             }
         }
         val symbolTableArg = if (!type.isPrimitive()) {
@@ -170,11 +179,26 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         } else {
             "${type.name}Value(it$typeArgs$symbolTableArg)"
         }
-        return if (type.name != "Unit") "$variableName?.let { $wrappedValue } ?: NullValue" else "UnitValue"
+        val preMap = when (type.name) { // TODO change hardcoded conversions to more generic handling
+            "Map", "MutableMap" -> {
+                when (type.arguments?.get(1)?.name) {
+                    "List" -> "?.mapValues { ListValue(it.value, ${_type.arguments!!.get(1)!!.arguments!!.get(0)!!.toDataTypeCode()}$symbolTableArg) }"
+                    else -> ""
+                }
+            }
+            "List" -> {
+                when (type.arguments?.get(0)?.name) {
+                    "Pair" -> "?.map { PairValue(it, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
+                    else -> ""
+                }
+            }
+            else -> ""
+        }
+        return if (type.name != "Unit") "$variableName$preMap?.let { $wrappedValue } ?: NullValue" else "UnitValue"
     }
 
     // Interpreter runtime value -> kotlin value
-    fun unwrap(variableName: String, type: TypeNode): String {
+    fun unwrapOne(variableName: String, type: TypeNode): String {
         val type = resolve(type)
         val question = if (type.isNullable) "?" else ""
         return if (type is FunctionTypeNode) {
@@ -193,6 +217,18 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                     } ?: ""
                 }$question"
             }
+        }
+    }
+
+    fun unwrap(variableName: String, type: TypeNode, isVararg: Boolean = false): String {
+        return if (isVararg) {
+            "($variableName as ListValue).value.map { ${unwrapOne("it", type)} }"
+        } else if (type.name in setOf("List")) {
+            // do not transform MutableList, otherwise no side effect can be performed
+            val postUnwrap = if (type.name == "MutableList") ".toMutableList()" else ""
+            "($variableName as DelegatedValue<${type.name}<*>>).value.map { ${unwrapOne("it", type.arguments!!.first())} }$postUnwrap"
+        } else {
+            unwrapOne(variableName, type)
         }
     }
 
