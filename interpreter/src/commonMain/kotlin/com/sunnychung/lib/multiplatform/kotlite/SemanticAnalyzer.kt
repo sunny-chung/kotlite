@@ -713,6 +713,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
 
+                if (callableType == CallableType.Constructor) {
+                    val clazz = resolution.definition as ClassDefinition
+                    if (!clazz.isInstanceCreationAllowed) {
+                        throw SemanticException("Instances of class ${clazz.fullQualifiedName} cannot be created directly via constructor")
+                    }
+                }
+
                 if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(resolution.scope.scopeLevel)) {
                     val symbols = symbolRecorders.last()
                     when (resolution.type) {
