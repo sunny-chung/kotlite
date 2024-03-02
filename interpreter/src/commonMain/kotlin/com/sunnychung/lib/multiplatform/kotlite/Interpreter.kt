@@ -73,6 +73,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
+import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ThrowableValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
@@ -144,6 +146,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is IndexOpNode -> this.eval()
             is InfixFunctionCallNode -> this.eval()
             is ElvisOpNode -> this.eval()
+            is ThrowNode -> this.eval()
         }
     }
 
@@ -1169,6 +1172,11 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             return result
         }
         return fallbackNode.eval() as RuntimeValue
+    }
+
+    fun ThrowNode.eval(): RuntimeValue {
+        val result = value.eval() as ThrowableValue
+        throw EvaluateRuntimeException(callStack.getStacktrace(position), result)
     }
 
     fun StringNode.eval(): StringValue {

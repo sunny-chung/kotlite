@@ -30,6 +30,40 @@ open class ThrowableValue(
                 ThrowableValue(interpreter.symbolTable(), message, cause, interpreter.callStack.getStacktrace())
             },
         )
+
+        val properties = listOf(
+            ExtensionProperty(
+                declaredName = "message",
+                typeParameters = emptyList(),
+                receiver = "Throwable",
+                type = "String?",
+                getter = { interpreter, receiver ->
+                    (receiver as ThrowableValue).message?.let { StringValue(it) } ?: NullValue
+                },
+            ),
+            ExtensionProperty(
+                declaredName = "cause",
+                typeParameters = emptyList(),
+                receiver = "Throwable",
+                type = "Throwable?",
+                getter = { interpreter, receiver ->
+                    (receiver as ThrowableValue).cause ?: NullValue
+                },
+            )
+        )
+
+        val functions = listOf(
+            CustomFunctionDefinition(
+                position = SourcePosition.BUILTIN,
+                receiverType = "Throwable",
+                functionName = "stackTraceToString",
+                returnType = "String",
+                parameterTypes = emptyList(),
+                executable = { interpreter, receiver, args, typeArgs ->
+                    (receiver as ThrowableValue).stacktrace.joinToString("\n").let { StringValue(it) }
+                },
+            ),
+        )
     }
 }
 

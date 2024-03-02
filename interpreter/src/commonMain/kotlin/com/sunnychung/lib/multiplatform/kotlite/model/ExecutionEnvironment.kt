@@ -19,6 +19,14 @@ class ExecutionEnvironment(
         PairValue.properties.forEach {
             registerExtensionProperty(it)
         }
+
+        registerClass(ThrowableValue.clazz)
+        ThrowableValue.properties.forEach {
+            registerExtensionProperty(it)
+        }
+        ThrowableValue.functions.forEach {
+            registerFunction(it)
+        }
     }
 
     fun registerFunction(function: CustomFunctionDefinition) {

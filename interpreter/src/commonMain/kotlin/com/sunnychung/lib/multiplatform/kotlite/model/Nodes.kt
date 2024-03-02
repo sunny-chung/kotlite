@@ -601,3 +601,10 @@ data class ElvisOpNode(
         return "$self--primary-->${primaryNode.toMermaid()}\n$self--fallback-->${fallbackNode.toMermaid()}\n"
     }
 }
+
+data class ThrowNode(override val position: SourcePosition, val value: ASTNode) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Throw\"]"
+        return "$self-->${value.toMermaid()}"
+    }
+}

@@ -422,4 +422,18 @@ class PropertyTypeTest {
             }"
         """.trimIndent())
     }
+
+    @Test
+    fun nullInElvisFail() {
+        assertTypeCheckFail("""
+            val x: Int = 2 ?: null
+        """.trimIndent())
+    }
+
+    @Test
+    fun nullInElvisSuccess() {
+        assertSemanticSuccess("""
+            val x: Int? = 2 ?: null
+        """.trimIndent())
+    }
 }

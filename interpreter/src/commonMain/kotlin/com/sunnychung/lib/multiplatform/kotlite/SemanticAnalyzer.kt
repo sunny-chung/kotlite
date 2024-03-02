@@ -73,6 +73,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolReferenceSet
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
+import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
@@ -103,6 +104,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         TypeNode(SourcePosition.NONE, "String", null, false),
         TypeNode(SourcePosition.NONE, "Char", null, false),
         TypeNode(SourcePosition.NONE, "Unit", null, false),
+        TypeNode(SourcePosition.NONE, "Throwable", null, false),
     )
         .flatMap {
             listOf(
@@ -112,6 +114,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
         .let { it + listOf(
             "Null" to TypeNode(SourcePosition.NONE, "Nothing", null, true),
+            "Nothing" to TypeNode(SourcePosition.NONE, "Nothing", null, false),
         ) }
         .toMap()
 
@@ -251,6 +254,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is AsOpNode -> this.visit(modifier = modifier)
             is InfixFunctionCallNode -> this.visit(modifier = modifier)
             is ElvisOpNode -> this.visit(modifier = modifier)
+            is ThrowNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -1639,6 +1643,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         type()
     }
 
+    fun ThrowNode.visit(modifier: Modifier = Modifier()) {
+        this.value.visit(modifier = modifier)
+        val type = this.value.type()
+        if (!typeRegistry["Throwable"]!!.toDataType().isAssignableFrom(type.toDataType())) {
+            throw SemanticException(value.position, "Expression is not a throwable value")
+        }
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -1687,6 +1699,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is CharNode -> typeRegistry["Char"]!!
             is InfixFunctionCallNode -> this.type(modifier = modifier)
             is ElvisOpNode -> this.type(modifier = modifier)
+            is ThrowNode -> typeRegistry["Nothing"]!!
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {
@@ -1890,10 +1903,18 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 return type1.toNullable()
             }
             if (type1.name == "Nothing" && type2.name != type1.name) {
-                return type2.toNullable()
+                return if (type1.isNullable) {
+                    type2.toNullable()
+                } else {
+                    type2
+                }
             }
             if (type2.name == "Nothing" && type2.name != type1.name) {
-                return type1.toNullable()
+                return if (type2.isNullable) {
+                    type1.toNullable()
+                } else {
+                    type1
+                }
             }
 
             val typeTree1 = superTypeTree(currentScope.assertToDataType(type1))

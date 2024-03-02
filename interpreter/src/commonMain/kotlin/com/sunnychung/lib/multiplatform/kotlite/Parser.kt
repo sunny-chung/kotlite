@@ -48,6 +48,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringFieldIdentifierNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
@@ -738,7 +739,7 @@ class Parser(protected val lexer: Lexer) {
             }
             TokenType.Identifier -> {
                 when (currentToken.value) {
-                    "return", "break", "continue" -> return jumpExpression()
+                    "throw", "return", "break", "continue" -> return jumpExpression()
                     "if" -> return ifExpression()
 
                     // literal
@@ -978,6 +979,11 @@ class Parser(protected val lexer: Lexer) {
     fun jumpExpression(): ASTNode {
         val t = eat(TokenType.Identifier)
         when (t.value) { // TODO support return@
+            "throw" -> {
+                repeatedNL()
+                val expr = expression()
+                return ThrowNode(position = t.position, value = expr)
+            }
             "return" -> {
                 val expr = if (!isSemi()) {
                     expression()

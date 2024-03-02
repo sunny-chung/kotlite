@@ -37,6 +37,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringFieldIdentifierNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -100,7 +101,8 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is IndexOpNode -> this.generate()
             is InfixFunctionCallNode -> this.generate()
             is ElvisOpNode -> this.generate()
-        }
+            is ThrowNode -> this.generate()
+    }
 
     protected fun AssignmentNode.generate()
         = "${subject.generate()} $operator ${value.generate()}"
@@ -232,5 +234,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
     protected fun InfixFunctionCallNode.generate() = "${node1.generate()} $functionName ${node2.generate()}"
 
     protected fun ElvisOpNode.generate() = "${primaryNode.generate()} ?: ${fallbackNode.generate()}"
+
+    protected fun ThrowNode.generate() = "throw ${value.generate()}"
 
 }
