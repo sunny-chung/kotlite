@@ -15,8 +15,8 @@ class MapEntryValue(value: Map.Entry<RuntimeValue, RuntimeValue>, keyType: DataT
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "MapEntry",
             typeParameters = listOf(
-                TypeParameterNode(name = "K", typeUpperBound = null),
-                TypeParameterNode(name = "V", typeUpperBound = null)
+                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "K", typeUpperBound = null),
+                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "V", typeUpperBound = null)
             ),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),

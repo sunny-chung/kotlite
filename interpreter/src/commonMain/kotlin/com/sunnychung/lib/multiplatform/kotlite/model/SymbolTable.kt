@@ -49,7 +49,7 @@ open class SymbolTable(
         if (typeAlias.containsKey(name) || typeAlias.containsKey("$name?")) {
             throw DuplicateIdentifierException(name, IdentifierClassifier.TypeAlias)
         }
-        val typeUpperBound = typeUpperBound ?: TypeNode("Any", null, true)
+        val typeUpperBound = typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
         typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound)!!
         typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true))!!
     }
@@ -111,7 +111,7 @@ open class SymbolTable(
         }
         type.arguments?.forEachIndexed { index, it ->
             // TODO refactor this repeated logic
-            val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode("Any", null, true)
+            val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
             if (!assertToDataType(upperBound).isAssignableFrom(assertToDataType(it))) {
                 throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
             }
@@ -440,7 +440,7 @@ open class SymbolTable(
 
     fun listTypeAliasInThisScope(): List<TypeParameterNode> {
         return typeAlias.map {
-            TypeParameterNode(it.key, it.value.toTypeNode())
+            TypeParameterNode(SourcePosition.NONE, it.key, it.value.toTypeNode())
         }
     }
 

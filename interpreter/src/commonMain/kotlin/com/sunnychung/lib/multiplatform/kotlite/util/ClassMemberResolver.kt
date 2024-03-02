@@ -19,7 +19,7 @@ class ClassMemberResolver(private val clazz: ClassDefinition, private val typeAr
     init {
         val genericResolutions: MutableList<Pair<ClassDefinition, Map<String, TypeNode>>> = mutableListOf()
         genericResolutions += clazz to clazz.typeParameters.mapIndexed { index, tp ->
-            tp.name to (typeArguments?.get(index) ?: TypeNode(tp.name, null, false))
+            tp.name to (typeArguments?.get(index) ?: TypeNode(tp.position, tp.name, null, false))
         }.toMap()
         var clazz = clazz
         while (clazz.superClass != null) {
@@ -109,7 +109,7 @@ class ClassMemberResolver(private val clazz: ClassDefinition, private val typeAr
         val lookup: Map<String, Pair<FunctionDeclarationNode, Int>> = clazz.findMemberFunctionsWithIndexByDeclaredName(memberName)
         return lookup.mapValues {
             val upperBounds = genericUpperBounds[it.value.second].second.map {
-                TypeParameterNode(it.key, it.value)
+                TypeParameterNode(it.value.position, it.key, it.value)
             }
             FunctionAndTypes(
                 function = it.value.first,

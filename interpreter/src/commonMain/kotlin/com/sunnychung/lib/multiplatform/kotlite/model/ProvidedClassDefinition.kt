@@ -24,23 +24,28 @@ class ProvidedClassDefinition(
     declarations = emptyList(),
     rawMemberProperties = emptyList(),
     memberFunctions = emptyMap(),
-    primaryConstructor = ClassPrimaryConstructorNode(primaryConstructorParameters.map {
-        val modifiers = with(Parser(Lexer("", ""))) { it.modifiers.toClassParameterModifiers() }
-        ClassParameterNode(
-            isProperty = false,
-            isMutable = false,
-            modifiers = modifiers.filterIsInstance<PropertyModifier>().toSet(),
-            parameter = FunctionValueParameterNode(
-                name = it.name,
-                declaredType = it.type.toTypeNode(position.filename),
-                defaultValue = it.defaultValueExpression?.let {
-                    Parser(Lexer(position.filename, it)).expression()
-                },
-                transformedRefName = it.name,
-                modifiers = modifiers.filterIsInstance<FunctionValueParameterModifier>().toSet(),
+    primaryConstructor = ClassPrimaryConstructorNode(
+        position = position,
+        parameters = primaryConstructorParameters.map {
+            val modifiers = with(Parser(Lexer("", ""))) { it.modifiers.toClassParameterModifiers() }
+            ClassParameterNode(
+                position = position,
+                isProperty = false,
+                isMutable = false,
+                modifiers = modifiers.filterIsInstance<PropertyModifier>().toSet(),
+                parameter = FunctionValueParameterNode(
+                    position = position,
+                    name = it.name,
+                    declaredType = it.type.toTypeNode(position.filename),
+                    defaultValue = it.defaultValueExpression?.let {
+                        Parser(Lexer(position.filename, it)).expression()
+                    },
+                    transformedRefName = it.name,
+                    modifiers = modifiers.filterIsInstance<FunctionValueParameterModifier>().toSet(),
+                )
             )
-        )
-    }),
+        }
+    ),
     superClassInvocation = superClassInvocation?.let {
         Parser(Lexer(position.filename, it)).delegationSpecifiers()
     },

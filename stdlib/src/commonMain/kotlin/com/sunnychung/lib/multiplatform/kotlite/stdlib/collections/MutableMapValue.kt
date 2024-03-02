@@ -15,8 +15,8 @@ class MutableMapValue(value: Map<RuntimeValue, RuntimeValue>, keyType: DataType,
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "MutableMap",
             typeParameters = listOf(
-                TypeParameterNode(name = "K", typeUpperBound = null),
-                TypeParameterNode(name = "V", typeUpperBound = null)
+                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "K", typeUpperBound = null),
+                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "V", typeUpperBound = null)
             ),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),

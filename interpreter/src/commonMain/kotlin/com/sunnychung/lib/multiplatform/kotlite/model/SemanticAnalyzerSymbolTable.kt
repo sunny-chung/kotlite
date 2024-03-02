@@ -88,7 +88,7 @@ class SemanticAnalyzerSymbolTable(
                     arguments = it.first.primaryConstructor?.parameters?.map { it.parameter } ?: emptyList(),
                     typeParameters = it.first.typeParameters,
                     receiverType = null,
-                    returnType = TypeNode(it.first.fullQualifiedName, null, false),
+                    returnType = TypeNode(SourcePosition.NONE, it.first.fullQualifiedName, null, false),
                     signature = it.first.fullQualifiedName,
                     definition = it.first,
                     scope = this
@@ -341,7 +341,7 @@ class SemanticAnalyzerSymbolTable(
                         if (argType.name == "*") return@forEachIndexed
                         val typeParameter = func.typeParameters.firstOrNull { it.name == argType.name }
                         val functionTypeParameterType = if (typeParameter != null) {
-                            typeParameter.typeUpperBound ?: TypeNode("Any", null, true)
+                            typeParameter.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
                         } else {
                             argType
                         }.let { typeNodeToDataType(it) } // TODO generic type
@@ -376,17 +376,18 @@ class SemanticAnalyzerSymbolTable(
 
     fun DataType.toTypeNode(): TypeNode =
         if (this is NothingType) {
-            TypeNode("Nothing", null, true)
+            TypeNode(SourcePosition.NONE, "Nothing", null, true)
         } else if (this !is ObjectType && this !is FunctionType) {
-            TypeNode(name, null, isNullable)
+            TypeNode(SourcePosition.NONE, name, null, isNullable)
         } else if (this is FunctionType) {
             FunctionTypeNode(
+                position = SourcePosition.NONE,
                 parameterTypes = arguments.map { it.toTypeNode() },
                 returnType = returnType.toTypeNode(),
                 isNullable = isNullable,
             )
         } else {
-            TypeNode(name, null, isNullable)
+            TypeNode(SourcePosition.NONE, name, null, isNullable)
         }
 }
 

@@ -9,6 +9,7 @@ fun String.toTypeNode(filename: String) = Parser(Lexer(filename, this))
 
 class CustomFunctionDeclarationNode(
     private val def: CustomFunctionDefinition,
+    position: SourcePosition? = null,
     name: String? = null,
     receiver: TypeNode? = null,
     returnType: TypeNode? = null,
@@ -18,14 +19,16 @@ class CustomFunctionDeclarationNode(
     body: BlockNode? = null,
     transformedRefName: String? = null,
 ) : FunctionDeclarationNode(
+    position = position ?: def.position,
     name = name ?: def.functionName,
     receiver = receiver ?: def.receiverType?.toTypeNode(def.position.filename),
     declaredReturnType = returnType ?: def.returnType.toTypeNode(def.position.filename),
     typeParameters = typeParameters ?: def.typeParameters.map {
-        TypeParameterNode(it.name, it.typeUpperBound?.toTypeNode(def.position.filename))
+        TypeParameterNode(def.position, it.name, it.typeUpperBound?.toTypeNode(def.position.filename))
     },
     valueParameters = valueParameters ?: def.parameterTypes.map {
         FunctionValueParameterNode(
+            position = def.position,
             name = it.name,
             declaredType = it.type.toTypeNode(def.position.filename),
             defaultValue = it.defaultValueExpression?.let { Parser(Lexer(def.position.filename, it)).expression() },

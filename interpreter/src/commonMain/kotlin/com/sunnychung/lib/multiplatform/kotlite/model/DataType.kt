@@ -45,7 +45,7 @@ sealed interface DataType {
 
     fun copyOf(isNullable: Boolean): DataType
 
-    fun toTypeNode() = TypeNode(name, null, isNullable)
+    fun toTypeNode() = TypeNode(SourcePosition.NONE, name, null, isNullable)
 }
 
 data class IntType(override val isNullable: Boolean = false) : DataType {
@@ -212,7 +212,7 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     }
 
     override fun toTypeNode(): TypeNode {
-        return TypeNode(name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
+        return TypeNode(SourcePosition.NONE, name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
     }
 }
 
@@ -297,6 +297,7 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
 
     override fun toTypeNode(): TypeNode {
         return FunctionTypeNode(
+            position = SourcePosition.NONE,
             parameterTypes = arguments.map { it.toTypeNode() },
             returnType = returnType.toTypeNode(),
             isNullable = isNullable,
@@ -334,11 +335,13 @@ fun DataType.isNonNullIntegralType() = when (this) {
 fun DataType.toTypeNode(): TypeNode = when (this) {
     is TypeParameterType -> upperBound.toTypeNode()
     is ObjectType -> TypeNode(
+        SourcePosition.NONE,
         name,
         arguments.map { it.toTypeNode() }.emptyToNull(),
         isNullable
     )
     else -> TypeNode(
+        SourcePosition.NONE,
         name,
         null,
         isNullable

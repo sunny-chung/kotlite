@@ -14,7 +14,7 @@ class MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType,
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "MutableList",
-            typeParameters = listOf(TypeParameterNode(name = "T", typeUpperBound = null)),
+            typeParameters = listOf(TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "T", typeUpperBound = null)),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },

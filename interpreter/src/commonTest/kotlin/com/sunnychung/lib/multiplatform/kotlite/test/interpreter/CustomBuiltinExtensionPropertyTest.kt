@@ -18,7 +18,7 @@ import kotlin.test.assertEquals
 class CustomBuiltinExtensionPropertyTest {
     private val LIST_CLAZZ = ProvidedClassDefinition(
         fullQualifiedName = "List",
-        typeParameters = listOf(TypeParameterNode(name = "T", typeUpperBound = null)),
+        typeParameters = listOf(TypeParameterNode(SourcePosition("<Test>", 1, 1), name = "T", typeUpperBound = null)),
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = { _, _, _ -> throw UnsupportedOperationException() },

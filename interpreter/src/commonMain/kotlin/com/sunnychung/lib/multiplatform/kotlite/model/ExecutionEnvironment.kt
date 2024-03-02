@@ -54,7 +54,7 @@ class ExecutionEnvironment(
             if (!classRegistrationFilter(className)) return@flatMap emptyList()
             fun createTypeParameters(typeName: String): List<TypeParameterNode> {
                 return when (typeName) {
-                    "Class" -> listOf(TypeParameterNode("T", TypeNode("Any", null, false)))
+                    "Class" -> listOf(TypeParameterNode(SourcePosition.BUILTIN, "T", TypeNode(SourcePosition.NONE, "Any", null, false)))
                     else -> emptyList()
                 }
             }

@@ -95,14 +95,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     // a cache of common types for optimization. not a must to use them
     val typeRegistry = listOf(
-        TypeNode("Any", null, false),
-        TypeNode("Int", null, false),
-        TypeNode("Long", null, false),
-        TypeNode("Double", null, false),
-        TypeNode("Boolean", null, false),
-        TypeNode("String", null, false),
-        TypeNode("Char", null, false),
-        TypeNode("Unit", null, false),
+        TypeNode(SourcePosition.NONE, "Any", null, false),
+        TypeNode(SourcePosition.NONE, "Int", null, false),
+        TypeNode(SourcePosition.NONE, "Long", null, false),
+        TypeNode(SourcePosition.NONE, "Double", null, false),
+        TypeNode(SourcePosition.NONE, "Boolean", null, false),
+        TypeNode(SourcePosition.NONE, "String", null, false),
+        TypeNode(SourcePosition.NONE, "Char", null, false),
+        TypeNode(SourcePosition.NONE, "Unit", null, false),
     )
         .flatMap {
             listOf(
@@ -111,7 +111,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             )
         }
         .let { it + listOf(
-            "Null" to TypeNode("Nothing", null, true),
+            "Null" to TypeNode(SourcePosition.NONE, "Nothing", null, true),
         ) }
         .toMap()
 
@@ -150,14 +150,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             typeRegistry["$name${if (isNullable) "?" else ""}"]!!
         } else if (this is FunctionType) {
             FunctionTypeNode(
+                position = SourcePosition.NONE,
                 parameterTypes = arguments.map { it.toTypeNode() },
                 returnType = returnType.toTypeNode(),
                 isNullable = isNullable,
             )
         } else if (this is ObjectType) {
-            TypeNode(name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
+            TypeNode(SourcePosition.NONE, name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
         } else {
-            TypeNode(name, null, isNullable)
+            TypeNode(SourcePosition.NONE, name, null, isNullable)
         }
 
     fun TypeNode.toDataType(): DataType {
@@ -172,7 +173,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun TypeNode.unboxClassTypeAsCompanion() = if (this is ClassTypeNode) {
-        TypeNode("${this.clazz.name}.Companion", this.clazz.arguments, false)
+        TypeNode(position, "${this.clazz.name}.Companion", this.clazz.arguments, false)
     } else {
         this
     }
@@ -348,12 +349,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     /**
                      * e.g. `x[0] = v`, subject == x[0], subject.subject == x
                      */
-                    function = NavigationNode(subject.subject, ".", ClassMemberReferenceNode("set")),
+                    function = NavigationNode(position, subject.subject, ".", ClassMemberReferenceNode(position, "set")),
                     arguments = subject.arguments.mapIndexed { index, it ->
-                        FunctionCallArgumentNode(index = index, value = it)
-                    } + listOf(FunctionCallArgumentNode(index = subject.arguments.size, value = value)),
+                        FunctionCallArgumentNode(position = it.position, index = index, value = it)
+                    } + listOf(FunctionCallArgumentNode(position = value.position, index = subject.arguments.size, value = value)),
                     declaredTypeArguments = emptyList(),
-                    position = SourcePosition("TODO", 1, 1) /* TODO */,
+                    position = position,
                     modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
                 )
                 functionCall!!.visit(modifier)
@@ -582,6 +583,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             if (clazz.superClass != null) {
                 val superClassTypeResolutions = ClassMemberResolver(clazz, typeNode.arguments).genericResolutions.let { it[it.lastIndex - 1] }.second
                 val superClassType = TypeNode(
+                    SourcePosition.NONE,
                     clazz.superClass.name,
                     clazz.superClass.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
                     isNullable = false,
@@ -746,7 +748,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     receiverType = null,
                     returnType = resolution.returnType.let {
                         if (callableType == CallableType.Constructor) {
-                            TypeNode(it.name, resolution.typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull(), false)
+                            TypeNode(SourcePosition.NONE, it.name, resolution.typeParameters.map {
+                                TypeNode(SourcePosition.NONE, it.name, null, false)
+                            }.emptyToNull(), false)
                         } else {
                             it
                         }
@@ -895,7 +899,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     type = if (typeArgumentByName.isEmpty()) {
                         it.type.resolveGenericParameterTypeToUpperBound(
                             functionArgumentAndReturnTypeDeclarations.typeParameters +
-                                extraTypeResolutions.map { TypeParameterNode(it.key, it.value) }
+                                extraTypeResolutions.map { TypeParameterNode(it.value.position, it.key, it.value) }
                         ) // note the order
                             .toDataType()
                     } else {
@@ -1091,7 +1095,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                  *   val o: T<T<T<Int>>> = T<T<T<Int>>>()
                  * ```
                  */
-                TypeNode(returnType.name, typeArguments.emptyToNull(), false)
+                TypeNode(returnType.position, returnType.name, typeArguments.emptyToNull(), false)
             }
         }
 
@@ -1284,10 +1288,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         } else {
             hasFunctionCall = true
             call = FunctionCallNode(
-                function = NavigationNode(subject, ".", ClassMemberReferenceNode("get")),
-                arguments = arguments.mapIndexed { index, it -> FunctionCallArgumentNode(index = index, value = it) },
+                function = NavigationNode(position, subject, ".", ClassMemberReferenceNode(position, "get")),
+                arguments = arguments.mapIndexed { index, it -> FunctionCallArgumentNode(it.position, index = index, value = it) },
                 declaredTypeArguments = emptyList(),
-                position = SourcePosition("TODO", 1, 1) /* TODO */,
+                position = position,
                 modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
             )
             call!!.visit(modifier)
@@ -1297,8 +1301,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     fun ClassDeclarationNode.visit(modifier: Modifier = Modifier()) {
         val fullQualifiedClassName = fullQualifiedName
         val classType = TypeNode(
+            position = position,
             name = fullQualifiedClassName,
-            arguments = typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull(),
+            arguments = typeParameters.map { TypeNode(it.position, it.name, null, false) }.emptyToNull(),
             isNullable = false,
         )
 
@@ -1418,6 +1423,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     ?.map {
                         val p = it.parameter
                         PropertyDeclarationNode(
+                            position = p.position,
                             name = p.name,
                             declaredModifiers = it.modifiers,
                             typeParameters = emptyList(),
@@ -1458,10 +1464,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             declarationScope.declareClass(classDefinition)
 
             // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()
-            val pseudoTypeArguments = typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull()
-            currentScope.declareProperty("this", TypeNode(name, pseudoTypeArguments, false), false)
+            val pseudoTypeArguments = typeParameters.map { TypeNode(it.position, it.name, null, false) }.emptyToNull()
+            currentScope.declareProperty("this", TypeNode(SourcePosition.NONE, name, pseudoTypeArguments, false), false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
-            currentScope.declareProperty("this/${fullQualifiedClassName}", TypeNode(name, pseudoTypeArguments, false), false)
+            currentScope.declareProperty("this/${fullQualifiedClassName}", TypeNode(SourcePosition.NONE, name, pseudoTypeArguments, false), false)
             currentScope.registerTransformedSymbol(IdentifierClassifier.Property, "this/${fullQualifiedClassName}", "this")
 
             superClassInvocation?.let { superClassInvocation ->
@@ -1720,8 +1726,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     // e.g. `name()`, where name is a VariableReferenceNode
     fun VariableReferenceNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()) = type ?: (
             currentScope.findClass(variableName)
-                ?.let { ClassTypeNode(TypeNode(variableName, null, false)) }
-                ?: currentScope.findFunctionsByOriginalName(variableName).firstOrNull()?.let { FunctionTypeNode(parameterTypes = null, returnType = null, isNullable = false) }
+                ?.let { ClassTypeNode(TypeNode(position, variableName, null, false)) }
+                ?: currentScope.findFunctionsByOriginalName(variableName).firstOrNull()?.let { FunctionTypeNode(position = it.first.position, parameterTypes = null, returnType = null, isNullable = false) }
                 ?: currentScope.getPropertyType(variableName).first.type.toTypeNode()!!
             ).also { type = it }
 
@@ -1771,6 +1777,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         } else {
             resolver.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
                 return FunctionTypeNode(
+                    position = it.function.position,
                     parameterTypes = emptyList(),
                     returnType = it.resolvedReturnType,
                     isNullable = false
@@ -1778,6 +1785,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             }
             findExtensionFunction(subjectType.toDataType(), memberName)?.let {
                 return FunctionTypeNode(
+                    position = it.position,
                     parameterTypes = emptyList(),
                     returnType = it.returnType,
                     isNullable = false
@@ -1827,16 +1835,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
     }
 
     fun LambdaLiteralNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
-        if (modifier.isSkipGenerics) return FunctionTypeNode(parameterTypes = null, returnType = null, isNullable = false)
+        if (modifier.isSkipGenerics) return FunctionTypeNode(position = position, parameterTypes = null, returnType = null, isNullable = false)
         type?.let { return it }
-        return FunctionTypeNode(parameterTypes = valueParameters.map { it.type(modifier = modifier) }, returnType = body.type(), isNullable = false)
+        return FunctionTypeNode(position = position, parameterTypes = valueParameters.map { it.type(modifier = modifier) }, returnType = body.type(), isNullable = false)
             .also { type = it }
     }
 
     fun InfixFunctionCallNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }
         return when (functionName) {
-            "to" -> TypeNode("Pair", arguments = listOf(node1.type(modifier), node2.type(modifier)), isNullable = false)
+            "to" -> TypeNode(SourcePosition.NONE, "Pair", arguments = listOf(node1.type(modifier), node2.type(modifier)), isNullable = false)
             "is", "!is" -> typeRegistry["Boolean"]!!
             else -> throw UnsupportedOperationException("Infix function `$functionName` is not supported")
         }.also { type = it }
@@ -1892,14 +1900,28 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                                     return@run
                                 }
                                 return TypeNode(
+                                    position = SourcePosition.NONE,
                                     name = superType1.name,
                                     arguments = superType1.arguments.mapIndexed { index, it ->
                                         superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode())
                                     }.emptyToNull(),
                                     isNullable = isNullable,
                                 )
+                            } else if (superType1 is FunctionType && superType2 is FunctionType) {
+                                if (superType1.arguments.size != superType2.arguments.size) {
+                                    return@run
+                                }
+                                return FunctionTypeNode(
+                                    position = SourcePosition.NONE,
+                                    parameterTypes = superType1.arguments.mapIndexed { index, it ->
+                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode())
+                                    },
+                                    returnType = superTypeOf(superType1.returnType.toTypeNode(), superType2.returnType.toTypeNode()),
+                                    isNullable = isNullable,
+                                )
                             } else if (superType1 == superType2) {
-                                return TypeNode(superType1.name, null, isNullable = isNullable)
+                                // types that are not objects nor functions have no type arguments
+                                return TypeNode(SourcePosition.NONE, superType1.name, null, isNullable = isNullable)
                             }
                             return@run
                         }

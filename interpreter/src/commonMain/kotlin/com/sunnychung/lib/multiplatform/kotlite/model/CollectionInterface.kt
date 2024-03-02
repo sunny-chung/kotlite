@@ -7,7 +7,7 @@ class CollectionInterface {
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "Collection",
-            typeParameters = listOf(TypeParameterNode(name = "T", typeUpperBound = null)),
+            typeParameters = listOf(TypeParameterNode(position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1), name = "T", typeUpperBound = null)),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },

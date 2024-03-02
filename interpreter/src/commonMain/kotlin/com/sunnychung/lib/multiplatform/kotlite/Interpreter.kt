@@ -288,9 +288,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is VariableReferenceNode -> {
                 if (this.ownerRef != null) {
                     NavigationNode(
-                        subject = VariableReferenceNode(ownerRef!!.ownerRefName),
+                        position = position,
+                        subject = VariableReferenceNode(position = position, variableName = ownerRef!!.ownerRefName),
                         operator = ".",
-                        member = ClassMemberReferenceNode(this.variableName, this.transformedRefName),
+                        member = ClassMemberReferenceNode(
+                            position = this.position,
+                            name = this.variableName,
+                            transformedRefName = this.transformedRefName
+                        ),
                         transformedRefName = ownerRef!!.extensionPropertyRef
                     ).write(value)
                 } else {
@@ -382,9 +387,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         // class constructor -> variableName? TODO
         if (ownerRef != null) {
             return NavigationNode(
-                subject = VariableReferenceNode(ownerRef!!.ownerRefName),
+                position = position,
+                subject = VariableReferenceNode(position = position, variableName = ownerRef!!.ownerRefName),
                 operator = ".",
-                member = ClassMemberReferenceNode(variableName, transformedRefName),
+                member = ClassMemberReferenceNode(
+                    position = position,
+                    name = variableName,
+                    transformedRefName = transformedRefName
+                ),
                 transformedRefName = ownerRef!!.extensionPropertyRef,
             ).eval()
         }
@@ -422,9 +432,13 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 if (function is VariableReferenceNode && function.ownerRef != null) {
                     return this.copy(
                         function = NavigationNode(
-                            subject = VariableReferenceNode(this.function.ownerRef!!.ownerRefName),
+                            position = position,
+                            subject = VariableReferenceNode(
+                                position = position,
+                                variableName = this.function.ownerRef!!.ownerRefName
+                            ),
                             operator = ".",
-                            member = ClassMemberReferenceNode(directName),
+                            member = ClassMemberReferenceNode(position = position, name = directName),
                             transformedRefName = this.function.ownerRef!!.extensionPropertyRef,
                         )
                     ).eval()
@@ -583,12 +597,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 (classResolver?.let { resolver ->
                     resolvedFunction?.classTreeIndex?.let { index ->
                         resolver.genericResolutions[index].second.map {
-                            TypeParameterNode(it.key, it.value)
+                            TypeParameterNode(it.value.position, it.key, it.value)
                         }
                     }
                 } ?: emptyList()) +
                 functionNode.typeParameters.mapIndexed { index, tp ->
-                    TypeParameterNode(tp.name, typeArguments[index])
+                    TypeParameterNode(tp.position, tp.name, typeArguments[index])
                 }
             )
             .associate { it.name to it.typeUpperBound!! }
@@ -624,7 +638,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 symbolTable.mergeFrom(it)
             }
             extraScopeParameters.forEach {
-                symbolTable.declareProperty(it.key, TypeNode(it.value.type().name, null, false), false) // TODO change to use DataType directly
+                symbolTable.declareProperty(it.key, TypeNode(SourcePosition.NONE, it.value.type().name, null, false), false) // TODO change to use DataType directly
                 symbolTable.assign(it.key, it.value)
             }
             functionNode.typeParameters.forEach {
@@ -759,9 +773,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //            }
 
         // variable "this" is available after primary constructor
-        symbolTable.declareProperty("this", TypeNode(instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty("this", TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this", instance)
-        symbolTable.declareProperty("this/${instance.clazz!!.fullQualifiedName}", TypeNode(instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty("this/${instance.clazz!!.fullQualifiedName}", TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
         symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
         symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this/${instance.clazz!!.fullQualifiedName}", "this")
@@ -773,14 +787,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             // a hack to resolve the "super" keyword. See documentation
             symbolTable.declareProperty(
                 "super",
-                TypeNode(instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
+                TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
                 false
             )
             symbolTable.assign("super", instance)
         }
 
         val typeParametersAndArguments = clazz.typeParameters.mapIndexed { index, tp ->
-            TypeParameterNode(tp.name, typeArguments[index].toTypeNode())
+            TypeParameterNode(tp.position, tp.name, typeArguments[index].toTypeNode())
         }
         val typeArgumentByName = typeParametersAndArguments.associate {
             it.name to it.typeUpperBound!!
@@ -809,8 +823,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
                     is ClassInstanceInitializerNode -> {
                         val init = FunctionDeclarationNode(
+                            position = it.position,
                             name = "init",
-                            declaredReturnType = TypeNode("Unit", null, false),
+                            declaredReturnType = TypeNode(it.position, "Unit", null, false),
                             valueParameters = emptyList(),
                             body = it.block
                         )
@@ -882,7 +897,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
             val instanceGenericTypeResolutions = if (subject is ClassInstance) {
                 subject.clazz!!.typeParameters.mapIndexed { index, it ->
-                    TypeParameterNode(it.name, subject.typeArguments[index].toTypeNode())
+                    TypeParameterNode(it.position, it.name, subject.typeArguments[index].toTypeNode())
                 }
             } else emptyList()
 
@@ -954,8 +969,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     fun ClassDeclarationNode.eval() {
         val declarationScope = callStack.currentSymbolTable()
         val classType = TypeNode(
+            position = position,
             name = fullQualifiedName,
-            arguments = typeParameters.map { TypeNode(it.name, null, false) }.emptyToNull(),
+            arguments = typeParameters.map { TypeNode(it.position, it.name, null, false) }.emptyToNull(),
             isNullable = false,
         )
 
@@ -982,6 +998,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     ?.map {
                         val p = it.parameter
                         PropertyDeclarationNode(
+                            position = p.position,
                             name = p.name,
                             declaredModifiers = it.modifiers,
                             typeParameters = emptyList(),

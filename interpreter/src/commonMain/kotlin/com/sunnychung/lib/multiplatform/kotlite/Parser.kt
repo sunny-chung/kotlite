@@ -219,8 +219,8 @@ class Parser(protected val lexer: Lexer) {
         if (currentToken.type == TokenType.Operator && currentToken.value in setOf("++", "--", "-", "+", "!")) {
             val t = eat(TokenType.Operator)
             return when (t.value) {
-                "++", "--" -> UnaryOpNode(operator = "pre${t.value}", node = null)
-                else -> UnaryOpNode(operator = t.value as String, node = null)
+                "++", "--" -> UnaryOpNode(position = t.position, operator = "pre${t.value}", node = null)
+                else -> UnaryOpNode(position = t.position, operator = t.value as String, node = null)
             }
         }
         return null
@@ -304,9 +304,10 @@ class Parser(protected val lexer: Lexer) {
             throw UnsupportedOperationException("Lambda is not supported")
 //            parenthesizedExpression()
         } else {
-            ClassMemberReferenceNode(eat(TokenType.Identifier).value as String) // any better node?
+            val t = eat(TokenType.Identifier)
+            ClassMemberReferenceNode(position = t.position, t.value as String) // any better node?
         }
-        return NavigationNode(subject, operator.value as String, memberExpression)
+        return NavigationNode(operator.position, subject, operator.value as String, memberExpression)
     }
 
     /**
@@ -322,7 +323,7 @@ class Parser(protected val lexer: Lexer) {
     fun indexingSuffix(subject: ASTNode): IndexOpNode {
         val expressions = mutableListOf<ASTNode>()
         var hasEatenComma = false
-        eat(TokenType.Operator, "[")
+        val t = eat(TokenType.Operator, "[")
         repeatedNL()
         expressions += expression()
         repeatedNL()
@@ -343,7 +344,7 @@ class Parser(protected val lexer: Lexer) {
             }
         }
         eat(TokenType.Operator, "]")
-        return IndexOpNode(subject = subject, arguments = expressions)
+        return IndexOpNode(position = t.position, subject = subject, arguments = expressions)
     }
 
     /**
@@ -356,20 +357,21 @@ class Parser(protected val lexer: Lexer) {
      */
     fun postfixUnarySuffix(subject: ASTNode): ASTNode {
         val originalTokenIndex = tokenIndex
-        when (val op = currentToken.value as? String) { // TODO complete
+        val t = currentToken
+        when (val op = t.value as? String) { // TODO complete
             "(", "{", "<" -> try {
                 return callSuffix(subject)
             } catch (_: ParseException) {
                 resetTokenToIndex(originalTokenIndex)
             }
             "[" -> return indexingSuffix(subject)
-            "++", "--" -> { eat(TokenType.Operator, op); return UnaryOpNode(subject, "post$op") }
+            "++", "--" -> { eat(TokenType.Operator, op); return UnaryOpNode(t.position, subject, "post$op") }
             "!" -> { // this rule prevents conflict with consecutive boolean "Not" operators
                 val nextToken = peekNextToken()
                 if (nextToken.type == TokenType.Operator && nextToken.value == "!") {
                     eat(TokenType.Operator, op)
                     eat(TokenType.Operator, op)
-                    return UnaryOpNode(subject, "!!")
+                    return UnaryOpNode(t.position, subject, "!!")
                 }
             }
         }
@@ -395,6 +397,7 @@ class Parser(protected val lexer: Lexer) {
         if (isCurrentToken(TokenType.Symbol, "{")) {
             val lambda = lambdaLiteral()
             arguments += FunctionCallArgumentNode(
+                position = lambda.position,
                 index = arguments.size,
                 value = lambda
             )
@@ -445,6 +448,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun valueArgument(index: Int): FunctionCallArgumentNode {
         repeatedNL()
+        val t = currentToken
         val name = if (peekNextToken().type == TokenType.Symbol && peekNextToken().value == "=") {
             val name = userDefinedIdentifier()
             eat(TokenType.Symbol, "=")
@@ -452,7 +456,7 @@ class Parser(protected val lexer: Lexer) {
         } else null
         repeatedNL()
         val value = expression()
-        return FunctionCallArgumentNode(index = index, name = name, value = value)
+        return FunctionCallArgumentNode(position = t.position, index = index, name = name, value = value)
     }
 
     /**
@@ -487,7 +491,7 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun ifExpression(): ASTNode {
-        eat(TokenType.Identifier, "if")
+        val t = eat(TokenType.Identifier, "if")
         repeatedNL()
         eat(TokenType.Operator, "(")
         repeatedNL()
@@ -518,18 +522,18 @@ class Parser(protected val lexer: Lexer) {
         if (trueBlock == null && falseBlock == null) {
             if (!hasEatSemicolonAfterCondition) throw ExpectTokenMismatchException(";", lastToken().position)
         }
-        return IfNode(condition = condition, trueBlock = trueBlock, falseBlock = falseBlock)
+        return IfNode(position = t.position, condition = condition, trueBlock = trueBlock, falseBlock = falseBlock)
     }
 
     fun stringContentOrExpression(addNode: (ASTNode) -> Unit) {
         when (currentToken.type) {
             TokenType.StringLiteral -> {
                 val t = eat(TokenType.StringLiteral)
-                addNode(StringLiteralNode(t.value as String))
+                addNode(StringLiteralNode(t.position, t.value as String))
             }
             TokenType.StringFieldIdentifier -> {
                 val t = eat(TokenType.StringFieldIdentifier)
-                addNode(StringFieldIdentifierNode(t.value as String))
+                addNode(StringFieldIdentifierNode(t.position, t.value as String))
             }
             TokenType.Symbol -> {
                 if (currentToken.value == "\${") {
@@ -569,13 +573,13 @@ class Parser(protected val lexer: Lexer) {
     fun lineStringLiteral(): ASTNode {
         val nodes = mutableListOf<ASTNode>()
         switchMode(Lexer.Mode.QuotedString) // switch mode before reading next token
-        eat(TokenType.Symbol, "\"")
+        val t = eat(TokenType.Symbol, "\"")
         while (!isCurrentToken(TokenType.Symbol, "\"")) {
             stringContentOrExpression { nodes += it }
         }
         exitMode()
         eat(TokenType.Symbol, "\"")
-        return StringNode(nodes)
+        return StringNode(t.position, nodes)
     }
 
     /**
@@ -597,13 +601,13 @@ class Parser(protected val lexer: Lexer) {
     fun multiLineStringLiteral(): ASTNode {
         val nodes = mutableListOf<ASTNode>()
         switchMode(Lexer.Mode.MultilineString) // switch mode before reading next token
-        eat(TokenType.Symbol, "\"\"\"")
+        val t = eat(TokenType.Symbol, "\"\"\"")
         while (!isCurrentToken(TokenType.Symbol, "\"\"\"")) {
             stringContentOrExpression { nodes += it }
         }
         exitMode()
         eat(TokenType.Symbol, "\"\"\"")
-        return StringNode(nodes)
+        return StringNode(t.position, nodes)
     }
 
     /**
@@ -651,8 +655,15 @@ class Parser(protected val lexer: Lexer) {
                 if (parameters.isNotEmpty() && !hasEatenComma) {
                     throw ExpectTokenMismatchException(",", currentToken.position)
                 }
+                val t = currentToken
                 val (name, type) = variableDeclaration()
-                parameters += FunctionValueParameterNode(name = name, declaredType = type, modifiers = emptySet(), defaultValue = null)
+                parameters += FunctionValueParameterNode(
+                    position = t.position,
+                    name = name,
+                    declaredType = type,
+                    modifiers = emptySet(),
+                    defaultValue = null,
+                )
                 if (isCurrentTokenExcludingNL(TokenType.Symbol, ",")) {
                     repeatedNL()
                     eat(TokenType.Symbol, ",")
@@ -672,7 +683,7 @@ class Parser(protected val lexer: Lexer) {
         repeatedNL()
         eat(TokenType.Symbol, "}")
 
-        return LambdaLiteralNode(parameters, BlockNode(statements, position, ScopeType.FunctionBlock, FunctionBodyFormat.Lambda))
+        return LambdaLiteralNode(position, parameters, BlockNode(statements, position, ScopeType.FunctionBlock, FunctionBodyFormat.Lambda))
     }
 
     /**
@@ -711,19 +722,19 @@ class Parser(protected val lexer: Lexer) {
             }
             TokenType.Integer -> {
                 eat(TokenType.Integer)
-                return IntegerNode(currentToken.value as Int)
+                return IntegerNode(currentToken.position, currentToken.value as Int)
             }
             TokenType.Long -> {
                 eat(TokenType.Long)
-                return LongNode(currentToken.value as Long)
+                return LongNode(currentToken.position, currentToken.value as Long)
             }
             TokenType.Double -> {
                 eat(TokenType.Double)
-                return DoubleNode(currentToken.value as Double)
+                return DoubleNode(currentToken.position, currentToken.value as Double)
             }
             TokenType.Char -> {
                 eat(TokenType.Char)
-                return CharNode(currentToken.value as Char)
+                return CharNode(currentToken.position, currentToken.value as Char)
             }
             TokenType.Identifier -> {
                 when (currentToken.value) {
@@ -731,13 +742,13 @@ class Parser(protected val lexer: Lexer) {
                     "if" -> return ifExpression()
 
                     // literal
-                    "true" -> { eat(TokenType.Identifier); return BooleanNode(true) }
-                    "false" -> { eat(TokenType.Identifier); return BooleanNode(false) }
+                    "true" -> { eat(TokenType.Identifier); return BooleanNode(currentToken.position, true) }
+                    "false" -> { eat(TokenType.Identifier); return BooleanNode(currentToken.position, false) }
                     "null" -> { eat(TokenType.Identifier); return NullNode }
                 }
 
                 val t = eat(TokenType.Identifier)
-                return VariableReferenceNode(t.value as String)
+                return VariableReferenceNode(t.position, t.value as String)
             }
             TokenType.Symbol -> {
                 when (currentToken.value) {
@@ -759,10 +770,10 @@ class Parser(protected val lexer: Lexer) {
         var n = conjunction()
         while (isCurrentTokenExcludingNL(TokenType.Operator, "||")) {
             repeatedNL()
-            eat(TokenType.Operator, "||")
+            val t = eat(TokenType.Operator, "||")
             repeatedNL()
             val n2 = conjunction()
-            n = BinaryOpNode(node1 = n, node2 = n2, operator = "||")
+            n = BinaryOpNode(position = t.position, node1 = n, node2 = n2, operator = "||")
         }
         return n
     }
@@ -775,10 +786,10 @@ class Parser(protected val lexer: Lexer) {
         var n = equality()
         while (isCurrentTokenExcludingNL(TokenType.Operator, "&&")) {
             repeatedNL()
-            eat(TokenType.Operator, "&&")
+            val t = eat(TokenType.Operator, "&&")
             repeatedNL()
             val n2 = equality()
-            n = BinaryOpNode(node1 = n, node2 = n2, operator = "&&")
+            n = BinaryOpNode(position = t.position, node1 = n, node2 = n2, operator = "&&")
         }
         return n
     }
@@ -793,7 +804,7 @@ class Parser(protected val lexer: Lexer) {
             val t = eat(TokenType.Operator)
             repeatedNL()
             val n2 = comparison()
-            n = BinaryOpNode(node1 = n, node2 = n2, operator = t.value as String)
+            n = BinaryOpNode(position = t.position, node1 = n, node2 = n2, operator = t.value as String)
         }
         return n
     }
@@ -809,7 +820,7 @@ class Parser(protected val lexer: Lexer) {
             val t = eat(TokenType.Operator)
             repeatedNL()
             val n2 = infixOperation()
-            n = BinaryOpNode(node1 = n, node2 = n2, operator = t.value as String)
+            n = BinaryOpNode(position = t.position, node1 = n, node2 = n2, operator = t.value as String)
         }
         return n
     }
@@ -832,6 +843,7 @@ class Parser(protected val lexer: Lexer) {
             (currentToken.type == TokenType.Identifier && currentToken.value in setOf("is"))
             || (currentToken.`is`(TokenType.Operator, "!") && peekNextToken().`is`(TokenType.Identifier, "is"))
         ) {
+            val token = currentToken
             val t = if (currentToken.type == TokenType.Identifier) {
                 eat(TokenType.Identifier).value as String
             } else {
@@ -840,7 +852,7 @@ class Parser(protected val lexer: Lexer) {
             }
             repeatedNL()
             val n2 = type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
-            n = InfixFunctionCallNode(node1 = n, node2 = n2, functionName = t)
+            n = InfixFunctionCallNode(position = token.position, node1 = n, node2 = n2, functionName = t)
         }
         return n
     }
@@ -858,7 +870,7 @@ class Parser(protected val lexer: Lexer) {
             val t = eat(TokenType.Operator, "?:")
             repeatedNL()
             val n2 = infixFunctionCall()
-            n = ElvisOpNode(primaryNode = n, fallbackNode = n2)
+            n = ElvisOpNode(position = t.position, primaryNode = n, fallbackNode = n2)
         }
         return n
     }
@@ -873,7 +885,7 @@ class Parser(protected val lexer: Lexer) {
             val t = eat(TokenType.Identifier)
             repeatedNL()
             val n2 = additiveExpression()
-            n = InfixFunctionCallNode(node1 = n, node2 = n2, functionName = t.value as String)
+            n = InfixFunctionCallNode(position = t.position, node1 = n, node2 = n2, functionName = t.value as String)
         }
         return n
     }
@@ -891,7 +903,7 @@ class Parser(protected val lexer: Lexer) {
         while (currentToken.type == TokenType.Operator && currentToken.value in setOf("+", "-")) {
             val t = currentToken
             eat(TokenType.Operator)
-            node = BinaryOpNode(node, multiplicativeExpression(), t.value.toString())
+            node = BinaryOpNode(t.position, node, multiplicativeExpression(), t.value.toString())
         }
         return node
     }
@@ -909,7 +921,7 @@ class Parser(protected val lexer: Lexer) {
         while (currentToken.type == TokenType.Operator && currentToken.value in setOf("*", "/", "%")) {
             val t = currentToken
             eat(TokenType.Operator)
-            node = BinaryOpNode(node, asExpression(), t.value.toString())
+            node = BinaryOpNode(t.position, node, asExpression(), t.value.toString())
         }
         return node
     }
@@ -931,6 +943,7 @@ class Parser(protected val lexer: Lexer) {
         var node = prefixUnaryExpression()
         while (isCurrentTokenExcludingNLAnAsOperator()) {
             repeatedNL()
+            val t = currentToken
             val isNullable = if (isCurrentToken(TokenType.Identifier, "as?")) {
                 eat(TokenType.Identifier, "as?")
                 true
@@ -940,7 +953,7 @@ class Parser(protected val lexer: Lexer) {
             }
             repeatedNL()
             val type = type()
-            node = AsOpNode(isNullable = isNullable, expression = node, type = type)
+            node = AsOpNode(position = t.position, isNullable = isNullable, expression = node, type = type)
         }
         return node
     }
@@ -969,10 +982,10 @@ class Parser(protected val lexer: Lexer) {
                 val expr = if (!isSemi()) {
                     expression()
                 } else null
-                return ReturnNode(value = expr, returnToLabel = "", returnToAddress = "")
+                return ReturnNode(position = t.position, value = expr, returnToLabel = "", returnToAddress = "")
             }
-            "break" -> return BreakNode("", "")
-            "continue" -> return ContinueNode("", "")
+            "break" -> return BreakNode(t.position, "", "")
+            "continue" -> return ContinueNode(t.position, "", "")
         }
         TODO(t.value.toString())
     }
@@ -1052,6 +1065,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun typeParameter(): TypeParameterNode {
         repeatedNL()
+        val t = currentToken
         val name = userDefinedIdentifier()
         val typeUpperBound = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
             repeatedNL()
@@ -1059,7 +1073,7 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             type()
         } else null
-        return TypeParameterNode(name = name, typeUpperBound = typeUpperBound)
+        return TypeParameterNode(position = t.position, name = name, typeUpperBound = typeUpperBound)
     }
 
     /**
@@ -1114,13 +1128,14 @@ class Parser(protected val lexer: Lexer) {
      */
     fun typeReference(isParseDottedIdentifiers: Boolean = false, isIncludeLastIdentifierAsTypeName: Boolean = false): TypeNode {
         if (isCurrentToken(TokenType.Operator, "*")) {
-            eat(TokenType.Operator, "*")
-            return TypeNode("*", null, false)
+            val t = eat(TokenType.Operator, "*")
+            return TypeNode(t.position, "*", null, false)
         }
 
         var cursorPosBeforeLastDot: Int? = null
         val nameB = StringBuilder()
-        nameB.append(eat(TokenType.Identifier).value as String)
+        val t = eat(TokenType.Identifier)
+        nameB.append(t.value as String)
         while (isParseDottedIdentifiers && isCurrentTokenExcludingNL(TokenType.Operator, ".")) {
             cursorPosBeforeLastDot = tokenIndex
             repeatedNL()
@@ -1140,9 +1155,9 @@ class Parser(protected val lexer: Lexer) {
         } else false
         if (!isIncludeLastIdentifierAsTypeName && argument == null && !isNullable && cursorPosBeforeLastDot != null) {
             resetTokenToIndex(cursorPosBeforeLastDot)
-            return TypeNode(name.substringBeforeLast("."), argument, isNullable)
+            return TypeNode(t.position, name.substringBeforeLast("."), argument, isNullable)
         }
-        return TypeNode(name, argument, isNullable)
+        return TypeNode(t.position, name, argument, isNullable)
     }
 
     /**
@@ -1166,7 +1181,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun functionType(): FunctionTypeNode {
         val typeParameters = mutableListOf<TypeNode>()
-        eat(TokenType.Operator, "(")
+        val t = eat(TokenType.Operator, "(")
         repeatedNL()
         var hasEatenComma = false
         while (!isCurrentTokenExcludingNL(TokenType.Operator, ")")) {
@@ -1199,7 +1214,7 @@ class Parser(protected val lexer: Lexer) {
         repeatedNL()
         val returnType = type()
 
-        return FunctionTypeNode(parameterTypes = typeParameters, returnType = returnType, isNullable = false)
+        return FunctionTypeNode(position = t.position, parameterTypes = typeParameters, returnType = returnType, isNullable = false)
     }
 
     /**
@@ -1291,6 +1306,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun propertyDeclaration(modifiers: Set<String>, isProcessBody: Boolean = true): PropertyDeclarationNode {
         val modifiers = modifiers.toPropertyModifiers()
+        val t = currentToken
         val isMutable = eat(TokenType.Identifier).let {
             when (it.value) {
                 "val" -> false
@@ -1342,7 +1358,7 @@ class Parser(protected val lexer: Lexer) {
                     if (isSemi()) semi()
                     setter(type, isProcessBody)
                 } else null
-                PropertyAccessorsNode(type, getter, setter)
+                PropertyAccessorsNode(nextToken.position, type, getter, setter)
             }
             "set" -> {
                 repeatedNL()
@@ -1356,11 +1372,11 @@ class Parser(protected val lexer: Lexer) {
                     if (isSemi()) semi()
                     getter(type, isProcessBody)
                 } else null
-                PropertyAccessorsNode(type, getter, setter)
+                PropertyAccessorsNode(nextToken.position, type, getter, setter)
             }
             else -> null
         }
-        return PropertyDeclarationNode(name = name, declaredModifiers = modifiers, typeParameters = typeParameters, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
+        return PropertyDeclarationNode(position = t.position, name = name, declaredModifiers = modifiers, typeParameters = typeParameters, receiver = receiver, declaredType = type, isMutable = isMutable, initialValue = initialValue, accessors = accessors)
     }
 
     /**
@@ -1369,14 +1385,14 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun getter(type: TypeNode, isProcessBody: Boolean = true): FunctionDeclarationNode {
-        eat(TokenType.Identifier, "get")
+        val t = eat(TokenType.Identifier, "get")
         repeatedNL()
         eat(TokenType.Operator, "(")
         repeatedNL()
         eat(TokenType.Operator, ")")
         repeatedNL()
         val body = if (isProcessBody) functionBody() else dummyBlockNode()
-        return FunctionDeclarationNode(name = "get", declaredReturnType = type, valueParameters = emptyList(), body = body)
+        return FunctionDeclarationNode(position = t.position, name = "get", declaredReturnType = type, valueParameters = emptyList(), body = body)
     }
 
     /**
@@ -1391,7 +1407,7 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun setter(type: TypeNode, isProcessBody: Boolean = true): FunctionDeclarationNode {
-        eat(TokenType.Identifier, "set")
+        val t = eat(TokenType.Identifier, "set")
         repeatedNL()
         eat(TokenType.Operator, "(")
         repeatedNL()
@@ -1405,14 +1421,15 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             type().also { repeatedNL() }
         } else {
-            TypeNode("Unit", null, false)
+            TypeNode(t.position, "Unit", null, false)
         }
         val body = if (isProcessBody) functionBody() else dummyBlockNode()
         return FunctionDeclarationNode(
+            position = t.position,
             name = "set",
             declaredReturnType = returnType,
             valueParameters = listOf(
-                FunctionValueParameterNode(parameterName, type, null, emptySet())
+                FunctionValueParameterNode(t.position, parameterName, type, null, emptySet())
             ),
             body = body
         )
@@ -1491,6 +1508,7 @@ class Parser(protected val lexer: Lexer) {
      *
      */
     fun functionValueParameter(): FunctionValueParameterNode {
+        val t = currentToken
         val modifiers = modifiers().toFunctionValueParameterModifiers()
         val (name, type) = parameter()
         repeatedNL()
@@ -1499,7 +1517,7 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             expression()
         } else null
-        return FunctionValueParameterNode(name = name, declaredType = type, defaultValue = defaultValue, modifiers = modifiers)
+        return FunctionValueParameterNode(position = t.position, name = name, declaredType = type, defaultValue = defaultValue, modifiers = modifiers)
     }
 
     /**
@@ -1611,7 +1629,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun functionDeclaration(modifiers: Set<String>, isProcessBody: Boolean = true): FunctionDeclarationNode {
         val modifiers = modifiers.toFunctionModifiers()
-        eat(TokenType.Identifier, "fun")
+        val t = eat(TokenType.Identifier, "fun")
         repeatedNL()
         val typeParameters = if (currentToken.type == TokenType.Operator && currentToken.value == "<") {
             typeParameters()
@@ -1631,9 +1649,10 @@ class Parser(protected val lexer: Lexer) {
         // TODO make functionBody optional for interfaces
         if (!isProcessBody) {
             return FunctionDeclarationNode(
+                position = t.position,
                 name = name,
                 receiver = receiver,
-                declaredReturnType = type ?: TypeNode("Unit", null, false),
+                declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false),
                 valueParameters = valueParameters,
                 body = dummyBlockNode(),
                 typeParameters = typeParameters,
@@ -1642,9 +1661,10 @@ class Parser(protected val lexer: Lexer) {
         }
         val body = functionBody()
         return FunctionDeclarationNode(
+            position = t.position,
             name = name,
             receiver = receiver,
-            declaredReturnType = type ?: TypeNode("Unit", null, false).takeIf { body.format == FunctionBodyFormat.Block },
+            declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false).takeIf { body.format == FunctionBodyFormat.Block },
             valueParameters = valueParameters,
             body = body,
             typeParameters = typeParameters,
@@ -1675,6 +1695,7 @@ class Parser(protected val lexer: Lexer) {
      *     [{NL} '=' {NL} expression]
      */
     fun classParameter(): ClassParameterNode {
+        val t = currentToken
         val modifiers = modifiers().toClassParameterModifiers()
         val isMutable = if (currentToken.type == TokenType.Identifier && currentToken.value in setOf("val", "var")) {
             (currentToken.value == "var").also { eat(TokenType.Identifier) }
@@ -1691,10 +1712,12 @@ class Parser(protected val lexer: Lexer) {
             expression()
         } else null
         return ClassParameterNode(
+            position = t.position,
             isProperty = isMutable != null,
             isMutable = isMutable == true,
             modifiers = modifiers.filterIsInstance<PropertyModifier>().toSet(),
             parameter = FunctionValueParameterNode(
+                position = t.position,
                 name = name,
                 declaredType = type,
                 defaultValue = defaultValue,
@@ -1715,6 +1738,7 @@ class Parser(protected val lexer: Lexer) {
      *     ')'
      */
     fun primaryConstructor() : ClassPrimaryConstructorNode {
+        val t = currentToken
         val parameters = mutableListOf<ClassParameterNode>()
         if (isCurrentToken(TokenType.Identifier, "constructor")) {
             eat(TokenType.Identifier, "constructor")
@@ -1740,7 +1764,7 @@ class Parser(protected val lexer: Lexer) {
         }
         repeatedNL()
         eat(TokenType.Operator, ")")
-        return ClassPrimaryConstructorNode(parameters)
+        return ClassPrimaryConstructorNode(position = t.position, parameters = parameters)
     }
 
     /**
@@ -1760,10 +1784,10 @@ class Parser(protected val lexer: Lexer) {
         val declarations = mutableListOf<ASTNode>()
         while (!isCurrentTokenExcludingNL(TokenType.Symbol, "}")) {
             declarations += if (isCurrentToken(TokenType.Identifier, "init")) {
-                eat(TokenType.Identifier, "init")
+                val t = eat(TokenType.Identifier, "init")
                 repeatedNL()
                 val block = block(ScopeType.Initializer)
-                ClassInstanceInitializerNode(block)
+                ClassInstanceInitializerNode(position = t.position, block = block)
             } else {
                 declaration()
             }
@@ -1868,7 +1892,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun classDeclaration(modifiers: Set<String>): ClassDeclarationNode {
         val modifiers = modifiers.toClassModifiers()
-        eat(TokenType.Identifier, "class")
+        val t = eat(TokenType.Identifier, "class")
         repeatedNL()
         val name = userDefinedIdentifier()
         var token = currentTokenExcludingNL()
@@ -1894,6 +1918,7 @@ class Parser(protected val lexer: Lexer) {
             classBody()
         } else listOf()
         return ClassDeclarationNode(
+            position = t.position,
             name = name,
             declaredModifiers = modifiers,
             typeParameters = typeParameters,
@@ -1973,7 +1998,7 @@ class Parser(protected val lexer: Lexer) {
      *     (controlStructureBody | ';')
      */
     fun whileStatement(): ASTNode {
-        eat(TokenType.Identifier, "while")
+        val t = eat(TokenType.Identifier, "while")
         repeatedNL()
         eat(TokenType.Operator, "(")
         repeatedNL()
@@ -1987,7 +2012,7 @@ class Parser(protected val lexer: Lexer) {
         } else {
             controlStructureBody(ScopeType.While)
         }
-        return WhileNode(condition = condition, body = loopBody)
+        return WhileNode(position = t.position, condition = condition, body = loopBody)
     }
 
     /**
@@ -2060,6 +2085,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun script(): ScriptNode { // TODO complete
         val nodes = mutableListOf<ASTNode>()
+        val t = currentToken
 //        do {
 //            val curr = statement()
 //            if (curr != null) {
@@ -2077,7 +2103,7 @@ class Parser(protected val lexer: Lexer) {
             }
         }
         eat(TokenType.EOF)
-        return ScriptNode(nodes)
+        return ScriptNode(position = t.position, nodes = nodes)
     }
 
     /**

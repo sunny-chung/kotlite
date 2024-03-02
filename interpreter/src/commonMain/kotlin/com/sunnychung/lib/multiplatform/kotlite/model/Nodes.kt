@@ -11,67 +11,75 @@ import kotlin.random.Random
 fun generateId() = Random.nextInt()
 
 sealed interface ASTNode {
+    val position: SourcePosition
     fun toMermaid(): String
 }
 
-data class IntegerNode(val value: Int) : ASTNode {
+data class IntegerNode(override val position: SourcePosition, val value: Int) : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Integer ${value}\"]\n"
     }
 }
 
-data class DoubleNode(val value: Double) : ASTNode {
+data class DoubleNode(override val position: SourcePosition, val value: Double) : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Double ${value}\"]\n"
     }
 }
 
-data class LongNode(val value: Long) : ASTNode {
+data class LongNode(override val position: SourcePosition, val value: Long) : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Long ${value}\"]\n"
     }
 }
 
-data class BooleanNode(val value: Boolean) : ASTNode {
+data class BooleanNode(override val position: SourcePosition, val value: Boolean) : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Boolean ${value}\"]\n"
     }
 }
 
-data class ValueNode(val value: RuntimeValue) : ASTNode {
+data class ValueNode(override val position: SourcePosition, val value: RuntimeValue) : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Value ${value}\"]\n"
     }
 }
 
 data object NullNode : ASTNode {
+    override val position: SourcePosition
+        get() = SourcePosition("", 1, 1)
     override fun toMermaid(): String {
         return "${generateId()}[\"Null\"]\n"
     }
 }
 
-data class BinaryOpNode(val node1: ASTNode, val node2: ASTNode, val operator: String, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
+data class BinaryOpNode(override val position: SourcePosition, val node1: ASTNode, val node2: ASTNode, val operator: String, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Binary Op ${operator}\"]"
         return "$self-->${node1.toMermaid()}\n$self-->${node2.toMermaid()}\n"
     }
 }
 
-data class UnaryOpNode(var node: ASTNode?, val operator: String, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
+data class UnaryOpNode(override val position: SourcePosition, var node: ASTNode?, val operator: String, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Unary Op ${operator}\"]"
         return "$self-->${node?.toMermaid()}\n"
     }
 }
 
-data class ScriptNode(val nodes: List<ASTNode>) : ASTNode {
+data class ScriptNode(override val position: SourcePosition, val nodes: List<ASTNode>) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Script\"]"
         return nodes.map { "$self-->${it.toMermaid()}\n" }.joinToString("\n")
     }
 }
 
-open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNullable: Boolean, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+/**
+ *
+ * @param position This value is only useful when the type is invalid and error detail is needed.
+ * Most of the time it can be set to `SourcePosition.NONE`.
+ */
+open class TypeNode(override val position: SourcePosition, val name: String, val arguments: List<TypeNode>?, val isNullable: Boolean, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     init {
         if (arguments?.isEmpty() == true) throw IllegalArgumentException("empty argument")
         if (name == "Function" && this !is FunctionTypeNode) throw IllegalArgumentException("function type node should be a FunctionTypeNode instance")
@@ -85,6 +93,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
     }
 
     open fun copy(isNullable: Boolean) = TypeNode(
+        position = position,
         name = name,
         arguments = arguments,
         isNullable = isNullable,
@@ -94,6 +103,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
         if (this === other) return true
         if (other !is TypeNode) return false
 
+        if (position != other.position) return false
         if (name != other.name) return false
         if (arguments != other.arguments) return false
         if (isNullable != other.isNullable) return false
@@ -102,7 +112,8 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
     }
 
     override fun hashCode(): Int {
-        var result = name.hashCode()
+        var result = position.hashCode()
+        result = 31 * result + name.hashCode()
         result = 31 * result + (arguments?.hashCode() ?: 0)
         result = 31 * result + isNullable.hashCode()
         return result
@@ -110,6 +121,7 @@ open class TypeNode(val name: String, val arguments: List<TypeNode>?, val isNull
 }
 
 data class PropertyDeclarationNode(
+    override val position: SourcePosition,
     val name: String,
     val declaredModifiers: Set<PropertyModifier>,
     val typeParameters: List<TypeParameterNode>,
@@ -139,6 +151,8 @@ data class PropertyDeclarationNode(
 data class AssignmentNode(val subject: ASTNode, val operator: String, val value: ASTNode, @ModifyByAnalyzer @Deprecated("To be removed") var transformedRefName: String? = null) : ASTNode {
     @ModifyByAnalyzer var functionCall: FunctionCallNode? = null
 
+    override val position: SourcePosition get() = subject.position
+
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Assignment Node `$operator`\"]"
         return "$self-- subject -->${subject.toMermaid()}\n" +
@@ -146,7 +160,7 @@ data class AssignmentNode(val subject: ASTNode, val operator: String, val value:
     }
 }
 
-open class VariableReferenceNode(val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: PropertyOwnerInfo? = null, @ModifyByAnalyzer var type: TypeNode? = null) : ASTNode {
+open class VariableReferenceNode(override val position: SourcePosition, val variableName: String, @ModifyByAnalyzer var transformedRefName: String? = null, @ModifyByAnalyzer var ownerRef: PropertyOwnerInfo? = null, @ModifyByAnalyzer var type: TypeNode? = null) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Variable Reference Node `$variableName`\"]"
 }
 
@@ -169,7 +183,7 @@ enum class PropertyModifier {
     open, override
 }
 
-data class FunctionValueParameterNode(val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, val modifiers: Set<FunctionValueParameterModifier>, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+data class FunctionValueParameterNode(override val position: SourcePosition, val name: String, val declaredType: TypeNode?, val defaultValue: ASTNode?, val modifiers: Set<FunctionValueParameterModifier>, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     @ModifyByAnalyzer
     var inferredType: TypeNode? = null
     val type: TypeNode get() = declaredType ?: inferredType
@@ -184,7 +198,7 @@ data class FunctionValueParameterNode(val name: String, val declaredType: TypeNo
 
 data class BlockNode(
     val statements: List<ASTNode>,
-    val position: SourcePosition,
+    override val position: SourcePosition,
     val type: ScopeType,
     val format: FunctionBodyFormat,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
@@ -197,6 +211,7 @@ data class BlockNode(
 }
 
 interface CallableNode {
+    val position: SourcePosition
     val valueParameters: List<FunctionValueParameterNode>
     val typeParameters: List<TypeParameterNode>
     val returnType: TypeNode
@@ -206,6 +221,7 @@ interface CallableNode {
 }
 
 open class FunctionDeclarationNode(
+    override val position: SourcePosition,
     override val name: String,
     val receiver: TypeNode? = null,
     val declaredReturnType: TypeNode?,
@@ -255,6 +271,7 @@ open class FunctionDeclarationNode(
             throw UnsupportedOperationException("Copying subclasses is not supported")
         }
         return FunctionDeclarationNode(
+            position = position,
             name = name,
             receiver = receiver,
             declaredReturnType = declaredReturnType,
@@ -270,7 +287,7 @@ open class FunctionDeclarationNode(
 
 }
 
-data class FunctionCallArgumentNode(val index: Int, val name: String? = null, val value: ASTNode) : ASTNode {
+data class FunctionCallArgumentNode(override val position: SourcePosition, val index: Int, val name: String? = null, val value: ASTNode) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Argument Node #$index `$name`\"]"
         return "$self-->${value.toMermaid()}\n"
@@ -281,7 +298,7 @@ data class FunctionCallNode(
     val function: ASTNode,
     val arguments: List<FunctionCallArgumentNode>,
     val declaredTypeArguments: List<TypeNode>,
-    val position: SourcePosition,
+    override val position: SourcePosition,
     val isSuperclassConstruction: Boolean = false,
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
@@ -305,28 +322,28 @@ data class FunctionCallNode(
     }
 }
 
-data class ReturnNode(val value: ASTNode?, val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
+data class ReturnNode(override val position: SourcePosition, val value: ASTNode?, val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Return Node `$returnToLabel`\"]"
         return "$self${if (value != null) "-->${value.toMermaid()}" else "" }\n"
     }
 }
 
-data class ContinueNode(val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
+data class ContinueNode(override val position: SourcePosition, val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Continue Node `$returnToLabel`\"]"
         return self
     }
 }
 
-data class BreakNode(val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
+data class BreakNode(override val position: SourcePosition, val returnToLabel: String, @ModifyByAnalyzer var returnToAddress: String) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Break Node `$returnToLabel`\"]"
         return self
     }
 }
 
-data class IfNode(val condition: ASTNode, val trueBlock: BlockNode?, val falseBlock: BlockNode?, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
+data class IfNode(override val position: SourcePosition, val condition: ASTNode, val trueBlock: BlockNode?, val falseBlock: BlockNode?, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"If Node\"]"
         return "$self-- condition -->${condition.toMermaid()}\n" +
@@ -335,7 +352,7 @@ data class IfNode(val condition: ASTNode, val trueBlock: BlockNode?, val falseBl
     }
 }
 
-data class WhileNode(val condition: ASTNode, val body: BlockNode?) : ASTNode {
+data class WhileNode(override val position: SourcePosition, val condition: ASTNode, val body: BlockNode?) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"While Node\"]"
         return "$self-- condition -->${condition.toMermaid()}\n" +
@@ -344,6 +361,7 @@ data class WhileNode(val condition: ASTNode, val body: BlockNode?) : ASTNode {
 }
 
 data class ClassParameterNode(
+    override val position: SourcePosition,
     val isProperty: Boolean,
     val isMutable: Boolean,
     val modifiers: Set<PropertyModifier>,
@@ -363,7 +381,7 @@ data class ClassParameterNode(
     }
 }
 
-data class ClassPrimaryConstructorNode(val parameters: List<ClassParameterNode>) : ASTNode {
+data class ClassPrimaryConstructorNode(override val position: SourcePosition, val parameters: List<ClassParameterNode>) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Class Primary Constructor Node\"]"
         return "$self\n" +
@@ -371,13 +389,14 @@ data class ClassPrimaryConstructorNode(val parameters: List<ClassParameterNode>)
     }
 }
 
-data class ClassInstanceInitializerNode(val block: BlockNode) : ASTNode {
+data class ClassInstanceInitializerNode(override val position: SourcePosition, val block: BlockNode) : ASTNode {
     override fun toMermaid(): String {
         return "${generateId()}[\"Class Init Node\"]-->${block.toMermaid()}\n"
     }
 }
 
 data class ClassDeclarationNode(
+    override val position: SourcePosition,
     val name: String,
     val declaredModifiers: Set<ClassModifier>,
     val typeParameters: List<TypeParameterNode>,
@@ -398,11 +417,12 @@ data class ClassDeclarationNode(
     }
 }
 
-data class ClassMemberReferenceNode(val name: String, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
+data class ClassMemberReferenceNode(override val position: SourcePosition, val name: String, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Class Member Reference Node `$name`\"]"
 }
 
 data class NavigationNode(
+    override val position: SourcePosition,
     val subject: ASTNode,
     val operator: String,
     val member: ClassMemberReferenceNode,
@@ -417,6 +437,7 @@ data class NavigationNode(
 }
 
 class PropertyAccessorsNode(
+    override val position: SourcePosition,
     val type: TypeNode,
     val getter: FunctionDeclarationNode?,
     val setter: FunctionDeclarationNode?,
@@ -428,15 +449,16 @@ class PropertyAccessorsNode(
     }
 }
 
-class StringLiteralNode(val content: String) : ASTNode {
+class StringLiteralNode(override val position: SourcePosition, val content: String) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"String Node `$content`\"]"
 }
 
-class StringFieldIdentifierNode(fieldIdentifier: String) : VariableReferenceNode(fieldIdentifier) {
+class StringFieldIdentifierNode(override val position: SourcePosition, fieldIdentifier: String) : VariableReferenceNode(position, fieldIdentifier) {
     override fun toMermaid(): String = "${generateId()}[\"String Field Identifier Node `$variableName`\"]"
 }
 
 class StringNode(
+    override val position: SourcePosition,
     val nodes: List<ASTNode>
 ) : ASTNode {
     override fun toMermaid(): String {
@@ -446,6 +468,7 @@ class StringNode(
 }
 
 data class LambdaLiteralNode(
+    override val position: SourcePosition,
     val declaredValueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
     @ModifyByAnalyzer var type: FunctionTypeNode? = null,
@@ -460,6 +483,7 @@ data class LambdaLiteralNode(
         get() = if (declaredValueParameters.isEmpty() && parameterTypesUpperBound?.size == 1) {
             if (valueParameterIt == null) {
                 valueParameterIt = FunctionValueParameterNode(
+                    position = position,
                     name = "it",
                     declaredType = parameterTypesUpperBound!!.first(),
                     defaultValue = null,
@@ -490,8 +514,8 @@ data class LambdaLiteralNode(
     }
 }
 
-class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: List<TypeNode>?, val returnType: TypeNode?, isNullable: Boolean)
-    : TypeNode("Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
+class FunctionTypeNode(override val position: SourcePosition, val receiverType: TypeNode? = null, val parameterTypes: List<TypeNode>?, val returnType: TypeNode?, isNullable: Boolean)
+    : TypeNode(position, "Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
 
     override fun descriptiveName(): String {
         var s = "(${parameterTypes!!.joinToString(", ") { it.descriptiveName() }}) -> ${returnType!!.descriptiveName()}"
@@ -501,6 +525,7 @@ class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: L
 
     override fun copy(isNullable: Boolean): FunctionTypeNode {
         return FunctionTypeNode(
+            position = position,
             receiverType = receiverType,
             parameterTypes = parameterTypes,
             returnType = returnType,
@@ -517,13 +542,13 @@ class FunctionTypeNode(val receiverType: TypeNode? = null, val parameterTypes: L
     }
 }
 
-class ClassTypeNode(val clazz: TypeNode) : TypeNode("Class", listOf(clazz), false)
+class ClassTypeNode(val clazz: TypeNode) : TypeNode(clazz.position, "Class", listOf(clazz), false)
 
-class CharNode(val value: Char) : ASTNode {
+class CharNode(override val position: SourcePosition, val value: Char) : ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Char Node `$value` (${value.code})\"]"
 }
 
-class AsOpNode(val isNullable: Boolean, val expression: ASTNode, val type: TypeNode) : ASTNode {
+class AsOpNode(override val position: SourcePosition, val isNullable: Boolean, val expression: ASTNode, val type: TypeNode) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"As${if (isNullable) "?" else ""} Node\"]"
         return "$self-- expr -->${expression.toMermaid()}\n" +
@@ -531,13 +556,13 @@ class AsOpNode(val isNullable: Boolean, val expression: ASTNode, val type: TypeN
     }
 }
 
-class TypeParameterNode(val name: String, val typeUpperBound: TypeNode?): ASTNode {
+class TypeParameterNode(override val position: SourcePosition, val name: String, val typeUpperBound: TypeNode?): ASTNode {
     override fun toMermaid(): String = "${generateId()}[\"Type Parameter Node `$name`\"]" +
         (typeUpperBound?.let { "--type upper bound -->${it.toMermaid()}" } ?: "")
 }
-fun TypeParameterNode.typeUpperBoundOrAny() = typeUpperBound ?: TypeNode("Any", null, true)
+fun TypeParameterNode.typeUpperBoundOrAny() = typeUpperBound ?: TypeNode(position, "Any", null, true)
 
-class IndexOpNode(val subject: ASTNode, val arguments: List<ASTNode>): ASTNode {
+class IndexOpNode(override val position: SourcePosition, val subject: ASTNode, val arguments: List<ASTNode>): ASTNode {
     @ModifyByAnalyzer var hasFunctionCall: Boolean? = null
     @ModifyByAnalyzer var call: FunctionCallNode? = null
     @ModifyByAnalyzer var type: TypeNode? = null
@@ -552,6 +577,7 @@ class IndexOpNode(val subject: ASTNode, val arguments: List<ASTNode>): ASTNode {
 }
 
 data class InfixFunctionCallNode(
+    override val position: SourcePosition,
     val node1: ASTNode,
     val node2: ASTNode,
     val functionName: String,
@@ -565,6 +591,7 @@ data class InfixFunctionCallNode(
 }
 
 data class ElvisOpNode(
+    override val position: SourcePosition,
     val primaryNode: ASTNode,
     val fallbackNode: ASTNode,
     @ModifyByAnalyzer var type: TypeNode? = null,

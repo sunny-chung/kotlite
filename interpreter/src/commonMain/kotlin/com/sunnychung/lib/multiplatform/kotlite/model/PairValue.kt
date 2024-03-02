@@ -9,8 +9,8 @@ class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB:
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "Pair",
             typeParameters = listOf(
-                TypeParameterNode(name = "A", typeUpperBound = null),
-                TypeParameterNode(name = "B", typeUpperBound = null)
+                TypeParameterNode(position = SourcePosition.BUILTIN, name = "A", typeUpperBound = null),
+                TypeParameterNode(position = SourcePosition.BUILTIN, name = "B", typeUpperBound = null)
             ),
             isInstanceCreationAllowed = true,
             primaryConstructorParameters = listOf(

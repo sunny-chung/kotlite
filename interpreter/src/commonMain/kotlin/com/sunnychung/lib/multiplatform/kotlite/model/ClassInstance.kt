@@ -54,7 +54,7 @@ open class ClassInstance(
                             function,
                             emptyList(),
                             emptyList(),
-                            SourcePosition("TODO", 1, 1)
+                            SourcePosition("", 1, 1)
                         ).evalClassMemberAnyFunctionCall(this@ClassInstance, function)
                     }
                 },
@@ -63,9 +63,15 @@ open class ClassInstance(
                         val function = it.value.setter!!
                         FunctionCallNode(
                             function,
-                            listOf(FunctionCallArgumentNode(index = 0, value = ValueNode(value))),
+                            listOf(
+                                FunctionCallArgumentNode(
+                                    SourcePosition.NONE, index = 0, value = ValueNode(
+                                        SourcePosition.NONE, value
+                                    )
+                                )
+                            ),
                             emptyList(),
-                            SourcePosition("TODO", 1, 1)
+                            SourcePosition("", 1, 1)
                         ).evalClassMemberAnyFunctionCall(this@ClassInstance, function)
                     }
                 }
