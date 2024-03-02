@@ -230,7 +230,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         val result = node!!.eval()
         if (operator == "!!") {
             if (result == NullValue) {
-                throw EvaluateNullPointerException()
+                throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
             }
             return result as RuntimeValue
         }
@@ -331,7 +331,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun NavigationNode.resolveSuperKeyword(subjectValue: RuntimeValue): RuntimeValue {
         // a hack to resolve the "super" keyword. See documentation
-        return if (subject is VariableReferenceNode && subject.variableName == "super") {
+        return if (subject is VariableReferenceNode && subject.variableName == "super" && (subjectValue as ClassInstance).parentInstance != null) {
             var instance: ClassInstance? = subjectValue as ClassInstance
             val typeOfSuper = subject.type!!
             while (instance != null && instance.clazz!!.fullQualifiedName != typeOfSuper.name) {
@@ -480,7 +480,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 when (callableType) {
                     CallableType.ClassMemberFunction -> {
                         if (subject == NullValue) {
-                            throw EvaluateNullPointerException()
+                            throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
                         (subject as? ClassInstance)
                             ?.let { function.resolveSuperKeyword(it) as? ClassInstance }
@@ -494,7 +494,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
                             ?: throw RuntimeException("Analysed function $functionRefName not found")
                         if (subject == NullValue && !function.receiver!!.isNullable) {
-                            throw EvaluateNullPointerException()
+                            throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
                         return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function, replaceArguments = replaceArguments)
                     }
@@ -629,6 +629,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
         callStack.push(
             functionFullQualifiedName = functionNode.name,
+            isFunctionCall = true,
             scopeType = scopeType,
             callPosition = callPosition,
         )
@@ -881,9 +882,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
             symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "this/${subject.type().name}", "this")
 
-            if (subject is ClassInstance && subject.parentInstance != null) {
+            if (subject is ClassInstance) {
                 // a hack to resolve "super". See documentation
-                val parentInstance = subject.parentInstance
+                val parentInstance = subject.parentInstance ?: subject
                 symbolTable.declareProperty(position, "super", subject.type().toTypeNode(), false)
                 symbolTable.assign("super", subject)
                 symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "super", "super")
@@ -1058,7 +1059,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
             if (obj == NullValue && !extensionProperty.receiverType!!.isNullable) {
                 if (operator == ".") {
-                    throw EvaluateNullPointerException()
+                    throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                 } else if (operator == "?.") {
                     return obj
                 }
@@ -1069,7 +1070,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             }
         }
 
-        if (obj == NullValue) throw EvaluateNullPointerException()
+        if (obj == NullValue) throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
         obj as? ClassInstance ?: throw RuntimeException("Cannot access member `${member.name}` for type `${obj.type().nameWithNullable}`")
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(interpreter = this@Interpreter, name = obj.clazz!!.findMemberPropertyTransformedName(member.name)!!)) {
@@ -1101,7 +1102,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         } else if (isNullable) {
             NullValue
         } else {
-            throw EvaluateTypeCastException(value.type().descriptiveName, targetType.descriptiveName)
+            throw EvaluateTypeCastException(symbolTable(), callStack.getStacktrace(position), value.type().descriptiveName, targetType.descriptiveName)
         }
     }
 

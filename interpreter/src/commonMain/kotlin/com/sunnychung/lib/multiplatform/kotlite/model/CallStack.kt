@@ -11,6 +11,7 @@ class CallStack {
             functionFullQualifiedName = ":builtin",
             callPosition = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
             scopeType = ScopeType.Script,
+            isFunctionCall = false,
             parent = null,
             scopeLevel = 0
         )
@@ -18,6 +19,7 @@ class CallStack {
             functionFullQualifiedName = ":global",
             callPosition = SourcePosition(BuiltinFilename.GLOBAL, 1, 1),
             scopeType = ScopeType.Script,
+            isFunctionCall = false,
             parent = activationRecords.last(),
             scopeLevel = 1
         )
@@ -39,20 +41,25 @@ class CallStack {
         activationRecords[0].symbolTable.declareExtensionProperty(SourcePosition.BUILTIN, property.transformedName!!, property)
     }
 
-    fun getStacktrace(): List<String> {
-        return if (activationRecords.size < 3) {
-            emptyList()
-        } else {
-            return activationRecords.subList(2, activationRecords.size)
-                .asReversed()
-                .map { "${it.functionFullQualifiedName} (${it.callPosition.lineNum}:${it.callPosition.col})" }
-        }
+    fun getStacktrace(currentPosition: SourcePosition? = null): List<String> {
+        // first two are built-in and global, which are not in user scope
+        return let {
+            if (currentPosition != null) {
+                listOf("${currentPosition.filename}:${currentPosition.lineNum}:${currentPosition.col}")
+            } else {
+                emptyList()
+            }
+        } + activationRecords.subList(2, activationRecords.size)
+            .filter { it.isFunctionCall }
+            .asReversed()
+            .map { "${it.functionFullQualifiedName ?: "<anonymous>"} (${it.callPosition.filename}:${it.callPosition.lineNum}:${it.callPosition.col})" }
     }
 
-    fun push(functionFullQualifiedName: String?, scopeType: ScopeType, callPosition: SourcePosition) {
+    fun push(functionFullQualifiedName: String?, scopeType: ScopeType, callPosition: SourcePosition, isFunctionCall: Boolean = false) {
         activationRecords += ActivationRecord(
             functionFullQualifiedName = functionFullQualifiedName,
             callPosition = callPosition,
+            isFunctionCall = isFunctionCall,
             parent = activationRecords.last(),
             scopeLevel = activationRecords.size,
             scopeType = scopeType,

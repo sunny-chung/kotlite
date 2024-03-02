@@ -9,6 +9,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class NullTest {
 
@@ -292,5 +293,41 @@ class NullTest {
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
         assertEquals(-5, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun throwNPEWithStacktrace() {
+        val interpreter = interpreter("""
+            class A {
+                fun a(x: Int) = {
+                    if (x > 0) {
+                        x
+                    } else {
+                        null
+                    }
+                }
+                fun b(): Int = { a(0)()!! }()
+                fun f(): Int = b()
+            }
+            fun f() = A().f()
+            f()
+        """.trimIndent())
+        try {
+            interpreter.eval()
+        } catch (e: EvaluateNullPointerException) {
+            e.printWithStacktrace()
+            assertEquals(
+                expected = listOf(
+                    "<Test>:9:28",
+                    "<anonymous> (<Test>:9:32)",
+                    "b (<Test>:10:21)",
+                    "f (<Test>:12:16)",
+                    "f (<Test>:13:2)"
+                ),
+                actual = e.stacktrace,
+            )
+            return
+        }
+        throw AssertionError("It should fail with EvaluateNullPointerException")
     }
 }
