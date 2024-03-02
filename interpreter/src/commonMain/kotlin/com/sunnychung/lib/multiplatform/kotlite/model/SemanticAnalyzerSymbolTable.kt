@@ -345,7 +345,7 @@ class SemanticAnalyzerSymbolTable(
                         } else {
                             argType
                         }.let { typeNodeToDataType(it) } // TODO generic type
-                            ?: throw SemanticException("Unknown type ${argType.descriptiveName()}")
+                            ?: throw SemanticException(argType.position, "Unknown type ${argType.descriptiveName()}")
                         if (!functionTypeParameterType.isConvertibleFrom(objectTypeReceiver.arguments[index])) {
                             return@let false // type mismatch
                         }

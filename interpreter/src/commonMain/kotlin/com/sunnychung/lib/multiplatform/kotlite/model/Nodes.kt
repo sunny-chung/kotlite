@@ -135,7 +135,7 @@ data class PropertyDeclarationNode(
     @ModifyByAnalyzer val inferredModifiers: MutableSet<PropertyModifier> = mutableSetOf(),
 ) : ASTNode {
     val type: TypeNode
-        get() = declaredType ?: inferredType ?: throw SemanticException("Could not infer type for property `$name`")
+        get() = declaredType ?: inferredType ?: throw SemanticException(position, "Could not infer type for property `$name`")
     val modifiers: Set<PropertyModifier>
         get() = declaredModifiers + inferredModifiers
     override fun toMermaid(): String {
@@ -187,7 +187,7 @@ data class FunctionValueParameterNode(override val position: SourcePosition, val
     @ModifyByAnalyzer
     var inferredType: TypeNode? = null
     val type: TypeNode get() = declaredType ?: inferredType
-        ?: throw CannotInferTypeException("function value parameter type $name")
+        ?: throw CannotInferTypeException(position, "function value parameter type $name")
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Value Parameter Node `$name` modifiers=[${modifiers.joinToString(", ")}] \"]"
@@ -235,7 +235,7 @@ open class FunctionDeclarationNode(
     @ModifyByAnalyzer val inferredModifiers: MutableSet<FunctionModifier> = mutableSetOf(),
 ) : ASTNode, CallableNode {
     override val returnType: TypeNode
-        get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException("return type of function $name")
+        get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException(position, "return type of function $name")
     val modifiers: Set<FunctionModifier>
         get() = declaredModifiers + inferredModifiers
 

@@ -276,10 +276,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         val name = transformedRefName!!
         if (initialValue != null) {
             val value = initialValue.eval()
-            symbolTable.declareProperty(name, type, isMutable)
+            symbolTable.declareProperty(position, name, type, isMutable)
             symbolTable.assign(name, value as RuntimeValue)
         } else {
-            symbolTable.declareProperty(name, type, isMutable)
+            symbolTable.declareProperty(position, name, type, isMutable)
         }
     }
 
@@ -413,9 +413,9 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun FunctionDeclarationNode.eval() {
         if (receiver == null) {
-            callStack.currentSymbolTable().declareFunction(transformedRefName!!, this)
+            callStack.currentSymbolTable().declareFunction(position, transformedRefName!!, this)
         } else {
-            globalScope.declareExtensionFunction(transformedRefName!!, this)
+            globalScope.declareExtensionFunction(position, transformedRefName!!, this)
         }
     }
 
@@ -635,27 +635,27 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         try {
             val symbolTable = callStack.currentSymbolTable()
             extraSymbols?.let{
-                symbolTable.mergeFrom(it)
+                symbolTable.mergeFrom(callPosition, it)
             }
             extraScopeParameters.forEach {
-                symbolTable.declareProperty(it.key, TypeNode(SourcePosition.NONE, it.value.type().name, null, false), false) // TODO change to use DataType directly
+                symbolTable.declareProperty(callPosition, it.key, TypeNode(callPosition, it.value.type().name, null, false), false) // TODO change to use DataType directly
                 symbolTable.assign(it.key, it.value)
             }
             functionNode.typeParameters.forEach {
-                symbolTable.declareTypeAlias(it.name, it.typeUpperBound)
+                symbolTable.declareTypeAlias(callPosition, it.name, it.typeUpperBound)
             }
             typeParametersReplacedWithArguments.forEach {
                 if (symbolTable.findTypeAlias(it.key) == null) {
-                    symbolTable.declareTypeAlias(it.key, it.value) // TODO declare the original upper bound
+                    symbolTable.declareTypeAlias(callPosition, it.key, it.value) // TODO declare the original upper bound
                 }
-                symbolTable.declareTypeAliasResolution(it.key, typeArgumentsInDataType[it.key]!!)
+                symbolTable.declareTypeAliasResolution(callPosition, it.key, typeArgumentsInDataType[it.key]!!)
             }
             val valueParametersWithGenericsResolved = resolvedFunction?.resolvedValueParameterTypes
                 ?: functionNode.valueParameters
             functionNode.valueParameters.forEachIndexed { index, it ->
                 if (!isVararg && !(functionNode is LambdaLiteralNode && it.name == "_")) {
                     val argumentType = valueParametersWithGenericsResolved[index].type
-                    symbolTable.declareProperty(it.transformedRefName!!, argumentType, false)
+                    symbolTable.declareProperty(callPosition, it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
                         it.transformedRefName!!,
                         replaceArguments[index] ?: arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue)
@@ -723,7 +723,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             clazz.primaryConstructor?.parameters?.forEachIndexed { index, it ->
                 // no need to use transformedRefName as duplicated declarations are not possible here
                 val value = callArguments[index] ?: (it.parameter.defaultValue!!.eval() as RuntimeValue)
-                symbolTable.declareProperty(it.parameter.transformedRefName!!, it.parameter.type.resolveGenericParameterTypeArguments(typeArgumentByName), false)
+                symbolTable.declareProperty(it.position, it.parameter.transformedRefName!!, it.parameter.type.resolveGenericParameterTypeArguments(typeArgumentByName), false)
                 symbolTable.assign(it.parameter.transformedRefName!!, value)
                 callArguments[index] = value
             }
@@ -739,8 +739,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             callStack.push("super", ScopeType.Class, SourcePosition("TODO", 1, 1)) // TODO filename
             typeArguments.forEachIndexed { index, dataType ->
                 val typeParameter = clazz.typeParameters[index]
-                symbolTable().declareTypeAlias(typeParameter.name, typeParameter.typeUpperBound)
-                symbolTable().declareTypeAliasResolution(typeParameter.name, dataType)
+                symbolTable().declareTypeAlias(typeParameter.position, typeParameter.name, typeParameter.typeUpperBound)
+                symbolTable().declareTypeAliasResolution(typeParameter.position, typeParameter.name, dataType)
             }
             try {
                 superClassInvocation.eval() as ClassInstance?
@@ -773,12 +773,12 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 //            }
 
         // variable "this" is available after primary constructor
-        symbolTable.declareProperty("this", TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty(callPosition, "this", TypeNode(callPosition, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this", instance)
-        symbolTable.declareProperty("this/${instance.clazz!!.fullQualifiedName}", TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty(callPosition, "this/${instance.clazz!!.fullQualifiedName}", TypeNode(callPosition, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
-        symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
-        symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this/${instance.clazz!!.fullQualifiedName}", "this")
+        symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this", "this")
+        symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this/${instance.clazz!!.fullQualifiedName}", "this")
 //            instance.memberPropertyValues.forEach {
 //                symbolTable.putPropertyHolder(instance.clazz!!.memberPropertyNameToTransformedName[it.key]!!, it.value)
 //            }
@@ -786,6 +786,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         if (instance.clazz?.superClass != null) {
             // a hack to resolve the "super" keyword. See documentation
             symbolTable.declareProperty(
+                callPosition,
                 "super",
                 TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
                 false
@@ -809,7 +810,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             try {
                 val innerSymbolTable = callStack.currentSymbolTable()
                 nonPropertyArguments.forEach {
-                    innerSymbolTable.declareProperty(it.value.first.transformedRefNameInBody!!, it.value.first.parameter.type.resolveGenericParameterTypeArguments(typeArgumentByName), false)
+                    innerSymbolTable.declareProperty(callPosition, it.value.first.transformedRefNameInBody!!, it.value.first.parameter.type.resolveGenericParameterTypeArguments(typeArgumentByName), false)
                     innerSymbolTable.assign(it.value.first.transformedRefNameInBody!!, it.value.second)
                 }
                 when (it) {
@@ -863,29 +864,29 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             if (subject.type() is ObjectType) {
                 var clazz: ClassDefinition? = (subject.type() as ObjectType).clazz
                 while (clazz != null) {
-                    symbolTable.declareProperty("this/${clazz.name}", subject.type().toTypeNode(), false)
+                    symbolTable.declareProperty(position, "this/${clazz.name}", subject.type().toTypeNode(), false)
                     symbolTable.assign("this/${clazz.name}", subject)
                     clazz = clazz.superClass
                 }
             } else {
-                symbolTable.declareProperty("this/${subject.type().name}", subject.type().toTypeNode(), false)
+                symbolTable.declareProperty(position, "this/${subject.type().name}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${subject.type().name}", subject)
             }
             if (function.receiver != null && function.receiver!!.descriptiveName() != subject.type().name) {
-                symbolTable.declareProperty("this/${function.receiver!!.descriptiveName()}", subject.type().toTypeNode(), false)
+                symbolTable.declareProperty(position, "this/${function.receiver!!.descriptiveName()}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${function.receiver!!.descriptiveName()}", subject)
             }
-            symbolTable.declareProperty("this", subject.type().toTypeNode(), false)
+            symbolTable.declareProperty(position, "this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
-            symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this", "this")
-            symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "this/${subject.type().name}", "this")
+            symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
+            symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "this/${subject.type().name}", "this")
 
             if (subject is ClassInstance && subject.parentInstance != null) {
                 // a hack to resolve "super". See documentation
                 val parentInstance = subject.parentInstance
-                symbolTable.declareProperty("super", subject.type().toTypeNode(), false)
+                symbolTable.declareProperty(position, "super", subject.type().toTypeNode(), false)
                 symbolTable.assign("super", subject)
-                symbolTable.registerTransformedSymbol(IdentifierClassifier.Property, "super", "super")
+                symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "super", "super")
             }
 
 //            // TODO optimize to only copy needed members
@@ -982,10 +983,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
         callStack.push(fullQualifiedName, ScopeType.Class, SourcePosition("TODO", 1, 1)) // TODO filename
         try {
             typeParameters.forEach {
-                callStack.currentSymbolTable().declareTypeAlias(it.name, it.typeUpperBound)
+                callStack.currentSymbolTable().declareTypeAlias(position, it.name, it.typeUpperBound)
             }
 
-            declarationScope.declareClass(ClassDefinition(
+            declarationScope.declareClass(position, ClassDefinition(
                 currentScope = callStack.currentSymbolTable(),
                 name = name,
                 modifiers = modifiers,
@@ -1024,14 +1025,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             declarations
                 .filterIsInstance<FunctionDeclarationNode>()
                 .filter { it.receiver != null }
-                .forEach { globalScope.declareExtensionFunction(it.transformedRefName!!, it) }
+                .forEach { globalScope.declareExtensionFunction(it.position, it.transformedRefName!!, it) }
         } finally {
             callStack.pop(ScopeType.Class)
         }
 
         // companion object
         // TODO create only if a companion object is declared
-        callStack.currentSymbolTable().declareClass(ClassDefinition(
+        callStack.currentSymbolTable().declareClass(position, ClassDefinition(
             currentScope = callStack.currentSymbolTable(),
             name = "$name.Companion",
             fullQualifiedName = "$fullQualifiedName.Companion",
@@ -1112,16 +1113,16 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             runtimeRefs.putPropertyHolder(it, currentSymbolTable.getPropertyHolder(it))
         }
         refs.functions.forEach {
-            runtimeRefs.declareFunction(it, currentSymbolTable.findFunction(it)!!.first)
+            runtimeRefs.declareFunction(position, it, currentSymbolTable.findFunction(it)!!.first)
         }
         refs.classes.forEach {
-            runtimeRefs.declareClass(currentSymbolTable.findClass(it)!!.first)
+            runtimeRefs.declareClass(position, currentSymbolTable.findClass(it)!!.first)
         }
         refs.typeAlias.forEach {
 //            runtimeRefs.declareTypeAlias(it, currentSymbolTable.findTypeAlias(it)!!.first.toTypeNode(), currentSymbolTable)
             val resolution = currentSymbolTable.findTypeAliasResolution(it)!!.toTypeNode()
-            runtimeRefs.declareTypeAlias(it, currentSymbolTable.findTypeAlias(it)!!.first.toTypeNode(), currentSymbolTable)
-            runtimeRefs.declareTypeAliasResolution(it, resolution, currentSymbolTable)
+            runtimeRefs.declareTypeAlias(position, it, currentSymbolTable.findTypeAlias(it)!!.first.toTypeNode(), currentSymbolTable)
+            runtimeRefs.declareTypeAliasResolution(position, it, resolution, currentSymbolTable)
         }
 
 //        fun processTypeParameter(dataType: DataType) {

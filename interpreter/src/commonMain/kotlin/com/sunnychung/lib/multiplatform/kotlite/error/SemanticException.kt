@@ -1,3 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.error
 
-open class SemanticException(message: String) : Exception(message)
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
+
+open class SemanticException(position: SourcePosition, message: String)
+    : Exception("$message at [${position.filename}:${position.lineNum}:${position.col}]")

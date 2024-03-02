@@ -33,9 +33,9 @@ open class SymbolTable(
     private val typeAlias = mutableMapOf<String, DataType>()
     private val typeAliasResolution = mutableMapOf<String, DataType>()
 
-    fun declareProperty(name: String, type: TypeNode, isMutable: Boolean) {
+    fun declareProperty(position: SourcePosition, name: String, type: TypeNode, isMutable: Boolean) {
         if (hasProperty(name = name, true)) {
-            throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Property)
+            throw DuplicateIdentifierException(position = position, name = name, classifier = IdentifierClassifier.Property)
         }
         propertyDeclarations[name] = typeNodeToPropertyType(type = type, isMutable = isMutable)
             ?: throw RuntimeException("Unknown type ${type.name}")
@@ -45,32 +45,32 @@ open class SymbolTable(
         return typeAlias[name]?.let { it to this } ?: parentScope?.findTypeAlias(name)
     }
 
-    fun declareTypeAlias(name: String, typeUpperBound: TypeNode?, referenceSymbolTable: SymbolTable = this) {
+    fun declareTypeAlias(position: SourcePosition, name: String, typeUpperBound: TypeNode?, referenceSymbolTable: SymbolTable = this) {
         if (typeAlias.containsKey(name) || typeAlias.containsKey("$name?")) {
-            throw DuplicateIdentifierException(name, IdentifierClassifier.TypeAlias)
+            throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeAlias)
         }
         val typeUpperBound = typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
         typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound)!!
         typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true))!!
     }
 
-    fun declareTypeAliasResolution(name: String, type: TypeNode, referenceSymbolTable: SymbolTable = this) {
+    fun declareTypeAliasResolution(position: SourcePosition, name: String, type: TypeNode, referenceSymbolTable: SymbolTable = this) {
         if (findTypeAlias(name) == null || findTypeAlias("$name?") == null) {
             throw RuntimeException("Type alias $name not found")
         }
         if (typeAliasResolution.containsKey(name) || typeAliasResolution.containsKey("$name?")) {
-            throw DuplicateIdentifierException(name, IdentifierClassifier.TypeResolution)
+            throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeResolution)
         }
         typeAliasResolution[name] = referenceSymbolTable.assertToDataType(type)
         typeAliasResolution["$name?"] = referenceSymbolTable.assertToDataType(type.copy(isNullable = true))
     }
 
-    fun declareTypeAliasResolution(name: String, type: DataType) {
+    fun declareTypeAliasResolution(position: SourcePosition, name: String, type: DataType) {
         if (findTypeAlias(name) == null || findTypeAlias("$name?") == null) {
             throw RuntimeException("Type alias $name not found")
         }
         if (typeAliasResolution.containsKey(name) || typeAliasResolution.containsKey("$name?")) {
-            throw DuplicateIdentifierException(name, IdentifierClassifier.TypeResolution)
+            throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeResolution)
         }
         typeAliasResolution[name] = type
         typeAliasResolution["$name?"] = type.copyOf(isNullable = true)
@@ -272,10 +272,10 @@ open class SymbolTable(
         return thisScopeResult || (parentScope?.hasProperty(name) ?: false)
     }
 
-    fun declareFunction(name: String, node: FunctionDeclarationNode): String {
+    fun declareFunction(position: SourcePosition, name: String, node: FunctionDeclarationNode): String {
         val functionSignature = functionNameTransform(name = name, function = node)
         if (functionDeclarations.containsKey(functionSignature)) {
-            throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Function)
+            throw DuplicateIdentifierException(position = position, name = name, classifier = IdentifierClassifier.Function)
         }
 //        log.v(Exception()) { "Register $functionSignature at $scopeLevel" }
         functionDeclarations[functionSignature] = node
@@ -287,10 +287,10 @@ open class SymbolTable(
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findFunction(name) }
     }
 
-    fun declareExtensionFunction(name: String, node: FunctionDeclarationNode): String {
+    fun declareExtensionFunction(position: SourcePosition, name: String, node: FunctionDeclarationNode): String {
         val functionSignature = functionNameTransform(name = name, function = node)
         if (extensionFunctionDeclarations.containsKey(functionSignature)) {
-            throw DuplicateIdentifierException(name = name, classifier = IdentifierClassifier.Function)
+            throw DuplicateIdentifierException(position = position, name = name, classifier = IdentifierClassifier.Function)
         }
         extensionFunctionDeclarations[functionSignature] = node
         return functionSignature
@@ -301,9 +301,9 @@ open class SymbolTable(
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunction(transformedName) }
     }
 
-    fun declareExtensionProperty(transformedName: String, extensionProperty: ExtensionProperty) {
+    fun declareExtensionProperty(position: SourcePosition, transformedName: String, extensionProperty: ExtensionProperty) {
         if (extensionProperties.containsKey(transformedName)) {
-            throw DuplicateIdentifierException(name = transformedName, classifier = IdentifierClassifier.Property)
+            throw DuplicateIdentifierException(position = position, name = transformedName, classifier = IdentifierClassifier.Property)
         }
         if (extensionProperty.receiverType == null) {
             extensionProperty.receiverType = extensionProperty.receiver.toTypeNode("")
@@ -325,7 +325,7 @@ open class SymbolTable(
             }
         }
         if (receiverClass.findMemberPropertyTransformedName(extensionProperty.declaredName) != null) {
-            throw DuplicateIdentifierException(name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
+            throw DuplicateIdentifierException(position = position, name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
         }
         val resolvedReceiverType = extensionProperty.receiverType!!.resolveGenericParameterTypeToUpperBound(extensionTypeParameters)
         if (extensionProperties.any {
@@ -337,7 +337,7 @@ open class SymbolTable(
             } != false &&
             it.value.declaredName == extensionProperty.declaredName
         }) {
-            throw DuplicateIdentifierException(name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
+            throw DuplicateIdentifierException(position = position, name = extensionProperty.declaredName, classifier = IdentifierClassifier.Property)
         }
         extensionProperties[transformedName] = extensionProperty
     }
@@ -391,9 +391,9 @@ open class SymbolTable(
             .let { transformedName -> propertyValues[transformedName]?.read() }
     }
 
-    fun declareClass(classDefinition: ClassDefinition) {
+    fun declareClass(position: SourcePosition, classDefinition: ClassDefinition) {
         if (findClass(classDefinition.fullQualifiedName) != null) {
-            throw DuplicateIdentifierException(name = classDefinition.fullQualifiedName, classifier = IdentifierClassifier.Class)
+            throw DuplicateIdentifierException(position = position, name = classDefinition.fullQualifiedName, classifier = IdentifierClassifier.Class)
         }
         classDeclarations[classDefinition.fullQualifiedName] = classDefinition
     }
@@ -412,10 +412,10 @@ open class SymbolTable(
         return name
     }
 
-    internal fun registerTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String) {
+    internal fun registerTransformedSymbol(position: SourcePosition, identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String) {
         val key = identifierClassifier to transformedName
         if (transformedSymbols.containsKey(key)) {
-            throw DuplicateIdentifierException(transformedName, identifierClassifier)
+            throw DuplicateIdentifierException(position, transformedName, identifierClassifier)
         }
         transformedSymbols[key] = originalName
     }
@@ -452,57 +452,57 @@ open class SymbolTable(
         return typeAliasResolution
     }
 
-    fun mergeFrom(other: SymbolTable) { // this is only involved in runtime
+    fun mergeFrom(position: SourcePosition, other: SymbolTable) { // this is only involved in runtime
         log.d { "Merge from other SymbolTable" }
         other.propertyValues.forEach {
             putPropertyHolder(it.key, it.value)
         }
         other.functionDeclarations.forEach {
-            declareFunction(it.key, it.value)
+            declareFunction(position, it.key, it.value)
         }
         other.classDeclarations.forEach {
-            declareClass(it.value)
+            declareClass(position, it.value)
         }
         other.typeAlias
             .filterKeys { !it.endsWith('?') }
             .forEach {
                 // TODO handle conflicts with existing scope, e.g. generic functions
-                declareTypeAlias(it.key, it.value.toTypeNode())
+                declareTypeAlias(position, it.key, it.value.toTypeNode())
             }
         other.typeAliasResolution
             .filterKeys { !it.endsWith('?') }
             .forEach {
                 // TODO handle conflicts with existing scope, e.g. generic functions
-                declareTypeAliasResolution(it.key, it.value.toTypeNode())
+                declareTypeAliasResolution(position, it.key, it.value.toTypeNode())
             }
 //        this.transformedSymbols += other.transformedSymbols
     }
 
-    fun mergeDeclarationsFrom(other: SymbolTable, typeAliasResolution: Map<String, TypeNode>) {
+    fun mergeDeclarationsFrom(position: SourcePosition, other: SymbolTable, typeAliasResolution: Map<String, TypeNode>) {
         log.d { "Merge declarations from other SymbolTable" }
         other.typeAlias
             .filterKeys { !it.endsWith('?') }
             .forEach {
                 // TODO handle conflicts with existing scope, e.g. generic functions
-                declareTypeAlias(it.key, it.value.toTypeNode())
+                declareTypeAlias(position, it.key, it.value.toTypeNode())
                 typeAliasResolution[it.key]?.let { resolution ->
-                    declareTypeAliasResolution(it.key, resolution)
+                    declareTypeAliasResolution(position, it.key, resolution)
                 }
             }
         other.propertyDeclarations.forEach {
-            declareProperty(it.key, it.value.type.toTypeNode(), it.value.isMutable)
+            declareProperty(position, it.key, it.value.type.toTypeNode(), it.value.isMutable)
         }
         other.extensionFunctionDeclarations.forEach {
-            declareExtensionFunction(it.key, it.value)
+            declareExtensionFunction(position, it.key, it.value)
         }
         other.extensionProperties.forEach {
-            declareExtensionProperty(it.key, it.value)
+            declareExtensionProperty(position, it.key, it.value)
         }
         other.functionDeclarations.forEach {
-            declareFunction(it.key, it.value)
+            declareFunction(position, it.key, it.value)
         }
         other.classDeclarations.forEach {
-            declareClass(it.value)
+            declareClass(position, it.value)
         }
     }
 

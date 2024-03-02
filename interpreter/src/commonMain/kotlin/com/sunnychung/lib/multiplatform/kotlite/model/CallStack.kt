@@ -24,19 +24,19 @@ class CallStack {
     }
 
     internal fun provideBuiltinClass(clazz: ClassDefinition) {
-        activationRecords[0].symbolTable.declareClass(clazz)
+        activationRecords[0].symbolTable.declareClass(SourcePosition.BUILTIN, clazz)
     }
 
     internal fun provideBuiltinFunction(function: CustomFunctionDeclarationNode) {
         if (function.receiver == null) {
-            activationRecords[0].symbolTable.declareFunction(function.transformedRefName!!, function)
+            activationRecords[0].symbolTable.declareFunction(SourcePosition.BUILTIN, function.transformedRefName!!, function)
         } else {
-            activationRecords[0].symbolTable.declareExtensionFunction(function.transformedRefName!!, function)
+            activationRecords[0].symbolTable.declareExtensionFunction(SourcePosition.BUILTIN, function.transformedRefName!!, function)
         }
     }
 
     internal fun provideBuiltinExtensionProperty(property: ExtensionProperty) {
-        activationRecords[0].symbolTable.declareExtensionProperty(property.transformedName!!, property)
+        activationRecords[0].symbolTable.declareExtensionProperty(SourcePosition.BUILTIN, property.transformedName!!, property)
     }
 
     fun getStacktrace(): List<String> {
