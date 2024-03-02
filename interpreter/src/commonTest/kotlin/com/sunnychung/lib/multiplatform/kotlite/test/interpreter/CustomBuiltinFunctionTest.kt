@@ -4,6 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,7 +27,8 @@ class CustomBuiltinFunctionTest {
                     val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
                     println(s.value)
                     s
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         val interpreter = interpreter("""
@@ -51,7 +53,8 @@ class CustomBuiltinFunctionTest {
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
                 executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         val interpreter = interpreter("""
@@ -77,7 +80,8 @@ class CustomBuiltinFunctionTest {
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int", defaultValueExpression = "1")),
                 executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         val interpreter = interpreter("""
@@ -111,7 +115,8 @@ class CustomBuiltinFunctionTest {
                 ),
                 executable = { _, receiver, args, typeArgs ->
                     IntValue(((args[0] as IntValue).value + (args[1] as IntValue).value) * (args[2] as IntValue).value)
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         val interpreter = interpreter("""
@@ -147,7 +152,8 @@ class CustomBuiltinFunctionTest {
                 executable = { _, _, args, typeArgs ->
                     val s = StringValue("A|${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
                     s
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
             registerFunction(CustomFunctionDefinition(
                 receiverType = null,
@@ -161,7 +167,8 @@ class CustomBuiltinFunctionTest {
                 executable = { _, _, args, typeArgs ->
                     val s = StringValue("B|${(args[0] as StringValue).value}|${(args[1] as StringValue).value}|${(args[2] as StringValue).value}")
                     s
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         val interpreter = interpreter("""
@@ -186,7 +193,8 @@ class CustomBuiltinFunctionTest {
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
                 executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
             registerFunction(CustomFunctionDefinition(
                 receiverType = "String",
@@ -195,7 +203,8 @@ class CustomBuiltinFunctionTest {
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int"), CustomFunctionParameter("factor2", "Int")),
                 executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length * ((args[0] as IntValue).value + (args[1] as IntValue).value))
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         val interpreter = interpreter("""

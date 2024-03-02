@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
@@ -21,6 +22,7 @@ class CustomBuiltinExtensionPropertyTest {
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+        position = SourcePosition("<Test>", 1, 1),
     )
 
     @Test

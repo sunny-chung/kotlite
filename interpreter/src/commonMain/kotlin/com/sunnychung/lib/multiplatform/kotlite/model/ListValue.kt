@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.lexer.BuiltinFilename
+
 class ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable) : DelegatedValue<List<RuntimeValue>>(value, clazz, listOf(typeArgument), symbolTable) {
 
     companion object {
@@ -11,6 +13,7 @@ class ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: 
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superClassInvocation = "Collection<T>()",
             superClass = CollectionInterface.clazz,
+            position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
     }
 }

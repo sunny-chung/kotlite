@@ -2,12 +2,13 @@ package com.sunnychung.lib.multiplatform.kotlite.test.lexer
 
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
+import com.sunnychung.lib.multiplatform.kotlite.test.lexer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class LexerStringTest {
 
-    fun lexQuotedString(doubleQuotedString: String) = Lexer(doubleQuotedString).also {
+    fun lexQuotedString(doubleQuotedString: String) = lexer(doubleQuotedString).also {
         it.advanceChar()
         it.switchToMode(Lexer.Mode.QuotedString)
     }

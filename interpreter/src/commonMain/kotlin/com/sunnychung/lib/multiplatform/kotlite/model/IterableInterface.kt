@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.lexer.BuiltinFilename
+
 class IterableInterface {
 
     companion object {
@@ -9,6 +11,7 @@ class IterableInterface {
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+            position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
     }
 }

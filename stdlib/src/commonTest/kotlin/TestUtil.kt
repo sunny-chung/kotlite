@@ -6,7 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import kotlin.test.assertFailsWith
 
 fun semanticAnalyzer(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) = SemanticAnalyzer(
-    scriptNode = Parser(Lexer(code)).script(),
+    scriptNode = Parser(Lexer("<Test>", code)).script(),
     executionEnvironment = environment
 )
 

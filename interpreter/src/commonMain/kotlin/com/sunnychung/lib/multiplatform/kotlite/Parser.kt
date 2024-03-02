@@ -1652,7 +1652,7 @@ class Parser(protected val lexer: Lexer) {
         )
     }
 
-    fun dummyBlockNode() = BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block)
+    fun dummyBlockNode() = BlockNode(emptyList(), SourcePosition("", 1, 1), ScopeType.Function, FunctionBodyFormat.Block)
 
     fun Set<String>.toClassParameterModifiers(): List<Any> = this.map {
         when (it) {

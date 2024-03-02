@@ -7,6 +7,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValueHolder
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
@@ -33,7 +34,8 @@ class CustomBuiltinClassTest {
                         value = (callArguments[0] as StringValue).value,
                         symbolTable = interpreter.symbolTable()
                     )
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             )
         }
     }
@@ -45,7 +47,8 @@ class CustomBuiltinClassTest {
         primaryConstructorParameters = emptyList(),
         constructInstance = { _, _, _ ->
             throw UnsupportedOperationException()
-        }
+        },
+        position = SourcePosition("<Test>", 1, 1),
     )
 
     @Test

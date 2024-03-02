@@ -123,7 +123,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         }
 
         executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
-            Parser(Lexer(it.type)).type().also { type ->
+            Parser(Lexer("TODO", it.type)).type().also { type -> // TODO filename
                 it.typeNode = type
             }
             it.transformedName = "EP//${it.receiver}/${it.declaredName}/${++functionDefIndex}"
@@ -353,7 +353,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                         FunctionCallArgumentNode(index = index, value = it)
                     } + listOf(FunctionCallArgumentNode(index = subject.arguments.size, value = value)),
                     declaredTypeArguments = emptyList(),
-                    position = SourcePosition(1, 1) /* TODO */,
+                    position = SourcePosition("TODO", 1, 1) /* TODO */,
                     modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
                 )
                 functionCall!!.visit(modifier)
@@ -1287,7 +1287,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 function = NavigationNode(subject, ".", ClassMemberReferenceNode("get")),
                 arguments = arguments.mapIndexed { index, it -> FunctionCallArgumentNode(index = index, value = it) },
                 declaredTypeArguments = emptyList(),
-                position = SourcePosition(1, 1) /* TODO */,
+                position = SourcePosition("TODO", 1, 1) /* TODO */,
                 modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
             )
             call!!.visit(modifier)

@@ -4,6 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 
@@ -22,7 +23,8 @@ class CustomBuiltinFunctionErrorTest {
                 val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
                 println(s.value)
                 s
-            }
+            },
+            position = SourcePosition("<Test>", 1, 1),
         ))
         registerFunction(CustomFunctionDefinition(
             receiverType = "String",
@@ -31,7 +33,8 @@ class CustomBuiltinFunctionErrorTest {
             parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
             executable = { _, receiver, args, typeArgs ->
                 IntValue((receiver as StringValue).value.length)
-            }
+            },
+            position = SourcePosition("<Test>", 1, 1),
         ))
     }
 
@@ -114,7 +117,8 @@ class CustomBuiltinFunctionErrorTest {
                     val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
                     println(s.value)
                     s
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
             registerFunction(CustomFunctionDefinition(
                 receiverType = null,
@@ -129,7 +133,8 @@ class CustomBuiltinFunctionErrorTest {
                     val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
                     println(s.value)
                     s
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         assertSemanticFail("""
@@ -147,7 +152,8 @@ class CustomBuiltinFunctionErrorTest {
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
                 executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length)
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
             registerFunction(CustomFunctionDefinition(
                 receiverType = "String",
@@ -156,7 +162,8 @@ class CustomBuiltinFunctionErrorTest {
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
                 executable = { _, receiver, args, typeArgs ->
                     IntValue((receiver as StringValue).value.length)
-                }
+                },
+                position = SourcePosition("<Test>", 1, 1),
             ))
         }
         assertSemanticFail("""

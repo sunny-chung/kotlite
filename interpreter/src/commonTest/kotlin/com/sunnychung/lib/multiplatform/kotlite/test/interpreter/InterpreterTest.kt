@@ -10,7 +10,11 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-fun interpreter(code: String, isDebug: Boolean = true, executionEnvironment: ExecutionEnvironment = ExecutionEnvironment()) = Parser(Lexer(code)).let { parser ->
+fun interpreter(
+    code: String,
+    isDebug: Boolean = true,
+    executionEnvironment: ExecutionEnvironment = ExecutionEnvironment()
+) = Parser(Lexer(filename = "<Test>", code = code)).let { parser ->
     val it = parser.script()
     if (isDebug) {
         println("Tokens: ${parser.allTokens}")

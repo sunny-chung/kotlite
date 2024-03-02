@@ -306,7 +306,7 @@ open class SymbolTable(
             throw DuplicateIdentifierException(name = transformedName, classifier = IdentifierClassifier.Property)
         }
         if (extensionProperty.receiverType == null) {
-            extensionProperty.receiverType = extensionProperty.receiver.toTypeNode()
+            extensionProperty.receiverType = extensionProperty.receiver.toTypeNode("")
         }
         val receiverType = extensionProperty.receiverType!!
         val receiverClass = findClass(receiverType.name)?.first ?: throw RuntimeException("Class `${receiverType.name}` not found")

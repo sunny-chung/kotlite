@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
 class KZoneOffsetValue(value: KZoneOffset, symbolTable: SymbolTable) : DelegatedValue<KZoneOffset>(value, clazz, symbolTable = symbolTable) {
@@ -22,7 +23,8 @@ class KZoneOffsetValue(value: KZoneOffset, symbolTable: SymbolTable) : Delegated
                     hours = (callArguments[0] as IntValue).value,
                     minutes = (callArguments[1] as IntValue).value,
                 ), interpreter.symbolTable())
-            }
+            },
+            position = SourcePosition("KDateTime", 1, 1),
         )
     }
 }

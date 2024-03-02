@@ -12,7 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 fun interpreter(code: String, isDebug: Boolean = false, executionEnvironment: ExecutionEnvironment = ExecutionEnvironment()) = Parser(
-    Lexer(code)
+    Lexer("<Test>", code)
 ).let { parser ->
     val it = parser.script()
     if (isDebug) {

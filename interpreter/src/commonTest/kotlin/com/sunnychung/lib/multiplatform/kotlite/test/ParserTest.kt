@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-fun parser(code: String) = Parser(Lexer(code))
+fun parser(code: String) = Parser(Lexer(filename = "<Test>", code = code))
 
 class ParserTest {
 

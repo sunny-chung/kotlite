@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.lexer.BuiltinFilename
+
 class CallStack {
 
     private val activationRecords = mutableListOf<ActivationRecord>()
@@ -7,14 +9,14 @@ class CallStack {
     init {
         activationRecords += ActivationRecord(
             functionFullQualifiedName = ":builtin",
-            callPosition = SourcePosition(1, 1),
+            callPosition = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
             scopeType = ScopeType.Script,
             parent = null,
             scopeLevel = 0
         )
         activationRecords += ActivationRecord(
             functionFullQualifiedName = ":global",
-            callPosition = SourcePosition(1, 1),
+            callPosition = SourcePosition(BuiltinFilename.GLOBAL, 1, 1),
             scopeType = ScopeType.Script,
             parent = activationRecords.last(),
             scopeLevel = 1

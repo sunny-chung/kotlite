@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
 class KInstantValue(value: KInstant, symbolTable: SymbolTable) : DelegatedValue<KInstant>(value, clazz, symbolTable = symbolTable) {
@@ -16,7 +17,8 @@ class KInstantValue(value: KInstant, symbolTable: SymbolTable) : DelegatedValue<
             primaryConstructorParameters = listOf(CustomFunctionParameter("timestampMs", "Long")),
             constructInstance = { interpreter, callArguments, callPosition ->
                 KInstantValue(KInstant((callArguments[0] as LongValue).value), interpreter.symbolTable())
-            }
+            },
+            position = SourcePosition("KDateTime", 1, 1),
         )
     }
 }

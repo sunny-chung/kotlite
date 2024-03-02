@@ -10,12 +10,13 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isPrimitive
 
 internal class StdLibDelegationCodeGenerator(val name: String, val code: String, val outputPackage: String, val config: KotliteModuleConfig) {
-    val parser = Parser(Lexer(code))
+    val parser = Parser(Lexer(name, code))
     val extensionProperties: List<PropertyDeclarationNode>
     val functionInterfaces: List<FunctionDeclarationNode>
 
@@ -62,6 +63,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
@@ -77,24 +79,24 @@ ${config.typeAliases.toList().joinToString { "typealias ${it.first} = ${it.secon
 abstract class Abstract${name}LibModule : LibraryModule("$name") {
     override val classes = emptyList<ProvidedClassDefinition>()
 
-    override val properties = listOf<ExtensionProperty>(${extensionProperties.joinToString("") { "\n${it.generate(indent(8))},\n" }}
+    override val properties = listOf<ExtensionProperty>(${extensionProperties.joinToString("") { "\n${it.generate(SourcePosition(name, 1, 1), indent(8))},\n" }}
     )
     
-    override val functions = listOf<CustomFunctionDefinition>(${functionInterfaces.joinToString("") { "\n${it.generate(indent(8))},\n" }}
+    override val functions = listOf<CustomFunctionDefinition>(${functionInterfaces.joinToString("") { "\n${it.generate(SourcePosition(name, 1, 1), indent(8))},\n" }}
     )
 }
 """
     }
 
-    fun FunctionDeclarationNode.generate(indent: String): String {
+    fun FunctionDeclarationNode.generate(position: SourcePosition, indent: String): String {
         with (ScopedDelegationCodeGenerator(typeParameters)) {
-            return generate(indent)
+            return generate(position, indent)
         }
     }
 
-    fun PropertyDeclarationNode.generate(indent: String): String {
+    fun PropertyDeclarationNode.generate(position: SourcePosition, indent: String): String {
         with (ScopedDelegationCodeGenerator(typeParameters)) {
-            return generate(indent)
+            return generate(position, indent)
         }
     }
 }
@@ -109,7 +111,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         return type.resolveGenericParameterTypeToUpperBound(typeParameterNodes)
     }
 
-    fun FunctionDeclarationNode.generate(indent: String): String {
+    fun FunctionDeclarationNode.generate(position: SourcePosition, indent: String): String {
         return """CustomFunctionDefinition(
     receiverType = ${receiver?.let { "\"${it.descriptiveName().escape()}\"" } ?: "null"},
     functionName = "${name.escape()}",
@@ -148,7 +150,8 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             }
         })
         ${wrap("result", returnType)}
-    }
+    },
+    position = SourcePosition(filename = "${position.filename}", lineNum = ${position.lineNum}, col = ${position.col}),
 )""".prependIndent(indent)
     }
 
@@ -292,7 +295,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
         return """${indent}TypeParameter(name = "$name", typeUpperBound = ${typeUpperBound?.let { "\"${it.descriptiveName()}\"" } ?: "null"})"""
     }
 
-    fun PropertyDeclarationNode.generate(indent: String): String {
+    fun PropertyDeclarationNode.generate(position: SourcePosition, indent: String): String {
         val isReceiverNullable = receiver!!.isNullable
         val receiverQuestion = if (isReceiverNullable) "?" else ""
 

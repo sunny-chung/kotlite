@@ -9,11 +9,16 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 
 private val NON_IDENTIFIER_CHARACTERS = setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '[', ']', '<', '>', '!', '|', '&', '.', '?', '"', '\n', '\\')
 
-class Lexer(val code: String) {
+object BuiltinFilename {
+    val BUILTIN = "<Built-in>"
+    val GLOBAL = "<Global>"
+}
+
+class Lexer(val filename: String, val code: String) {
     private var pos: Int = 0
     private var lineNum = 1
     private var col = 1
-    private var locationHistory = mutableListOf(SourcePosition(1, 1)) // TODO optimize
+    private var locationHistory = mutableListOf(SourcePosition(filename, 1, 1)) // TODO optimize
     private var mode = mutableListOf(Mode.Main)
 
     fun switchToMode(mode: Mode) {
@@ -38,7 +43,7 @@ class Lexer(val code: String) {
             } else {
                 ++col
             }
-            locationHistory += SourcePosition(lineNum, col)
+            locationHistory += SourcePosition(filename, lineNum, col)
             ++pos
         }
         return if (pos < code.length) code[pos] else null
@@ -61,7 +66,7 @@ class Lexer(val code: String) {
         col = locationHistory[pos].col
     }
 
-    internal fun makeSourcePosition() = SourcePosition(lineNum = lineNum, col = col)
+    internal fun makeSourcePosition() = SourcePosition(filename = filename, lineNum = lineNum, col = col)
 
     internal fun Char.isIdentifierChar() = !isWhitespace() && this !in NON_IDENTIFIER_CHARACTERS
 

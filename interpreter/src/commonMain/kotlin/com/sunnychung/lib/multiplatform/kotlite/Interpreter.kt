@@ -722,7 +722,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun constructClassInstance(callArguments: Array<RuntimeValue>, callPosition: SourcePosition, typeArguments: Array<DataType>, clazz: ClassDefinition): ClassInstance {
         val parentInstance = clazz.superClassInvocation?.let { superClassInvocation ->
-            callStack.push("super", ScopeType.Class, SourcePosition(1, 1))
+            callStack.push("super", ScopeType.Class, SourcePosition("TODO", 1, 1)) // TODO filename
             typeArguments.forEachIndexed { index, dataType ->
                 val typeParameter = clazz.typeParameters[index]
                 symbolTable().declareTypeAlias(typeParameter.name, typeParameter.typeUpperBound)
@@ -963,7 +963,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
 
-        callStack.push(fullQualifiedName, ScopeType.Class, SourcePosition(1, 1))
+        callStack.push(fullQualifiedName, ScopeType.Class, SourcePosition("TODO", 1, 1)) // TODO filename
         try {
             typeParameters.forEach {
                 callStack.currentSymbolTable().declareTypeAlias(it.name, it.typeUpperBound)

@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 
 class ProvidedClassDefinition(
+    val position: SourcePosition,
     fullQualifiedName: String,
     typeParameters: List<TypeParameterNode>,
     isInstanceCreationAllowed: Boolean,
@@ -24,16 +25,16 @@ class ProvidedClassDefinition(
     rawMemberProperties = emptyList(),
     memberFunctions = emptyMap(),
     primaryConstructor = ClassPrimaryConstructorNode(primaryConstructorParameters.map {
-        val modifiers = with(Parser(Lexer(""))) { it.modifiers.toClassParameterModifiers() }
+        val modifiers = with(Parser(Lexer("", ""))) { it.modifiers.toClassParameterModifiers() }
         ClassParameterNode(
             isProperty = false,
             isMutable = false,
             modifiers = modifiers.filterIsInstance<PropertyModifier>().toSet(),
             parameter = FunctionValueParameterNode(
                 name = it.name,
-                declaredType = it.type.toTypeNode(),
+                declaredType = it.type.toTypeNode(position.filename),
                 defaultValue = it.defaultValueExpression?.let {
-                    Parser(Lexer(it)).expression()
+                    Parser(Lexer(position.filename, it)).expression()
                 },
                 transformedRefName = it.name,
                 modifiers = modifiers.filterIsInstance<FunctionValueParameterModifier>().toSet(),
@@ -41,7 +42,7 @@ class ProvidedClassDefinition(
         )
     }),
     superClassInvocation = superClassInvocation?.let {
-        Parser(Lexer(it)).delegationSpecifiers()
+        Parser(Lexer(position.filename, it)).delegationSpecifiers()
     },
     superClass = superClass,
 ) {
@@ -64,6 +65,7 @@ class ProvidedClassDefinition(
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = {_, _, _ -> throw UnsupportedOperationException()},
+        position = position,
     )
 
     fun copyCompanionClassDefinition() = ProvidedClassDefinition(
@@ -72,5 +74,6 @@ class ProvidedClassDefinition(
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = {_, _, _ -> throw UnsupportedOperationException()},
+        position = position,
     )
 }

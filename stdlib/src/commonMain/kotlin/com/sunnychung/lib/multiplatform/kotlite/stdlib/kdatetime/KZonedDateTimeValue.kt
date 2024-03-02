@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
 class KZonedDateTimeValue(value: KZonedDateTime, symbolTable: SymbolTable) : DelegatedValue<KZonedDateTime>(value, clazz, symbolTable = symbolTable) {
@@ -38,7 +39,8 @@ class KZonedDateTimeValue(value: KZonedDateTime, symbolTable: SymbolTable) : Del
                     ),
                     interpreter.symbolTable(),
                 )
-            }
+            },
+            position = SourcePosition("KDateTime", 1, 1),
         )
     }
 }

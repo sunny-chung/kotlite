@@ -50,6 +50,6 @@ class LambdaValue(val value: LambdaLiteralNode, private val resolvedType: Functi
     override fun convertToString() = "Lambda()"
 
     fun execute(arguments: Array<RuntimeValue?>): RuntimeValue {
-        return interpreter.evalFunctionCall(arguments, emptyArray(), SourcePosition(1, 1), value, emptyMap(), emptyList()).result
+        return interpreter.evalFunctionCall(arguments, emptyArray(), SourcePosition("TODO", 1, 1), value, emptyMap(), emptyList()).result
     }
 }

@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ListValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 
@@ -19,6 +20,7 @@ class MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType,
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superClassInvocation = "List<T>()",
             superClass = ListValue.clazz,
+            position = SourcePosition("Collections", 1, 1),
         )
     }
 }

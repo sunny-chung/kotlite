@@ -54,7 +54,7 @@ open class ClassInstance(
                             function,
                             emptyList(),
                             emptyList(),
-                            SourcePosition(1, 1)
+                            SourcePosition("TODO", 1, 1)
                         ).evalClassMemberAnyFunctionCall(this@ClassInstance, function)
                     }
                 },
@@ -65,7 +65,7 @@ open class ClassInstance(
                             function,
                             listOf(FunctionCallArgumentNode(index = 0, value = ValueNode(value))),
                             emptyList(),
-                            SourcePosition(1, 1)
+                            SourcePosition("TODO", 1, 1)
                         ).evalClassMemberAnyFunctionCall(this@ClassInstance, function)
                     }
                 }

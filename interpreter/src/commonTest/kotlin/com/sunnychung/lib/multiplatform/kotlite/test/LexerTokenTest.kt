@@ -7,7 +7,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+fun lexer(code: String) = Lexer(filename = "<Test>", code = code)
+
 class LexerTokenTest {
+
     fun assertToken(expectedType: TokenType, expectedValue: Any?, actual: Token) {
         assertEquals(expectedType, actual.type)
         assertEquals(expectedValue, actual.value)
@@ -15,7 +18,7 @@ class LexerTokenTest {
 
     @Test
     fun integersAndSpaces() {
-        val tokens = Lexer("1 + 5 * 7  - 2 ").readAllTokens()
+        val tokens = lexer("1 + 5 * 7  - 2 ").readAllTokens()
         println(tokens)
         assertTrue { tokens.size == 8 }
         assertToken(TokenType.Integer, 1, tokens[0])
@@ -30,13 +33,13 @@ class LexerTokenTest {
 
     @Test
     fun integersAndSpacesAndBrackets() {
-        val tokens = Lexer("1 + 5 * (7 + 3 )  - 2 ").readAllTokens()
+        val tokens = lexer("1 + 5 * (7 + 3 )  - 2 ").readAllTokens()
         println(tokens)
     }
 
     @Test
     fun lineComment1() {
-        val tokens = Lexer("""
+        val tokens = lexer("""
             // line comment 1
             1 + 5 * 7  - 2 
         """.trimIndent()).readAllTokens()
@@ -46,7 +49,7 @@ class LexerTokenTest {
 
     @Test
     fun lineComment2() {
-        val tokens = Lexer("""
+        val tokens = lexer("""
             // line comment 1
             1 + 5 * 7  - 2 // line comment 2
             10
@@ -57,7 +60,7 @@ class LexerTokenTest {
 
     @Test
     fun blockComment() {
-        val tokens = Lexer("""
+        val tokens = lexer("""
             1 + 5 * 7 /* block comment */ - 2 
         """.trimIndent()).readAllTokens()
         println(tokens)
@@ -66,7 +69,7 @@ class LexerTokenTest {
 
     @Test
     fun multilineBlockComment1() {
-        val tokens = Lexer("""
+        val tokens = lexer("""
             1 + 5 * 7 /* 
                 block comment
               */ - 2 
@@ -77,7 +80,7 @@ class LexerTokenTest {
 
     @Test
     fun multilineBlockComment2() {
-        val tokens = Lexer("""
+        val tokens = lexer("""
             1 + 5 * 7/* 
                 block comment
               */- 2 

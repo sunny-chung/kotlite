@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.lexer.BuiltinFilename
+
 class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB: DataType, symbolTable: SymbolTable) :
     DelegatedValue<Pair<RuntimeValue, RuntimeValue>>(value, clazz, listOf(typeA, typeB), symbolTable) {
 
@@ -23,6 +25,7 @@ class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB:
                     interpreter.symbolTable(),
                 )
             },
+            position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
 
         val properties = listOf(Property.first, Property.second)

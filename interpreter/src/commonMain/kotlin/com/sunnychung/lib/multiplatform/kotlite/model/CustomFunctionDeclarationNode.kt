@@ -4,7 +4,8 @@ import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 
-fun String.toTypeNode() = Parser(Lexer(this)).type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
+fun String.toTypeNode(filename: String) = Parser(Lexer(filename, this))
+    .type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
 
 class CustomFunctionDeclarationNode(
     private val def: CustomFunctionDefinition,
@@ -18,21 +19,21 @@ class CustomFunctionDeclarationNode(
     transformedRefName: String? = null,
 ) : FunctionDeclarationNode(
     name = name ?: def.functionName,
-    receiver = receiver ?: def.receiverType?.toTypeNode(),
-    declaredReturnType = returnType ?: def.returnType.toTypeNode(),
+    receiver = receiver ?: def.receiverType?.toTypeNode(def.position.filename),
+    declaredReturnType = returnType ?: def.returnType.toTypeNode(def.position.filename),
     typeParameters = typeParameters ?: def.typeParameters.map {
-        TypeParameterNode(it.name, it.typeUpperBound?.toTypeNode())
+        TypeParameterNode(it.name, it.typeUpperBound?.toTypeNode(def.position.filename))
     },
     valueParameters = valueParameters ?: def.parameterTypes.map {
         FunctionValueParameterNode(
             name = it.name,
-            declaredType = it.type.toTypeNode(),
-            defaultValue = it.defaultValueExpression?.let { Parser(Lexer(it)).expression() },
-            modifiers = with(Parser(Lexer(""))) { it.modifiers.toFunctionValueParameterModifiers() }
+            declaredType = it.type.toTypeNode(def.position.filename),
+            defaultValue = it.defaultValueExpression?.let { Parser(Lexer(def.position.filename, it)).expression() },
+            modifiers = with(Parser(Lexer("", ""))) { it.modifiers.toFunctionValueParameterModifiers() }
         )
     },
     declaredModifiers = modifiers ?: def.modifiers,
-    body = body ?: BlockNode(emptyList(), SourcePosition(1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode()),
+    body = body ?: BlockNode(emptyList(), SourcePosition(def.position.filename, 1, 1), ScopeType.Function, FunctionBodyFormat.Block, def.returnType.toTypeNode(def.position.filename)),
     transformedRefName = transformedRefName,
 ) {
     override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>, typeArguments: Map<String, DataType>): RuntimeValue {
