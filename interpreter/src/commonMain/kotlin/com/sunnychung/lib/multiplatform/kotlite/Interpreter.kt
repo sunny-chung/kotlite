@@ -21,6 +21,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallStack
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableType
+import com.sunnychung.lib.multiplatform.kotlite.model.CatchNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
@@ -75,6 +76,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowableValue
+import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
@@ -147,6 +149,8 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is InfixFunctionCallNode -> this.eval()
             is ElvisOpNode -> this.eval()
             is ThrowNode -> this.eval()
+            is CatchNode -> TODO()
+            is TryNode -> this.eval()
         }
     }
 
@@ -984,7 +988,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
 
-        callStack.push(fullQualifiedName, ScopeType.Class, SourcePosition("TODO", 1, 1)) // TODO filename
+        callStack.push(fullQualifiedName, ScopeType.Class, position)
         try {
             typeParameters.forEach {
                 callStack.currentSymbolTable().declareTypeAlias(position, it.name, it.typeUpperBound)
@@ -1175,8 +1179,71 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun ThrowNode.eval(): RuntimeValue {
-        val result = value.eval() as ThrowableValue
-        throw EvaluateRuntimeException(callStack.getStacktrace(position), result)
+        var initialResult = value.eval() as RuntimeValue
+        var result: RuntimeValue? = initialResult
+        while (result !is ThrowableValue && result is ClassInstance) {
+            result = result.parentInstance
+        }
+        if (result !is ThrowableValue) {
+            throw EvaluateTypeCastException(
+                currentScope = symbolTable(),
+                stacktrace = callStack.getStacktrace(position),
+                valueType = initialResult.type().descriptiveName,
+                targetType = "Throwable",
+            )
+        }
+        result = ThrowableValue(
+            currentScope = symbolTable(),
+            message = result.message,
+            cause = result.cause,
+            stacktrace = result.stacktrace,
+            thisClazz = symbolTable().findClass(initialResult.type().name)!!.first,
+        )
+        throw EvaluateRuntimeException(stacktrace = callStack.getStacktrace(position), error = result)
+    }
+
+    fun TryNode.eval(): RuntimeValue {
+        try {
+            return mainBlock.eval() as RuntimeValue
+        } catch (e: EvaluateRuntimeException) {
+            for (catch in catchBlocks) {
+                if (symbolTable().assertToDataType(catch.catchType).isAssignableFrom(e.error.type())) {
+                    return catch.eval(e.error)
+                }
+            }
+            throw e
+        } catch (e: Throwable) {
+            for (catch in catchBlocks) {
+                if (catch.catchType.name == "Throwable") {
+                    return catch.eval(e.toValue())
+                }
+            }
+            throw e
+        } finally {
+            finallyBlock?.eval()
+        }
+    }
+
+    fun Throwable.toValue(): ThrowableValue {
+        return ThrowableValue(symbolTable(), message, cause?.toValue(), emptyList(), this::class.qualifiedName)
+    }
+
+    fun CatchNode.eval(value: ThrowableValue): RuntimeValue {
+        callStack.push("<catch>", ScopeType.Catch, position)
+        return try {
+            valueTransformedRefName?.let { valueTransformedRefName ->
+                symbolTable().declareProperty(
+                    position = position,
+                    name = valueTransformedRefName,
+                    type = catchType,
+                    isMutable = false,
+                )
+                symbolTable().assign(name = valueTransformedRefName, value = value)
+            }
+            block.eval()
+        } finally {
+            callStack.pop(ScopeType.Catch)
+        }
     }
 
     fun StringNode.eval(): StringValue {

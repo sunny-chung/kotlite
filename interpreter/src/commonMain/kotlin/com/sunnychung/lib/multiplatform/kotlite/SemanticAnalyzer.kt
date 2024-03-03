@@ -18,6 +18,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableType
+import com.sunnychung.lib.multiplatform.kotlite.model.CatchNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
@@ -74,6 +75,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolReferenceSet
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
@@ -255,6 +257,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is InfixFunctionCallNode -> this.visit(modifier = modifier)
             is ElvisOpNode -> this.visit(modifier = modifier)
             is ThrowNode -> this.visit(modifier = modifier)
+            is CatchNode -> this.visit(modifier = modifier)
+            is TryNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -1647,8 +1651,48 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         this.value.visit(modifier = modifier)
         val type = this.value.type()
         if (!typeRegistry["Throwable"]!!.toDataType().isAssignableFrom(type.toDataType())) {
-            throw SemanticException(value.position, "Expression is not a throwable value")
+            throw SemanticException(value.position, "Expression type ${type.descriptiveName()} is not a throwable value")
         }
+    }
+
+    fun CatchNode.visit(modifier: Modifier = Modifier()) {
+        if (!typeRegistry["Throwable"]!!.toDataType().isAssignableFrom(catchType.toDataType())) {
+            throw SemanticException(catchType.position, "${catchType.descriptiveName()} is not a throwable value")
+        }
+
+        pushScope(
+            scopeName = "<catch>",
+            scopeType = ScopeType.ExtraWrap,
+            returnType = null,
+        )
+
+        if (valueName != "_") {
+            currentScope.declareProperty(position = position, name = valueName, type = catchType, isMutable = false)
+            currentScope.assign(
+                name = valueName,
+                value = SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(catchType, false)!!.type)
+            )
+            valueTransformedRefName = "$valueName/${currentScope.scopeLevel}"
+            currentScope.registerTransformedSymbol(
+                position = position,
+                identifierClassifier = IdentifierClassifier.Property,
+                transformedName = valueTransformedRefName!!,
+                originalName = valueName
+            )
+        }
+
+        this.block.visit(modifier = modifier)
+        type()
+
+        popScope()
+    }
+
+    fun TryNode.visit(modifier: Modifier = Modifier()) {
+        mainBlock.visit(modifier = modifier)
+        catchBlocks.forEach { it.visit(modifier = modifier) }
+        finallyBlock?.visit(modifier = modifier)
+
+        type()
     }
 
     fun analyze() = scriptNode.visit()
@@ -1700,6 +1744,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is InfixFunctionCallNode -> this.type(modifier = modifier)
             is ElvisOpNode -> this.type(modifier = modifier)
             is ThrowNode -> typeRegistry["Nothing"]!!
+            is CatchNode -> this.type(modifier = modifier)
+            is TryNode -> this.type(modifier = modifier)
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {
@@ -1880,6 +1926,22 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         } else {
             superTypeOf(type1, type2)
         }.also { type = it }
+    }
+
+    fun CatchNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        type?.let { return it }
+        type = block.type(modifier = modifier)
+        return type!!
+    }
+
+    fun TryNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        type?.let { return it }
+        var type = mainBlock.type(modifier = modifier)
+        catchBlocks.forEach {
+            type = superTypeOf(type, it.type(modifier = modifier))
+        }
+        this.type = type
+        return type
     }
 
     fun superTypeOf(vararg types: TypeNode?): TypeNode {

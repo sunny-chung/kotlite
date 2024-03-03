@@ -13,6 +13,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CatchNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
@@ -51,6 +52,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
+import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -697,6 +699,82 @@ class Parser(protected val lexer: Lexer) {
     fun functionLiteral() = lambdaLiteral()
 
     /**
+     * catchBlock:
+     *     'catch'
+     *     {NL}
+     *     '('
+     *     {annotation}
+     *     simpleIdentifier
+     *     ':'
+     *     type
+     *     [{NL} ',']
+     *     ')'
+     *     {NL}
+     *     block
+     *
+     */
+    fun catchBlock(): CatchNode {
+        val t = eat(TokenType.Identifier, "catch")
+        repeatedNL()
+        eat(TokenType.Operator, "(")
+        val valueName = userDefinedIdentifier()
+        eat(TokenType.Symbol, ":")
+        val type = type(isTryParenthesizedType = false)
+        eat(TokenType.Operator, ")")
+        repeatedNL()
+        val catchBlock = block(ScopeType.Catch)
+        return CatchNode(position = t.position, valueName = valueName, catchType = type, block = catchBlock)
+    }
+
+    /**
+     * finallyBlock:
+     *     'finally' {NL} block
+     *
+     */
+    fun finallyBlock(): BlockNode {
+        eat(TokenType.Identifier, "finally")
+        repeatedNL()
+        return block(ScopeType.Finally)
+    }
+
+    /**
+     * tryExpression:
+     *     'try' {NL} block (
+     *         ( ({NL} catchBlock {{NL} catchBlock}) [{NL} finallyBlock] )
+     *         |
+     *         ({NL} finallyBlock)
+     *     )
+     *
+     */
+    fun tryExpression(): TryNode {
+        val t = eat(TokenType.Identifier, "try")
+        repeatedNL()
+        val mainBlock = block(ScopeType.Try)
+        repeatedNL()
+        val catchNodes = mutableListOf<CatchNode>()
+        if (currentToken.`is`(TokenType.Identifier, "catch")) {
+            while (currentTokenExcludingNL().`is`(TokenType.Identifier, "catch")) {
+                repeatedNL()
+                catchNodes += catchBlock()
+            }
+        } else {
+            if (!currentToken.`is`(TokenType.Identifier, "finally")) {
+                throw ExpectTokenMismatchException("catch / finally", currentToken.position)
+            }
+        }
+        val finallyBlock = if (currentTokenExcludingNL().`is`(TokenType.Identifier, "finally")) {
+            repeatedNL()
+            finallyBlock()
+        } else null
+        return TryNode(
+            position = t.position,
+            mainBlock = mainBlock,
+            catchBlocks = catchNodes,
+            finallyBlock = finallyBlock,
+        )
+    }
+
+    /**
      * primaryExpression:
      *     parenthesizedExpression
      *     | simpleIdentifier
@@ -741,6 +819,7 @@ class Parser(protected val lexer: Lexer) {
                 when (currentToken.value) {
                     "throw", "return", "break", "continue" -> return jumpExpression()
                     "if" -> return ifExpression()
+                    "try" -> return tryExpression()
 
                     // literal
                     "true" -> { eat(TokenType.Identifier); return BooleanNode(currentToken.position, true) }

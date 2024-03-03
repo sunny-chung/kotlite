@@ -608,3 +608,34 @@ data class ThrowNode(override val position: SourcePosition, val value: ASTNode) 
         return "$self-->${value.toMermaid()}"
     }
 }
+
+data class TryNode(
+    override val position: SourcePosition,
+    val mainBlock: BlockNode,
+    val catchBlocks: List<CatchNode>,
+    val finallyBlock: BlockNode?,
+    @ModifyByAnalyzer var type: TypeNode? = null,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Try\"]"
+        return "$self--exec-->${mainBlock.toMermaid()}" +
+                catchBlocks.withIndex().joinToString { "\n$self--catch[${it.index}]-->${it.value.toMermaid()}" } +
+                (finallyBlock?.let { "\n$self--finally-->${it.toMermaid()}" } ?: "")
+    }
+}
+
+data class CatchNode(
+    override val position: SourcePosition,
+    val valueName: String,
+    val catchType: TypeNode,
+    val block: BlockNode,
+    @ModifyByAnalyzer var type: TypeNode? = null,
+) : ASTNode {
+    @ModifyByAnalyzer var valueTransformedRefName: String? = null
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Catch (val `$valueName`)\"]"
+        return "$self--type-->${catchType.toMermaid()}" +
+                "$self--exec-->${block.toMermaid()}"
+    }
+}

@@ -5,6 +5,7 @@ open class ThrowableValue(
     val message: String?,
     val cause: ThrowableValue?,
     val stacktrace: List<String>,
+    val externalExceptionClassName: String? = null,
     thisClazz: ClassDefinition? = null,
     parentInstance: ClassInstance? = null,
 ) : ClassInstance(
@@ -29,6 +30,7 @@ open class ThrowableValue(
                 val cause = callArguments[1] as? ThrowableValue
                 ThrowableValue(interpreter.symbolTable(), message, cause, interpreter.callStack.getStacktrace())
             },
+            modifiers = setOf(ClassModifier.open),
         )
 
         val properties = listOf(
@@ -49,7 +51,17 @@ open class ThrowableValue(
                 getter = { interpreter, receiver ->
                     (receiver as ThrowableValue).cause ?: NullValue
                 },
-            )
+            ),
+            ExtensionProperty(
+                declaredName = "name",
+                typeParameters = emptyList(),
+                receiver = "Throwable",
+                type = "String",
+                getter = { interpreter, receiver ->
+                    val value = receiver as ThrowableValue
+                    StringValue(value.externalExceptionClassName ?: value.fullClassName)
+                },
+            ),
         )
 
         val functions = listOf(

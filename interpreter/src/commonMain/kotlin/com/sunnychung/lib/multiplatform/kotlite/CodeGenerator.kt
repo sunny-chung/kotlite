@@ -8,6 +8,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BinaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CatchNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
@@ -38,6 +39,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringFieldIdentifierNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
@@ -102,6 +104,8 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is InfixFunctionCallNode -> this.generate()
             is ElvisOpNode -> this.generate()
             is ThrowNode -> this.generate()
+            is CatchNode -> this.generate()
+            is TryNode -> this.generate()
     }
 
     protected fun AssignmentNode.generate()
@@ -237,4 +241,13 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
 
     protected fun ThrowNode.generate() = "throw ${value.generate()}"
 
+    protected fun TryNode.generate() = "try ${
+        mainBlock.generate()
+    }${
+        catchBlocks.joinToString(prefix = " ") { it.generate() }
+    }${
+        finallyBlock?.let { " finally ${it.generate()}" }
+    }"
+
+    protected fun CatchNode.generate() = "catch ${block.generate()}"
 }
