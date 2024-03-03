@@ -1,7 +1,10 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.error.EvaluateRuntimeException
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -256,12 +259,26 @@ class ThrowableTest {
 
     @Test
     fun tryCatchExternalException() {
+        class MyExternalException : Exception()
+
+        val env = ExecutionEnvironment().apply {
+            registerFunction(CustomFunctionDefinition(
+                receiverType = null,
+                functionName = "throwAnExternalException",
+                returnType = "Nothing",
+                parameterTypes = emptyList(),
+                executable = { _, _, _, _ ->
+                    throw MyExternalException()
+                },
+                position = SourcePosition("<Test>", 1, 1),
+            ))
+        }
         val interpreter = interpreter("""
             var x = 1
             var z = 1
             var s = ""
             fun f(a: Int?) {
-                val y: Int = (a ?: 1) / 0
+                val y: Int = a ?: throwAnExternalException()
                 x += y
             }
             ++x
@@ -272,14 +289,14 @@ class ThrowableTest {
                 s += e.name
             }
             ++x
-        """.trimIndent())
+        """.trimIndent(), executionEnvironment = env)
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
         assertEquals(3, symbolTable.propertyValues.size)
         assertEquals(3, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("z") as IntValue).value)
-        assertTrue { (symbolTable.findPropertyByDeclaredName("s") as StringValue).value.contains("ArithmeticException") }
+        assertTrue { (symbolTable.findPropertyByDeclaredName("s") as StringValue).value.contains("MyExternalException") }
     }
 
     @Test

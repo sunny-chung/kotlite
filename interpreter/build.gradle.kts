@@ -78,7 +78,15 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-        val jvmMain by getting
+        val nonJsMain by creating {
+            dependsOn(commonMain)
+        }
+        val nonJsTest by creating {
+            dependsOn(commonTest)
+        }
+        val jvmMain by getting {
+            dependsOn(nonJsMain)
+        }
         val jvmTest by getting
         val jsMain by getting
         val jsTest by getting
@@ -86,10 +94,13 @@ kotlin {
 //        val nativeTest by getting
 
         val darwinMain by creating {
-            dependsOn(commonMain)
+            // bug: Compilation failed: IrPropertyPublicSymbolImpl ...
+//            dependsOn(commonMain)
+            dependsOn(nonJsMain)
         }
         val darwinTest by creating {
-            dependsOn(commonTest)
+//            dependsOn(commonTest)
+            dependsOn(nonJsTest)
         }
         val iosMain by creating {
             dependsOn(darwinMain)
