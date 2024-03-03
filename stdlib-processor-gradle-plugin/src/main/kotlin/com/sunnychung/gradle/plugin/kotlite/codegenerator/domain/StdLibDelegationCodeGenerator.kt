@@ -104,7 +104,7 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
 internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: List<TypeParameterNode>) {
 
     val typeParameters = typeParameterNodes.associate {
-        it.name to (it.typeUpperBound ?: TypeNode("Any", null, true))
+        it.name to (it.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true))
     }
 
     fun resolve(type: TypeNode): TypeNode {
@@ -256,15 +256,16 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         fun replace(type: TypeNode): TypeNode {
             // TODO don't hardcode
             if (type.name == "Any") {
-                return TypeNode("RuntimeValue", null, false)
+                return TypeNode(SourcePosition.NONE, "RuntimeValue", null, false)
             } else if (type.name in typeParameters.keys) {
                 return replace(typeParameters[type.name]!!)
             }
             return TypeNode(
-                type.name,
-                type.arguments?.map { replace(it) },
-                type.isNullable,
-                type.transformedRefName,
+                position = SourcePosition.NONE,
+                name = type.name,
+                arguments = type.arguments?.map { replace(it) },
+                isNullable = type.isNullable,
+                transformedRefName = type.transformedRefName,
             )
         }
         return replace(type).descriptiveName()
