@@ -27,6 +27,7 @@ class ExecutionEnvironment(
         ThrowableValue.functions.forEach {
             registerFunction(it)
         }
+        registerClass(ExceptionValue.clazz)
         registerClass(NullPointerExceptionValue.clazz)
         registerClass(TypeCastExceptionValue.clazz)
     }

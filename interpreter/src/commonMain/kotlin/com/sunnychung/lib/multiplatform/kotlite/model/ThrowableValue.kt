@@ -1,5 +1,9 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+/**
+ * The difference between Exception and Throwable is that, Throwable includes exceptions thrown outside the interpreter
+ * scope.
+ */
 open class ThrowableValue(
     currentScope: SymbolTable,
     val message: String?,
@@ -79,12 +83,53 @@ open class ThrowableValue(
     }
 }
 
+/**
+ * The difference between Exception and Throwable is that, Throwable includes exceptions thrown outside the interpreter
+ * scope.
+ */
+open class ExceptionValue(
+    currentScope: SymbolTable,
+    message: String?,
+    cause: ThrowableValue? = null,
+    stacktrace: List<String>,
+    thisClazz: ClassDefinition? = null,
+    parentInstance: ClassInstance? = null,
+) : ThrowableValue(
+    currentScope = currentScope,
+    message = message,
+    cause = cause,
+    stacktrace = stacktrace,
+    thisClazz = thisClazz ?: clazz,
+    parentInstance = null,
+) {
+    companion object {
+        val clazz = ProvidedClassDefinition(
+            position = SourcePosition.BUILTIN,
+            fullQualifiedName = "Exception",
+            typeParameters = emptyList(),
+            isInstanceCreationAllowed = true,
+            primaryConstructorParameters = listOf(
+                CustomFunctionParameter("message", "String?", "null"),
+                CustomFunctionParameter("cause", "Throwable?", "null"),
+            ),
+            constructInstance = { interpreter, callArguments, callPosition ->
+                val message = (callArguments[0] as? StringValue)?.value
+                val cause = callArguments[1] as? ThrowableValue
+                ExceptionValue(interpreter.symbolTable(), message, cause, interpreter.callStack.getStacktrace())
+            },
+            superClassInvocation = "Throwable(message, cause)",
+            superClass = ThrowableValue.clazz,
+            modifiers = setOf(ClassModifier.open),
+        )
+    }
+}
+
 class NullPointerExceptionValue(
     currentScope: SymbolTable,
     message: String? = "null",
     cause: ThrowableValue? = null,
     stacktrace: List<String>,
-) : ThrowableValue(
+) : ExceptionValue(
     currentScope = currentScope,
     message = message,
     cause = cause,
@@ -107,8 +152,8 @@ class NullPointerExceptionValue(
                 val cause = callArguments[1] as? ThrowableValue
                 NullPointerExceptionValue(interpreter.symbolTable(), message, cause, interpreter.callStack.getStacktrace())
             },
-            superClassInvocation = "Throwable(message, cause)",
-            superClass = ThrowableValue.clazz,
+            superClassInvocation = "Exception(message, cause)",
+            superClass = ExceptionValue.clazz,
         )
     }
 }
@@ -118,7 +163,7 @@ class TypeCastExceptionValue(
     val valueType: String,
     val targetType: String,
     stacktrace: List<String>,
-) : ThrowableValue(
+) : ExceptionValue(
     currentScope = currentScope,
     message = "`$valueType` cannot be casted to type `$targetType`",
     cause = null,
@@ -141,8 +186,8 @@ class TypeCastExceptionValue(
                 val targetType = (callArguments[1] as StringValue).value
                 TypeCastExceptionValue(interpreter.symbolTable(), valueType, targetType, interpreter.callStack.getStacktrace())
             },
-            superClassInvocation = "Throwable()",
-            superClass = ThrowableValue.clazz,
+            superClassInvocation = "Exception()",
+            superClass = ExceptionValue.clazz,
         )
     }
 }

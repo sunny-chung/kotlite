@@ -302,7 +302,7 @@ class ThrowableTest {
     @Test
     fun tryCatchMultipleExceptions() {
         val interpreter = interpreter("""
-            class UnexpectedException : Throwable("some error")
+            class UnexpectedException : Exception("some error")
             var x = 1
             var z = 1
             var s = ""
@@ -319,7 +319,7 @@ class ThrowableTest {
             } catch (e: UnexpectedException) {
                 z += 11
                 s += e.name
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
                 z += 13
                 s += e.name
             }
@@ -337,7 +337,7 @@ class ThrowableTest {
     @Test
     fun tryPreemptiveCatchMultipleExceptions() {
         val interpreter = interpreter("""
-            class UnexpectedException : Throwable("some error")
+            class UnexpectedException : Exception("some error")
             var x = 1
             var z = 1
             var s = ""
@@ -351,7 +351,7 @@ class ThrowableTest {
             } catch (e: NullPointerException) {
                 z += 6
                 s += e.name
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
                 z += 13
                 s += e.name
             } catch (e: UnexpectedException) {
@@ -375,7 +375,7 @@ class ThrowableTest {
             var x = 1
             ++x
             try {
-                throw Throwable("some error")
+                throw Exception("some error")
             } finally {
                 x += 10
             }
@@ -400,8 +400,8 @@ class ThrowableTest {
             var x = 1
             ++x
             try {
-                throw Throwable("some error")
-            } catch (e: Throwable) {
+                throw Exception("some error")
+            } catch (e: Exception) {
                 x += 7
             } finally {
                 x += 10
@@ -422,8 +422,8 @@ class ThrowableTest {
             var x = 1
             ++x
             try {
-                throw Throwable("some error")
-            } catch (e: Throwable) {
+                throw Exception("some error")
+            } catch (e: Exception) {
                 x += 7
                 throw e
             } finally {
@@ -481,7 +481,7 @@ class ThrowableTest {
     fun tryCatchExpression2() {
         val interpreter = interpreter("""
             val x: Int = try {
-                throw Throwable()
+                throw Exception()
                 12
             } catch (_: Throwable) {
                 19

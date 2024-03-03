@@ -243,7 +243,7 @@ class WhenTest {
             class C : A()
             class D : B()
             class Other
-            class MyException : Throwable("error")
+            class MyException : Exception("error")
             fun f(x: Int) = when (x) {
                 1, 2, 4 -> throw MyException()
                 5 -> D()
