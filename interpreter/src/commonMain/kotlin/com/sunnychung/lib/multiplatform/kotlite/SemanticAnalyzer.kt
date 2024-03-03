@@ -1181,6 +1181,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             if (s.scopeType == ScopeType.Script || s.parentScope == null) {
                 throw SemanticException(position, "`return` statement should be within a function")
             }
+            if (s.scopeType == ScopeType.Closure) {
+                throw SemanticException(position, "Direct `return` statement cannot live inside a lambda")
+            }
             s = s.parentScope!!
         }
         // TODO block return in lambda
