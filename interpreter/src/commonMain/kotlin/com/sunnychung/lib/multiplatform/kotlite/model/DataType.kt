@@ -86,7 +86,11 @@ data class NothingType(override val isNullable: Boolean) : DataType {
     override fun copyOf(isNullable: Boolean) = this
 
     override fun isAssignableFrom(other: DataType): Boolean {
-        return isNullable && super.isAssignableFrom(other)
+        return if (isNullable) {
+            super.isAssignableFrom(other)
+        } else {
+            other is NothingType && !other.isNullable
+        }
     }
 }
 data class AnyType(override val isNullable: Boolean = false) : DataType {

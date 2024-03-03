@@ -5,7 +5,7 @@ enum class ScopeType {
     FunctionBlock, FunctionParameters,
     ExtraWrap,
     Try, Catch, Finally,
-    If, For, While, DoWhile;
+    If, For, While, DoWhile, WhenOuter, WhenBody;
 
     companion object {
 //        fun isLoop(type: ScopeType) = type in setOf(For, While, DoWhile)

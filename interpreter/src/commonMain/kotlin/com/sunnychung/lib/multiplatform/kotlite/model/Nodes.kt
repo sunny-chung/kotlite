@@ -639,3 +639,64 @@ data class CatchNode(
                 "$self--exec-->${block.toMermaid()}"
     }
 }
+
+data class WhenSubjectNode(
+    override val position: SourcePosition,
+    val valueName: String?,
+    val declaredType: TypeNode?,
+    val value: ASTNode,
+    @ModifyByAnalyzer var valueTransformedRefName: String? = null,
+    @ModifyByAnalyzer var type: TypeNode? = null,
+) : ASTNode {
+    fun hasValueDeclaration(): Boolean = valueName != null
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"When subject${valueName?.let { " (val `$valueName`)" } ?: ""}\"]"
+        return "$self--expr-->${value.toMermaid()}" +
+                (declaredType?.let { "\n$self--type-->${it.toMermaid()}" } ?: "")
+    }
+}
+
+data class WhenConditionNode(
+    override val position: SourcePosition,
+    val testType: TestType,
+    val expression: ASTNode,
+    @ModifyByAnalyzer var type: TypeNode? = null,
+) : ASTNode {
+    enum class TestType {
+        RangeTest, TypeTest, Regular
+    }
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"When condition; type = $testType\"]"
+        return "$self--expr-->${expression.toMermaid()}"
+    }
+}
+
+data class WhenEntryNode(
+    override val position: SourcePosition,
+    val conditions: List<WhenConditionNode>,
+    val body: BlockNode,
+    @ModifyByAnalyzer var bodyType: TypeNode? = null,
+) : ASTNode {
+    fun isElseCondition(): Boolean = conditions.isEmpty()
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"When entry\"]"
+        return "$self--expr-->${body.toMermaid()}" +
+            conditions.joinToString { "\n$self-->${it.toMermaid()}" }
+    }
+}
+
+data class WhenNode(
+    override val position: SourcePosition,
+    val subject: WhenSubjectNode?,
+    val entries: List<WhenEntryNode>,
+    @ModifyByAnalyzer var type: TypeNode? = null,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"When\"]"
+        return entries.withIndex().joinToString("\n") { "$self--entry[${it.index}]-->${it.value.toMermaid()}" } +
+            (subject?.let { "\n$self--subject-->${it.toMermaid()}" } ?: "")
+    }
+}

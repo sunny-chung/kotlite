@@ -8,6 +8,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalBreakExc
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalContinueException
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnException
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
+import com.sunnychung.lib.multiplatform.kotlite.extension.fullClassName
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
@@ -85,6 +86,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
@@ -151,6 +156,10 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is ThrowNode -> this.eval()
             is CatchNode -> TODO()
             is TryNode -> this.eval()
+            is WhenConditionNode -> TODO()
+            is WhenEntryNode -> TODO()
+            is WhenNode -> this.eval()
+            is WhenSubjectNode -> TODO()
         }
     }
 
@@ -1225,7 +1234,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
     }
 
     fun Throwable.toValue(): ThrowableValue {
-        return ThrowableValue(symbolTable(), message, cause?.toValue(), emptyList(), this::class.qualifiedName)
+        return ThrowableValue(symbolTable(), message, cause?.toValue(), emptyList(), this.fullClassName)
     }
 
     fun CatchNode.eval(value: ThrowableValue): RuntimeValue {
@@ -1243,6 +1252,44 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             block.eval()
         } finally {
             callStack.pop(ScopeType.Catch)
+        }
+    }
+
+    fun WhenNode.eval(): RuntimeValue {
+        callStack.push("<when>", ScopeType.WhenOuter, position)
+        try {
+            val subjectValue = subject?.value?.eval() as? RuntimeValue ?: UnitValue
+            if (subject?.hasValueDeclaration() == true) {
+                subject.valueTransformedRefName?.let { valueTransformedRefName ->
+                    symbolTable().declareProperty(
+                        position = position,
+                        name = valueTransformedRefName,
+                        type = subject.type!!,
+                        isMutable = false,
+                    )
+                    symbolTable().assign(name = valueTransformedRefName, value = subjectValue)
+                }
+            }
+            entries.forEach { entry ->
+                if (entry.conditions.isEmpty() || entry.conditions.any {
+                        if (it.testType == WhenConditionNode.TestType.TypeTest) {
+                            val type = symbolTable().assertToDataType(it.expression as TypeNode)
+                            return@any type.isAssignableFrom(subjectValue.type())
+                        }
+                        val evalExprResult = it.expression.eval()
+                        if (subject == null) {
+                            return@any (evalExprResult as BooleanValue).value
+                        } else {
+                            return@any evalExprResult == subjectValue
+                        }
+                    }
+                ) {
+                    return entry.body.eval()
+                }
+            }
+            throw RuntimeException("No match for `when` expression at $position")
+        } finally {
+            callStack.pop(ScopeType.WhenOuter)
         }
     }
 

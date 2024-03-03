@@ -83,6 +83,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
@@ -259,6 +263,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is ThrowNode -> this.visit(modifier = modifier)
             is CatchNode -> this.visit(modifier = modifier)
             is TryNode -> this.visit(modifier = modifier)
+            is WhenConditionNode -> this.visit(modifier = modifier)
+            is WhenEntryNode -> this.visit(modifier = modifier)
+            is WhenNode -> this.visit(modifier = modifier)
+            is WhenSubjectNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -1695,6 +1703,89 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         type()
     }
 
+    fun WhenSubjectNode.visit(modifier: Modifier = Modifier()) {
+        value.visit(modifier = modifier)
+        val valueType = value.type()
+        if (declaredType != null && !declaredType.toDataType().isAssignableFrom(valueType.toDataType())) {
+            throw TypeMismatchException(declaredType.position, declaredType.descriptiveName(), valueType.descriptiveName())
+        }
+        type = declaredType ?: valueType
+
+        if (hasValueDeclaration()) {
+            currentScope.declareProperty(position = position, name = valueName!!, type = type!!, isMutable = false)
+            currentScope.assign(
+                name = valueName,
+                value = SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type!!, false)!!.type)
+            )
+            valueTransformedRefName = "$valueName/${currentScope.scopeLevel}"
+            currentScope.registerTransformedSymbol(
+                position = position,
+                identifierClassifier = IdentifierClassifier.Property,
+                transformedName = valueTransformedRefName!!,
+                originalName = valueName
+            )
+        }
+    }
+
+    fun WhenConditionNode.visit(modifier: Modifier = Modifier(), isWithoutSubject: Boolean) {
+        expression.visit(modifier = modifier)
+        val expressionType = expression.type()
+
+        if (isWithoutSubject) {
+            if (testType != WhenConditionNode.TestType.Regular) {
+                throw SemanticException(expression.position, "Only boolean expression is allowed in a `when` expression without subject")
+            }
+            if (!typeRegistry["Boolean"]!!.toDataType().isAssignableFrom(expressionType.toDataType())) {
+                throw SemanticException(expression.position, "Only boolean expression is allowed in a `when` expression without subject")
+            }
+        }
+
+        if (testType == WhenConditionNode.TestType.TypeTest && expression !is TypeNode) {
+            throw SemanticException(expression.position, "`is` must be followed by a type")
+        }
+
+        type = expressionType
+    }
+
+    fun WhenEntryNode.visit(modifier: Modifier = Modifier(), isWithoutSubject: Boolean) {
+        if (isWithoutSubject && conditions.size > 1) {
+            throw SemanticException(position, "Use '||' instead of commas in when-condition for 'when' without argument")
+        }
+        conditions.forEach { it.visit(modifier = modifier, isWithoutSubject = isWithoutSubject) }
+
+        body.visit(modifier = modifier)
+        bodyType = body.type()
+    }
+
+    fun WhenNode.visit(modifier: Modifier = Modifier()) {
+        pushScope(
+            scopeName = "<when>",
+            scopeType = ScopeType.WhenOuter,
+            returnType = null,
+        )
+
+        subject?.visit(modifier = modifier)
+
+        val numOfElse = entries.count { it.isElseCondition() }
+        if (numOfElse < 1) {
+            throw SemanticException(position, "Currently, `when` expression must be used with an `else` branch")
+        }
+        if (numOfElse > 1) {
+            throw SemanticException(position, "`when` expression can only contain one `else` branch")
+        }
+        val elseIndex = entries.indexOfFirst { it.isElseCondition() }
+        if (elseIndex != entries.lastIndex) {
+            throw SemanticException(entries[elseIndex].position, "`else` branch must be the last branch of a `when` expression")
+        }
+
+        entries.forEach { it.visit(modifier = modifier, isWithoutSubject = subject == null) }
+
+        // there is at least 1 else branch, so there is at least 1 branch
+        type = superTypeOf(*entries.map { it.bodyType }.toTypedArray())
+
+        popScope()
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -1746,6 +1837,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is ThrowNode -> typeRegistry["Nothing"]!!
             is CatchNode -> this.type(modifier = modifier)
             is TryNode -> this.type(modifier = modifier)
+            is WhenConditionNode -> TODO()
+            is WhenEntryNode -> TODO()
+            is WhenNode -> type!!
+            is WhenSubjectNode -> TODO()
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {

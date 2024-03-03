@@ -7,4 +7,8 @@ data class SourcePosition(val filename: String, val lineNum: Int, val col: Int) 
         val NONE = SourcePosition("", 1, 1)
         val BUILTIN = SourcePosition(BuiltinFilename.BUILTIN, 1, 1)
     }
+
+    override fun toString(): String {
+        return "[$filename:$lineNum:$col]"
+    }
 }

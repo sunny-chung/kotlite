@@ -57,6 +57,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 val ACCEPTED_MODIFIERS = setOf(
@@ -775,6 +779,141 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * whenSubject:
+     *     '(' [{annotation} {NL} 'val' {NL} variableDeclaration {NL} '=' {NL}] expression ')'
+     *
+     */
+    fun whenSubject(): WhenSubjectNode {
+        val t = eat(TokenType.Operator, "(")
+        var valueDeclaration: Pair<String, TypeNode?>? = null
+        repeatedNL()
+        if (currentToken.`is`(TokenType.Identifier, "val")) {
+            eat(TokenType.Identifier, "val")
+            repeatedNL()
+            valueDeclaration = variableDeclaration()
+            repeatedNL()
+            eat(TokenType.Symbol, "=")
+            repeatedNL()
+        }
+        val expr = expression()
+        repeatedNL()
+        eat(TokenType.Operator, ")")
+        return WhenSubjectNode(
+            position = t.position,
+            valueName = valueDeclaration?.first,
+            declaredType = valueDeclaration?.second,
+            value = expr,
+        )
+    }
+
+    /**
+     * whenCondition:
+     *     expression
+     *     | rangeTest
+     *     | typeTest
+     */
+    fun whenCondition(): WhenConditionNode {
+        // TODO: rangeTest
+        if (currentToken.`is`(TokenType.Identifier, "is")) {
+            val t = eat(TokenType.Identifier, "is")
+            val type = type()
+            return WhenConditionNode(
+                position = t.position,
+                testType = WhenConditionNode.TestType.TypeTest,
+                expression = type,
+            )
+        } else {
+            val t = currentToken
+            val expr = expression()
+            return WhenConditionNode(
+                position = t.position,
+                testType = WhenConditionNode.TestType.Regular,
+                expression = expr,
+            )
+        }
+    }
+
+    /**
+     *
+     * whenEntry:
+     *     (whenCondition {{NL} ',' {NL} whenCondition} [{NL} ','] {NL} '->' {NL} controlStructureBody [semi])
+     *     | ('else' {NL} '->' {NL} controlStructureBody [semi])
+     *
+     */
+    fun whenEntry(): WhenEntryNode {
+        val t = currentToken
+        val conditions = if (t.`is`(TokenType.Identifier, "else")) {
+            eat(TokenType.Identifier, "else")
+            repeatedNL()
+            eat(TokenType.Symbol, "->")
+            repeatedNL()
+            emptyList()
+        } else {
+            buildList {
+                var hasComma = false
+                do {
+                    if (isNotEmpty() && !hasComma) {
+                        throw ExpectTokenMismatchException(",", currentToken.position)
+                    }
+                    add(whenCondition())
+                    repeatedNL()
+                    hasComma = false
+                    if (currentToken.`is`(TokenType.Symbol, ",")) {
+                        eat(TokenType.Symbol, ",")
+                        repeatedNL()
+                        hasComma = true
+                    }
+                } while (!isCurrentToken(TokenType.Symbol, "->"))
+                eat(TokenType.Symbol, "->")
+                repeatedNL()
+            }
+        }
+        repeatedNL()
+        val body = controlStructureBody(ScopeType.WhenBody)
+        if (isSemi()) {
+            semi()
+        }
+        return WhenEntryNode(
+            position = t.position,
+            conditions = conditions,
+            body = body,
+        )
+    }
+
+    /**
+     * whenExpression:
+     *     'when'
+     *     {NL}
+     *     [whenSubject]
+     *     {NL}
+     *     '{'
+     *     {NL}
+     *     {whenEntry {NL}}
+     *     {NL}
+     *     '}'
+     */
+    fun whenExpression(): WhenNode {
+        val t = eat(TokenType.Identifier, "when")
+        repeatedNL()
+        val subject = if (currentToken.`is`(TokenType.Operator, "(")) {
+            whenSubject().also { repeatedNL() }
+        } else null
+        eat(TokenType.Symbol, "{")
+        repeatedNL()
+        val entries = mutableListOf<WhenEntryNode>()
+        while (!isCurrentTokenExcludingNL(TokenType.Symbol, "}")) {
+            entries += whenEntry()
+            repeatedNL()
+        }
+        eat(TokenType.Symbol, "}")
+        return WhenNode(
+            position = t.position,
+            subject = subject,
+            entries = entries,
+        )
+    }
+
+    /**
      * primaryExpression:
      *     parenthesizedExpression
      *     | simpleIdentifier
@@ -819,6 +958,7 @@ class Parser(protected val lexer: Lexer) {
                 when (currentToken.value) {
                     "throw", "return", "break", "continue" -> return jumpExpression()
                     "if" -> return ifExpression()
+                    "when" -> return whenExpression()
                     "try" -> return tryExpression()
 
                     // literal

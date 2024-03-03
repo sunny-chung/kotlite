@@ -45,6 +45,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenNode
+import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Boolean) {
@@ -106,6 +110,10 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is ThrowNode -> this.generate()
             is CatchNode -> this.generate()
             is TryNode -> this.generate()
+            is WhenConditionNode -> this.generate()
+            is WhenEntryNode -> this.generate()
+            is WhenNode -> this.generate()
+            is WhenSubjectNode -> this.generate()
     }
 
     protected fun AssignmentNode.generate()
@@ -250,4 +258,58 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
     }"
 
     protected fun CatchNode.generate() = "catch ${block.generate()}"
+
+    protected fun WhenSubjectNode.generate() = buildString {
+        append("(")
+        if (hasValueDeclaration()) {
+            append("val $valueName")
+            if (declaredType != null) {
+                append(": ")
+                append(declaredType.generate())
+            }
+            if (isPrintDebugInfo) {
+                append("<$valueTransformedRefName>")
+            }
+            append(" = ")
+        }
+        append(value.generate())
+        append(")")
+    }
+
+    protected fun WhenConditionNode.generate() = buildString {
+        if (testType == WhenConditionNode.TestType.TypeTest) {
+            append("is ")
+        }
+        append(expression.generate())
+    }
+
+    protected fun WhenEntryNode.generate() = buildString {
+        if (isElseCondition()) {
+            append("else")
+        } else {
+            append(conditions.joinToString(", ") { it.generate() })
+        }
+        append(" -> ")
+        append(body.generate())
+    }
+
+    protected fun WhenNode.generate() = buildString {
+        append("when ")
+        if (subject != null) {
+            append(subject.generate())
+            append(" ")
+        }
+        append("{\n")
+        ++indentLevel
+
+        entries.forEach {
+            append(indent())
+            append(it.generate())
+            append("\n")
+        }
+
+        --indentLevel
+        append(indent())
+        append("}")
+    }
 }
