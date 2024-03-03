@@ -50,6 +50,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LabelNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongType
@@ -267,6 +268,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is WhenEntryNode -> this.visit(modifier = modifier)
             is WhenNode -> this.visit(modifier = modifier)
             is WhenSubjectNode -> this.visit(modifier = modifier)
+            is LabelNode -> TODO()
         }
     }
 
@@ -1182,13 +1184,23 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 throw SemanticException(position, "`return` statement should be within a function")
             }
             if (s.scopeType == ScopeType.Closure) {
-                throw SemanticException(position, "Direct `return` statement cannot live inside a lambda")
+                if (returnToLabel.isEmpty()) {
+                    throw SemanticException(position, "Direct `return` statement cannot live inside a lambda")
+                } else {
+                    if (s.scopeName != "$returnToLabel@") {
+                        throw SemanticException(position, "Return label `$returnToLabel` does not match the enclosing lambda label")
+                    }
+                    break
+                }
             }
             s = s.parentScope!!
         }
+        if (returnToLabel.isNotEmpty() && s.scopeType != ScopeType.Closure) {
+            throw SemanticException(position, "Return label `$returnToLabel` not found")
+        }
         // TODO block return in lambda
         // s.scopeType == ScopeType.Function
-        val declaredReturnType = s.returnType!!
+        val declaredReturnType = s.returnType
         if (declaredReturnType is FunctionType && value is LambdaLiteralNode) {
             value.parameterTypesUpperBound = declaredReturnType.arguments.map { it.toTypeNode() }
             value.returnTypeUpperBound = declaredReturnType.returnType.toTypeNode()
@@ -1196,7 +1208,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         value?.visit(modifier = modifier)
         val valueType = value?.type()?.toDataType() ?: UnitType()
-        if (!declaredReturnType.isAssignableFrom(valueType)) {
+        if (declaredReturnType != null && !declaredReturnType.isAssignableFrom(valueType)) {
             throw TypeMismatchException(position, s.returnType!!.nameWithNullable, valueType.nameWithNullable)
         }
     }
@@ -1584,7 +1596,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         symbolRecorders += SymbolReferenceSet(scopeLevel = currentScope.scopeLevel)
         pushScope(
-            scopeName = "<lambda>",
+            scopeName = label?.label?.let { "$it@" } ?: "<lambda>",
             scopeType = ScopeType.Closure,
             returnType = returnTypeUpperBound?.toDataType() //type.returnType.toDataType(),
         )
@@ -1844,6 +1856,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is WhenEntryNode -> TODO()
             is WhenNode -> type!!
             is WhenSubjectNode -> TODO()
+            is LabelNode -> TODO()
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {

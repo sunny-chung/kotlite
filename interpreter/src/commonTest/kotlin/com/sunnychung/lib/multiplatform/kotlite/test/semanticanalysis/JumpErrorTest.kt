@@ -38,4 +38,60 @@ class JumpErrorTest {
             val a = g(2)
         """.trimIndent())
     }
+
+    @Test
+    fun returnToNonExistingLabel1() {
+        assertSemanticFail("""
+            val f = def@ {
+                return@abc 123
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun returnToNonExistingLabel2() {
+        assertSemanticFail("""
+            val f = {
+                return@abc 123
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun returnToNonExistingLabel3() {
+        assertSemanticFail("""
+            fun f() = {
+                return@abc 123
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun returnToOuterScopeLabel() {
+        assertSemanticFail("""
+            fun f() = abc@ {
+                {
+                    return@abc 123
+                }()
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun returnWrongTypeInLambda() {
+        assertSemanticFail("""
+            val f: () -> Int = {
+                3.5
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun returnWrongTypeInLambdaWithReturnLabel() {
+        assertSemanticFail("""
+            val f: () -> Int = a@ {
+                return@a 3.5
+            }
+        """.trimIndent())
+    }
 }

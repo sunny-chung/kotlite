@@ -7,7 +7,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.Token
 import com.sunnychung.lib.multiplatform.kotlite.model.TokenType
 
-private val NON_IDENTIFIER_CHARACTERS = setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '[', ']', '<', '>', '!', '|', '&', '.', '?', '"', '\n', '\\')
+private val NON_IDENTIFIER_CHARACTERS = setOf('+', '-', '*', '/', '%', '(', ')', '=', ',', ':', ';', '{', '}', '[', ']', '<', '>', '!', '|', '&', '.', '?', '"', '@', '\n', '\\')
 
 object BuiltinFilename {
     val BUILTIN = "<Built-in>"
@@ -316,18 +316,21 @@ class Lexer(val filename: String, val code: String) {
                             }
                         }
 
-                        c in setOf(':', ',', '{', '}') -> return Token(
+                        c in setOf(':', ',', '{', '}', '@') -> return Token(
                             TokenType.Symbol,
                             c.toString(),
                             makeSourcePosition()
                         )
 
                         c in setOf(';') -> return Token(TokenType.Semicolon, c.toString(), makeSourcePosition())
-                        c.isIdentifierChar() -> return Token(
-                            TokenType.Identifier,
-                            readIdentifier(),
-                            makeSourcePosition()
-                        )
+                        c.isIdentifierChar() -> {
+                            val position = makeSourcePosition()
+                            return Token(
+                                TokenType.Identifier,
+                                readIdentifier(),
+                                position
+                            )
+                        }
                     }
 
                     Mode.QuotedString -> return when {

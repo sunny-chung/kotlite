@@ -216,6 +216,7 @@ interface CallableNode {
     val typeParameters: List<TypeParameterNode>
     val returnType: TypeNode
     val name: String?
+    val labelName: String?
 
     fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>, typeArguments: Map<String, DataType>): RuntimeValue
 }
@@ -238,6 +239,9 @@ open class FunctionDeclarationNode(
         get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException(position, "return type of function $name")
     val modifiers: Set<FunctionModifier>
         get() = declaredModifiers + inferredModifiers
+
+    override val labelName: String?
+        get() = null
 
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
@@ -471,12 +475,16 @@ data class LambdaLiteralNode(
     override val position: SourcePosition,
     val declaredValueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode,
+    val label: LabelNode?,
     @ModifyByAnalyzer var type: FunctionTypeNode? = null,
     @ModifyByAnalyzer var accessedRefs: SymbolReferenceSet? = null,
     @ModifyByAnalyzer var parameterTypesUpperBound: List<TypeNode>? = null,
     @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
 ) : ASTNode, CallableNode {
     @ModifyByAnalyzer var valueParameterIt: FunctionValueParameterNode? = null
+
+    override val labelName: String?
+        get() = label?.label
 
     override val typeParameters: List<TypeParameterNode> = emptyList()
     override val valueParameters: List<FunctionValueParameterNode>
@@ -698,5 +706,15 @@ data class WhenNode(
         val self = "${generateId()}[\"When\"]"
         return entries.withIndex().joinToString("\n") { "$self--entry[${it.index}]-->${it.value.toMermaid()}" } +
             (subject?.let { "\n$self--subject-->${it.toMermaid()}" } ?: "")
+    }
+}
+
+data class LabelNode(
+    override val position: SourcePosition,
+    val label: String,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Label '$label'\"]"
+        return self
     }
 }

@@ -52,6 +52,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LabelNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ListValue
@@ -160,6 +161,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is WhenEntryNode -> TODO()
             is WhenNode -> this.eval()
             is WhenSubjectNode -> TODO()
+            is LabelNode -> TODO()
         }
     }
 
@@ -696,6 +698,18 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     result
                 }
             } catch (r: NormalReturnException) {
+                if (r.returnToLabel.isEmpty()) {
+                    if (functionNode.labelName != null) {
+                        throw RuntimeException("Returning to a non-function callable")
+                    }
+                } else {
+                    if (functionNode.labelName == null) {
+                        throw RuntimeException("Returning to a non-lambda callable")
+                    } else if (functionNode.labelName != r.returnToLabel) {
+                        throw RuntimeException("Returning to a lambda with mismatching label")
+                    }
+                }
+
                 r.value
             }
 
@@ -948,7 +962,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
 
     fun ReturnNode.eval() {
         val value = (value?.eval() ?: UnitValue) as RuntimeValue
-        throw NormalReturnException(returnToAddress, value)
+        throw NormalReturnException(returnToAddress = returnToAddress, returnToLabel = returnToLabel, value = value)
     }
 
     fun BreakNode.eval() {

@@ -35,6 +35,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LabelNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
@@ -161,6 +162,36 @@ class Parser(protected val lexer: Lexer) {
         return t
     }
 
+    fun isCurrentTokenLabel(): Boolean {
+        val t = currentToken
+        return parseAndRollback {
+            try {
+                val next1 = readToken()
+                val next2 = readToken()
+
+                t.type == TokenType.Identifier && next1.`is`(
+                    TokenType.Symbol,
+                    "@"
+                ) && areTokensConsecutive(t, next1) && !areTokensConsecutive(next1, next2)
+            } catch (_: IndexOutOfBoundsException) {
+                false
+            }
+        }
+    }
+
+    fun currentTokenExcludingLabel(isResetIndex: Boolean = true): Token {
+        val originalTokenIndex = tokenIndex
+        var t: Token = currentToken
+        while (t.type == TokenType.Identifier && peekNextToken().`is`(TokenType.Symbol, "@") && areTokensConsecutive(t, peekNextToken())) {
+            readToken()
+            t = readToken()
+        }
+        if (isResetIndex) {
+            resetTokenToIndex(originalTokenIndex)
+        }
+        return t
+    }
+
     fun isCurrentTokenExcludingNL(type: TokenType, value: Any): Boolean {
         val t = currentTokenExcludingNL()
         return t.type == type && t.value == value
@@ -209,6 +240,37 @@ class Parser(protected val lexer: Lexer) {
         return eat(TokenType.Identifier).value as String // TODO validate not reserved words
     }
 
+    fun label(): LabelNode {
+        val identifier = eat(TokenType.Identifier)
+        val at = eat(TokenType.Symbol, "@")
+        if (!areTokensConsecutive(identifier, at)) {
+            throw ExpectTokenMismatchException("@", identifier.position.let {
+                it.copy(col = it.col + (identifier.value as String).length)
+            })
+        }
+        repeatedNL()
+        return LabelNode(position = identifier.position, label = identifier.value as String)
+    }
+
+    fun <T> tryParse(operation: () -> T): T? {
+        val originalIndex = tokenIndex
+        return try {
+            operation()
+        } catch (_: ParseException) {
+            resetTokenToIndex(originalIndex)
+            null
+        }
+    }
+
+    fun <T> parseAndRollback(operation: () -> T): T {
+        val originalIndex = tokenIndex
+        return try {
+            operation()
+        } finally {
+            resetTokenToIndex(originalIndex)
+        }
+    }
+
     fun parenthesizedExpression(): ASTNode {
         eat(TokenType.Operator, "(")
         val node = expression()
@@ -222,13 +284,15 @@ class Parser(protected val lexer: Lexer) {
      *     | label
      *     | (prefixUnaryOperator {NL})
      */
-    fun unaryPrefix(): UnaryOpNode? { // TODO complete
+    fun unaryPrefix(): ASTNode? { // TODO complete
         if (currentToken.type == TokenType.Operator && currentToken.value in setOf("++", "--", "-", "+", "!")) {
             val t = eat(TokenType.Operator)
             return when (t.value) {
                 "++", "--" -> UnaryOpNode(position = t.position, operator = "pre${t.value}", node = null)
                 else -> UnaryOpNode(position = t.position, operator = t.value as String, node = null)
             }
+        } else if (isCurrentTokenLabel()) {
+            return label()
         }
         return null
     }
@@ -241,16 +305,19 @@ class Parser(protected val lexer: Lexer) {
      */
     fun prefixUnaryExpression(): ASTNode {
         val nodes = mutableListOf<UnaryOpNode>()
+        var label: LabelNode? = null
         do {
             val curr = unaryPrefix()
-            if (curr != null) {
+            if (curr is UnaryOpNode) {
                 if (nodes.isNotEmpty()) {
                     nodes.last().node = curr
                 }
                 nodes += curr
+            } else if (curr is LabelNode) {
+                label = curr
             }
         } while (curr != null)
-        val expr = postfixUnaryExpression()
+        val expr = postfixUnaryExpression(label = label)
         if (nodes.isNotEmpty()) {
             nodes.last().node = expr
             return nodes.first()
@@ -263,8 +330,8 @@ class Parser(protected val lexer: Lexer) {
      * postfixUnaryExpression:
      *     primaryExpression {postfixUnarySuffix}
      */
-    fun postfixUnaryExpression(): ASTNode {
-        var result = primaryExpression() // TODO complete expression
+    fun postfixUnaryExpression(label: LabelNode? = null): ASTNode {
+        var result = primaryExpression(label) // TODO complete expression
         while (currentTokenExcludingNL().type in setOf(TokenType.Operator, TokenType.Symbol)) {
             val newResult = postfixUnarySuffix(result)
             if (newResult == result) break
@@ -366,11 +433,6 @@ class Parser(protected val lexer: Lexer) {
         val originalTokenIndex = tokenIndex
         val t = currentToken
         when (val op = t.value as? String) { // TODO complete
-            "(", "{", "<" -> try {
-                return callSuffix(subject)
-            } catch (_: ParseException) {
-                resetTokenToIndex(originalTokenIndex)
-            }
             "[" -> return indexingSuffix(subject)
             "++", "--" -> { eat(TokenType.Operator, op); return UnaryOpNode(t.position, subject, "post$op") }
             "!" -> { // this rule prevents conflict with consecutive boolean "Not" operators
@@ -381,6 +443,14 @@ class Parser(protected val lexer: Lexer) {
                     return UnaryOpNode(t.position, subject, "!!")
                 }
             }
+            "(", "{", "<" -> try {
+                return callSuffix(subject)
+            } catch (_: ParseException) {
+                resetTokenToIndex(originalTokenIndex)
+            }
+        }
+        if (isCurrentTokenLabel()) {
+            return callSuffix(subject)
         }
         when (currentTokenExcludingNL().value) {
             ".", "?." -> return navigationSuffix(subject)
@@ -401,6 +471,9 @@ class Parser(protected val lexer: Lexer) {
         if (isCurrentToken(TokenType.Operator, "(")) {
             arguments += valueArguments()
         }
+        val label = if (isCurrentTokenLabel()) {
+            label()
+        } else null
         if (isCurrentToken(TokenType.Symbol, "{")) {
             val lambda = lambdaLiteral()
             arguments += FunctionCallArgumentNode(
@@ -408,6 +481,8 @@ class Parser(protected val lexer: Lexer) {
                 index = arguments.size,
                 value = lambda
             )
+        } else if (label != null) {
+            throw ExpectTokenMismatchException("{", currentToken.position)
         }
         return FunctionCallNode(
             function = subject,
@@ -649,7 +724,7 @@ class Parser(protected val lexer: Lexer) {
      *     | (multiVariableDeclaration [{NL} ':' {NL} type])
      *
      */
-    fun lambdaLiteral(): ASTNode {
+    fun lambdaLiteral(label: LabelNode? = null): LambdaLiteralNode {
         val parameters = mutableListOf<FunctionValueParameterNode>()
 
         val position = eat(TokenType.Symbol, "{").position
@@ -690,7 +765,12 @@ class Parser(protected val lexer: Lexer) {
         repeatedNL()
         eat(TokenType.Symbol, "}")
 
-        return LambdaLiteralNode(position, parameters, BlockNode(statements, position, ScopeType.FunctionBlock, FunctionBodyFormat.Lambda))
+        return LambdaLiteralNode(
+            position = position,
+            declaredValueParameters = parameters,
+            body = BlockNode(statements, position, ScopeType.FunctionBlock, FunctionBodyFormat.Lambda),
+            label = label,
+        )
     }
 
     /**
@@ -700,7 +780,7 @@ class Parser(protected val lexer: Lexer) {
      *     | anonymousFunction
      *
      */
-    fun functionLiteral() = lambdaLiteral()
+    fun functionLiteral(label: LabelNode? = null) = lambdaLiteral(label = label)
 
     /**
      * catchBlock:
@@ -930,7 +1010,7 @@ class Parser(protected val lexer: Lexer) {
      *     | tryExpression
      *     | jumpExpression
      */
-    fun primaryExpression(): ASTNode {
+    fun primaryExpression(label: LabelNode? = null): ASTNode {
         val currentToken = currentToken
         when (currentToken.type) {
             TokenType.Operator -> {
@@ -955,6 +1035,7 @@ class Parser(protected val lexer: Lexer) {
                 return CharNode(currentToken.position, currentToken.value as Char)
             }
             TokenType.Identifier -> {
+                println("id = ${currentToken.value}")
                 when (currentToken.value) {
                     "throw", "return", "break", "continue" -> return jumpExpression()
                     "if" -> return ifExpression()
@@ -973,7 +1054,7 @@ class Parser(protected val lexer: Lexer) {
             TokenType.Symbol -> {
                 when (currentToken.value) {
                     "\"", "\"\"\"" -> return stringLiteral()
-                    "{" -> return functionLiteral()
+                    "{" -> return functionLiteral(label = label)
                 }
             }
             // TODO other token types
@@ -1197,17 +1278,24 @@ class Parser(protected val lexer: Lexer) {
      */
     fun jumpExpression(): ASTNode {
         val t = eat(TokenType.Identifier)
-        when (t.value) { // TODO support return@
+        when (t.value) {
             "throw" -> {
                 repeatedNL()
                 val expr = expression()
                 return ThrowNode(position = t.position, value = expr)
             }
             "return" -> {
+                var label = if (currentToken.`is`(TokenType.Symbol, "@")
+                    && peekNextToken().type == TokenType.Identifier
+                    && areTokensConsecutive(t, currentToken, peekNextToken())
+                ) {
+                    eat(TokenType.Symbol, "@")
+                    eat(TokenType.Identifier).value as String
+                } else ""
                 val expr = if (!isSemi()) {
                     expression()
                 } else null
-                return ReturnNode(position = t.position, value = expr, returnToLabel = "", returnToAddress = "")
+                return ReturnNode(position = t.position, value = expr, returnToLabel = label, returnToAddress = "")
             }
             "break" -> return BreakNode(t.position, "", "")
             "continue" -> return ContinueNode(t.position, "", "")
@@ -2356,4 +2444,18 @@ class Parser(protected val lexer: Lexer) {
 
 }
 
-fun Token.`is`(type: TokenType, value: Any) = this.type == type && this.value == value
+private fun Token.`is`(type: TokenType, value: Any) = this.type == type && this.value == value
+
+private fun areTokensConsecutive(vararg tokens: Token): Boolean {
+    val first = tokens.first()
+    var expectedCol = first.position.col + (first.value as String).length
+    var i = 1
+    while (i < tokens.size) {
+        if (tokens[i].position.lineNum != first.position.lineNum || tokens[i].position.col != expectedCol) {
+            return false
+        }
+        expectedCol += (tokens[i].value as String).length
+        ++i
+    }
+    return true
+}

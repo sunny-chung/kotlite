@@ -27,6 +27,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
+import com.sunnychung.lib.multiplatform.kotlite.model.LabelNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
@@ -114,6 +115,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is WhenEntryNode -> this.generate()
             is WhenNode -> this.generate()
             is WhenSubjectNode -> this.generate()
+            is LabelNode -> this.generate()
     }
 
     protected fun AssignmentNode.generate()
@@ -230,7 +232,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
 
     protected fun LambdaLiteralNode.generate()
         = debug("<p=${accessedRefs!!.properties}; f=${accessedRefs!!.functions}; c=${accessedRefs!!.classes}>") +
-            "{${valueParameters.joinToString(", ") {it.generate()}}${if (valueParameters.isNotEmpty()) " ->" else ""}\n" +
+            "${label?.generate() ?: ""}{${valueParameters.joinToString(", ") {it.generate()}}${if (valueParameters.isNotEmpty()) " ->" else ""}\n" +
             run {
                 ++indentLevel
                 val s = body.statements.joinToString("") { "${indent()}${it.generate()}\n" }
@@ -312,4 +314,6 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         append(indent())
         append("}")
     }
+
+    protected fun LabelNode.generate() = "$label@ "
 }
