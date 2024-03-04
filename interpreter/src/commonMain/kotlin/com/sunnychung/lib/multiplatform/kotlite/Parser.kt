@@ -24,6 +24,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNod
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -65,7 +66,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 val ACCEPTED_MODIFIERS = setOf(
-    "open", "override", "operator", "vararg"
+    "open", "override", "operator", "vararg", "enum"
 )
 
 /**
@@ -1035,7 +1036,6 @@ class Parser(protected val lexer: Lexer) {
                 return CharNode(currentToken.position, currentToken.value as Char)
             }
             TokenType.Identifier -> {
-                println("id = ${currentToken.value}")
                 when (currentToken.value) {
                     "throw", "return", "break", "continue" -> return jumpExpression()
                     "if" -> return ifExpression()
@@ -2187,9 +2187,62 @@ class Parser(protected val lexer: Lexer) {
     fun Set<String>.toClassModifiers() = this.map {
         when (it) {
             "open" -> ClassModifier.open
+            "enum" -> ClassModifier.enum
             else -> throw ParseException("Modifier `$it` cannot be applied to class")
         }
     }.toSet()
+
+    /**
+     * enumEntry:
+     *     [modifiers {NL}] simpleIdentifier [{NL} valueArguments] [{NL} classBody]
+     *
+     */
+    fun enumEntry(): EnumEntryNode {
+        val t = currentToken
+        val name = userDefinedIdentifier()
+        val valueArguments = if (isCurrentTokenExcludingNL(TokenType.Operator, "(")) {
+            repeatedNL()
+            valueArguments()
+        } else emptyList()
+        return EnumEntryNode(position = t.position, name = name, arguments = valueArguments)
+    }
+
+    /**
+     * enumClassBody:
+     *     '{'
+     *     {NL}
+     *     [enumEntries]
+     *     [{NL} ';' {NL} classMemberDeclarations]
+     *     {NL}
+     *     '}'
+     *
+     * enumEntries:
+     *     enumEntry {{NL} ',' {NL} enumEntry} {NL} [',']
+     *
+     * @return Pair of enum entries and class member declarations
+     */
+    fun enumClassBody(): Pair<List<EnumEntryNode>, List<ASTNode>> {
+        eat(TokenType.Symbol, "{")
+        repeatedNL()
+        val enumEntries = buildList {
+            while (!currentTokenExcludingNL().let {
+                    it.`is`(TokenType.Symbol, ";") || it.`is`(TokenType.Symbol, "}")
+                }) {
+                var hasComma = false
+                add(enumEntry())
+                repeatedNL()
+                hasComma = false
+                if (isCurrentTokenExcludingNL(TokenType.Symbol, ",")) {
+                    hasComma = true
+                    eat(TokenType.Symbol, ",")
+                    repeatedNL()
+                }
+            }
+        }
+        repeatedNL()
+        eat(TokenType.Symbol, "}")
+        return Pair(enumEntries, emptyList())
+    }
 
     /**
      * classDeclaration:
@@ -2226,10 +2279,18 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             delegationSpecifiers()
         } else null
-        val declarations = if (isCurrentTokenExcludingNL(TokenType.Symbol, "{")) {
+        var declarations: List<ASTNode> = emptyList()
+        var enumEntries: List<EnumEntryNode> = emptyList()
+        if (isCurrentTokenExcludingNL(TokenType.Symbol, "{")) {
             repeatedNL()
-            classBody()
-        } else listOf()
+            if (ClassModifier.enum in modifiers) {
+                val (enumEntries_, declarations_) = enumClassBody()
+                enumEntries = enumEntries_
+                declarations = declarations_
+            } else {
+                declarations = classBody()
+            }
+        }
         return ClassDeclarationNode(
             position = t.position,
             name = name,
@@ -2237,7 +2298,8 @@ class Parser(protected val lexer: Lexer) {
             typeParameters = typeParameters,
             primaryConstructor = primaryConstructor,
             superClassInvocation = superClassInvocation as FunctionCallNode?,
-            declarations = declarations
+            declarations = declarations,
+            enumEntries = enumEntries,
         )
     }
 

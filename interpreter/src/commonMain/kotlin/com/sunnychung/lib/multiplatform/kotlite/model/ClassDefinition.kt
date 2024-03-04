@@ -35,6 +35,8 @@ open class ClassDefinition(
     val superClass: ClassDefinition? = null
 ) {
 
+    var enumValues: Map<String, ClassInstance> = emptyMap()
+
     init {
         if (superClass != null && superClassInvocation == null) {
             throw RuntimeException("superClassInvocation must be provided if there is a supper class")

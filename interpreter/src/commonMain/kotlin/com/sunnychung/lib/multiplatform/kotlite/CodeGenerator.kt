@@ -18,6 +18,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNod
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -116,6 +117,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is WhenNode -> this.generate()
             is WhenSubjectNode -> this.generate()
             is LabelNode -> this.generate()
+            is EnumEntryNode -> this.generate()
     }
 
     protected fun AssignmentNode.generate()
@@ -143,11 +145,16 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             (typeParameters.emptyToNull()?.let { parameters -> "<${parameters.joinToString(", ") {it.generate()}}> " } ?: " ") +
             (primaryConstructor?.let { "${it.generate()} " } ?: "") +
             (superClassInvocation?.let { ": ${it.generate()} " } ?: "") +
-            "{\n" + run {
+            "{\n" + buildString {
                 ++indentLevel
-                val s = declarations.joinToString("") { "${indent()}${it.generate()}\n" }
+                if (enumEntries.isNotEmpty()) {
+                    append(indent())
+                    append(enumEntries.joinToString(", ") { it.generate() })
+                    append(";\n")
+                }
+                append(declarations.joinToString("") { "${indent()}${it.generate()}\n" })
                 --indentLevel
-                "$s${indent()}}"
+                append(indent(), "}")
             }
 
     protected fun ClassInstanceInitializerNode.generate()
@@ -316,4 +323,13 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
     }
 
     protected fun LabelNode.generate() = "$label@ "
+
+    protected fun EnumEntryNode.generate() = buildString {
+        append(name)
+        if (arguments.isNotEmpty()) {
+            append("(")
+            append(arguments.joinToString(", ") { it.generate() })
+            append(")")
+        }
+    }
 }

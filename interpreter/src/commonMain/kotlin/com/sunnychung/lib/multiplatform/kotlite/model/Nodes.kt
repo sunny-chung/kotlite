@@ -176,7 +176,7 @@ enum class FunctionValueParameterModifier {
 }
 
 enum class ClassModifier {
-    open
+    open, enum
 }
 
 enum class PropertyModifier {
@@ -407,6 +407,7 @@ data class ClassDeclarationNode(
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superClassInvocation: FunctionCallNode?,
     val declarations: List<ASTNode>,
+    val enumEntries: List<EnumEntryNode> = emptyList(),
     @ModifyByAnalyzer var fullQualifiedName: String = name,
 ) : ASTNode {
     @ModifyByAnalyzer val inferredModifiers: Set<ClassModifier> = mutableSetOf()
@@ -430,13 +431,18 @@ data class NavigationNode(
     val subject: ASTNode,
     val operator: String,
     val member: ClassMemberReferenceNode,
-    @ModifyByAnalyzer var type: TypeNode? = null,
+    @ModifyByAnalyzer var type: TypeNode? = null, // data type
+    @ModifyByAnalyzer var memberType: MemberType? = null,
     @ModifyByAnalyzer var transformedRefName: String? = null, // for extension property use
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Navigation Node\"]"
         return "$self-- subject -->${subject.toMermaid()}\n" +
                 "$self-- access -->${member.toMermaid()}\n"
+    }
+
+    enum class MemberType {
+        Direct, Extension, Enum
     }
 }
 
@@ -716,5 +722,19 @@ data class LabelNode(
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Label '$label'\"]"
         return self
+    }
+}
+
+data class EnumEntryNode(
+    override val position: SourcePosition,
+    val name: String,
+    val arguments: List<FunctionCallArgumentNode>,
+) : ASTNode {
+    @ModifyByAnalyzer var call: FunctionCallNode? = null
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Enum '$name'\"]"
+        return self + arguments.withIndex().joinToString {
+            "\n$self--arg[${it.index}]-->${it.value.toMermaid()}"
+        }
     }
 }

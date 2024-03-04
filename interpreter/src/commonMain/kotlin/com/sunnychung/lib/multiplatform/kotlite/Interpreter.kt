@@ -9,7 +9,6 @@ import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalContinue
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnException
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.fullClassName
-import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
@@ -30,6 +29,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassTypeNode
@@ -39,6 +39,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -81,7 +82,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ThrowableValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
-import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
@@ -162,6 +162,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             is WhenNode -> this.eval()
             is WhenSubjectNode -> TODO()
             is LabelNode -> TODO()
+            is EnumEntryNode -> TODO()
         }
     }
 
@@ -1011,6 +1012,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
 
+        val clazz: ClassDefinition
         callStack.push(fullQualifiedName, ScopeType.Class, position)
         try {
             typeParameters.forEach {
@@ -1051,7 +1053,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                 declarations = declarations,
                 superClassInvocation = superClassInvocation,
                 superClass = superClass,
-            ))
+            ).also { clazz = it })
             // register extension functions in global scope
             declarations
                 .filterIsInstance<FunctionDeclarationNode>()
@@ -1076,6 +1078,14 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             memberFunctions = emptyMap(),
             primaryConstructor = null
         ))
+
+        // creating enum values
+        if (ClassModifier.enum in modifiers) {
+            clazz.enumValues = enumEntries.associate {
+                val instance = it.call!!.eval() as ClassInstance
+                it.name to instance
+            }
+        }
     }
 
     fun NavigationNode.eval(): RuntimeValue {
@@ -1083,7 +1093,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             .let { resolveSuperKeyword(it) }
 //        return obj.memberPropertyValues[member.transformedRefName!!]!!
 
-        if (transformedRefName != null) {
+        if (memberType == NavigationNode.MemberType.Extension && transformedRefName != null) {
             val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!)
                 ?: throw RuntimeException("Extension property `${member.name}` on receiver `${obj.type().nameWithNullable}` could not be found")
 
@@ -1098,6 +1108,16 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             extensionProperty.getter?.let { getter ->
                 return getter(this@Interpreter, obj)
             }
+        }
+        if (memberType == NavigationNode.MemberType.Enum) {
+            val originalClassName = (obj as ClassInstance).clazz!!.fullQualifiedName.removeSuffix(".Companion")
+            val enumClazz = symbolTable().findClass(originalClassName)?.first
+                ?: throw RuntimeException("Cannot find class $originalClassName")
+            if (ClassModifier.enum !in enumClazz.modifiers) {
+                throw RuntimeException("Class `$originalClassName` is not an enum class")
+            }
+            return enumClazz.enumValues[member.name]
+                ?: throw RuntimeException("No such enum `${member.name}` in class `$originalClassName`")
         }
 
         if (obj == NullValue) throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))

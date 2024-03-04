@@ -23,6 +23,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstanceInitializerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassModifier
@@ -34,6 +35,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentInfo
@@ -269,6 +271,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is WhenNode -> this.visit(modifier = modifier)
             is WhenSubjectNode -> this.visit(modifier = modifier)
             is LabelNode -> TODO()
+            is EnumEntryNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -689,7 +692,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         evaluateAndRegisterReturnType(this)
     }
 
-    fun FunctionCallNode.visit(modifier: Modifier = Modifier()) {
+    fun FunctionCallNode.visit(modifier: Modifier = Modifier(), isSkipConstructionSecurityCheck: Boolean = false) {
         arguments.forEachIndexed { i, _ ->
             arguments.forEachIndexed { j, _ ->
                 if (i < j && arguments[i].name != null && arguments[j].name != null && arguments[i].name == arguments[j].name) {
@@ -737,7 +740,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
                 if (callableType == CallableType.Constructor) {
                     val clazz = resolution.definition as ClassDefinition
-                    if (!clazz.isInstanceCreationAllowed) {
+                    if (!isSkipConstructionSecurityCheck && !clazz.isInstanceCreationAllowed) {
                         throw SemanticException(position, "Instances of class ${clazz.fullQualifiedName} cannot be created directly via constructor")
                     }
                 }
@@ -1270,6 +1273,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     if (isCheckWriteAccess && !property.isMutable) {
                         throw SemanticException(position, "val `$memberName` cannot be reassigned")
                     }
+                    memberType = NavigationNode.MemberType.Direct
                     return
                 }
                 clazz.findMemberPropertyCustomAccessor(memberName)?.let { accessor ->
@@ -1280,7 +1284,18 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                     } else if (accessor.getter == null) {
                         throw SemanticException(position, "Getter for `$memberName` is not declared")
                     }
+                    memberType = NavigationNode.MemberType.Direct
                     return
+                }
+                if (clazz.fullQualifiedName.endsWith(".Companion") && !subjectType.isNullable) {
+                    val originalClassName = clazz.fullQualifiedName.removeSuffix(".Companion")
+                    val originalClass = currentScope.findClass(originalClassName)?.first
+                        ?: throw RuntimeException("Cannot find class $originalClassName")
+
+                    if (ClassModifier.enum in originalClass.modifiers && originalClass.enumValues.containsKey(memberName)) {
+                        memberType = NavigationNode.MemberType.Enum
+                        return
+                    }
                 }
                 val resolvedSubjectType = subjectType.toTypeNode()
 //                .let {
@@ -1298,13 +1313,18 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                             throw SemanticException(position, "Getter for `$memberName` is not declared")
                         }
                         transformedRefName = it.first
+                        memberType = NavigationNode.MemberType.Extension
                         return
                     }
             } else {
-                if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) return
-                if (currentScope.findExtensionFunctionsIncludingSuperClasses(subjectType, memberName)
-                        .isNotEmpty()
-                ) return
+                if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) {
+                    memberType = NavigationNode.MemberType.Direct
+                    return
+                }
+                if (currentScope.findExtensionFunctionsIncludingSuperClasses(subjectType, memberName).isNotEmpty()) {
+                    memberType = NavigationNode.MemberType.Extension
+                    return
+                }
             }
         }
         throw SemanticException(position, "Type `${subjectType.descriptiveName}` has no member `$memberName`")
@@ -1344,6 +1364,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         )
 
         val declarationScope = currentScope
+
+        if (ClassModifier.enum in modifiers) {
+            if (ClassModifier.open in modifiers) {
+                throw SemanticException(position, "An enum class cannot be applied with an 'open' modifier")
+            }
+            if (superClassInvocation != null) {
+                throw SemanticException(superClassInvocation.position, "Enum class cannot inherit classes")
+            }
+        }
 
         // Declare nullable class type
         declarationScope.declareClass(
@@ -1498,7 +1527,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 superClassInvocation = superClassInvocation,
                 superClass = superClass,
             )
-
             declarationScope.declareClass(position, classDefinition)
 
             // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()
@@ -1552,6 +1580,19 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 .forEach {
                     it.visit(modifier = modifier, isClassMemberFunction = true)
                 }
+
+            // enum
+            val knownEnumNames = mutableSetOf<String>()
+            enumEntries.forEach {
+                if (knownEnumNames.contains(it.name)) {
+                    throw SemanticException(it.position, "Enum entry `${it.name}` for class `${classDefinition.fullQualifiedName}` is duplicated")
+                }
+                it.visit(modifier = modifier, classDefinition.fullQualifiedName)
+                knownEnumNames += it.name
+            }
+            classDefinition.enumValues = enumEntries.associate {
+                it.name to ClassInstance(symbolTable, classDefinition.fullQualifiedName, classDefinition, emptyList())
+            }
         }
         popScope()
         popScope()
@@ -1801,6 +1842,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         popScope()
     }
 
+    fun EnumEntryNode.visit(modifier: Modifier = Modifier(), className: String = "") {
+        if (className.isEmpty()) throw RuntimeException("Missing className")
+        call = FunctionCallNode(
+            function = VariableReferenceNode(SourcePosition.NONE, className),
+            arguments = arguments,
+            declaredTypeArguments = emptyList(),
+            position = position,
+            isSuperclassConstruction = false,
+        ).also { it.visit(modifier = modifier, isSkipConstructionSecurityCheck = true) }
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -1857,6 +1909,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
             is WhenNode -> type!!
             is WhenSubjectNode -> TODO()
             is LabelNode -> TODO()
+            is EnumEntryNode -> TODO()
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {
@@ -1941,11 +1994,28 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
         val resolver = ClassMemberResolver(clazz, subjectType.arguments)
         if (lookupType == IdentifierClassifier.Property) {
+            /**
+             * As of Kotlin 1.9, resolution order is Companion Property > Enum Entry
+             */
             resolver.findMemberPropertyCustomAccessorWithType(memberName)?.let {
                 return it.second.also { type = it }
             }
             resolver.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
                 return it.second.also { type = it }
+            }
+            if (clazz.fullQualifiedName.endsWith(".Companion") && !subjectType.isNullable) {
+                val originalClassName = clazz.fullQualifiedName.removeSuffix(".Companion")
+                val originalClass = currentScope.findClass(originalClassName)?.first
+                    ?: throw RuntimeException("Cannot find class $originalClassName")
+
+                if (ClassModifier.enum in originalClass.modifiers && originalClass.enumValues.containsKey(memberName)) {
+                    return TypeNode(
+                        position = SourcePosition.NONE,
+                        name = originalClass.fullQualifiedName,
+                        arguments = null,
+                        isNullable = false,
+                    ).also { type = it }
+                }
             }
             transformedRefName?.let {
                 currentScope.findExtensionProperty(it)
