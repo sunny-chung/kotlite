@@ -315,6 +315,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                             name = this.variableName,
                             transformedRefName = this.transformedRefName
                         ),
+                        memberType = NavigationNode.MemberType.Extension,
                         transformedRefName = ownerRef!!.extensionPropertyRef
                     ).write(value)
                 } else {
@@ -414,6 +415,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                     name = variableName,
                     transformedRefName = transformedRefName
                 ),
+                memberType = NavigationNode.MemberType.Extension,
                 transformedRefName = ownerRef!!.extensionPropertyRef,
             ).eval()
         }
@@ -458,6 +460,7 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
                             ),
                             operator = ".",
                             member = ClassMemberReferenceNode(position = position, name = directName),
+                            memberType = NavigationNode.MemberType.Extension,
                             transformedRefName = this.function.ownerRef!!.extensionPropertyRef,
                         )
                     ).eval()
