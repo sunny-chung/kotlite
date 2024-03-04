@@ -35,12 +35,17 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNod
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ComparableRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ExceptionValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
+import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallResult
@@ -94,7 +99,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
-class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
+class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: ExecutionEnvironment) {
 
     internal val callStack = CallStack()
     internal val globalScope = callStack.currentSymbolTable()
@@ -1078,7 +1083,41 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             orderedInitializersAndPropertyDeclarations = emptyList(),
             declarations = emptyList(),
             rawMemberProperties = emptyList(),
-            memberFunctions = emptyMap(),
+            memberFunctions = buildList {
+                if (ClassModifier.enum in modifiers) {
+                    add(CustomFunctionDeclarationNode(
+                        CustomFunctionDefinition(
+                            position = position,
+                            receiverType = "$fullQualifiedName.Companion",
+                            functionName = "valueOf",
+                            returnType = classType.descriptiveName(),
+                            parameterTypes = listOf(CustomFunctionParameter("value", "String")),
+                            executable = { interpreter, receiver, args, typeArgs ->
+                                val value: String = (args[0] as StringValue).value
+                                clazz.enumValues[value]
+                                    ?: throwEvalRuntimeException(
+                                        position,
+                                        "Enum value '$value' not found in class $name"
+                                    )
+                            }
+                        ),
+                        transformedRefName = executionEnvironment.findGeneratedMapping(
+                            type = ExecutionEnvironment.SymbolType.Function,
+                            receiverType = "$fullQualifiedName.Companion",
+                            name = "valueOf",
+                        ).transformedName,
+                    ).also {
+                        it.valueParameters.forEach { p ->
+                            p.transformedRefName = executionEnvironment.findGeneratedMapping(
+                                type = ExecutionEnvironment.SymbolType.ValueParameter,
+                                receiverType = it.receiver!!.descriptiveName(),
+                                parentName = it.name,
+                                name = p.name,
+                            ).transformedName
+                        }
+                    })
+                }
+            }.associateBy { it.transformedRefName!! },
             primaryConstructor = null
         ))
 
@@ -1087,6 +1126,23 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             clazz.enumValues = enumEntries.associate {
                 val instance = it.call!!.eval() as ClassInstance
                 it.name to instance
+            }
+
+            ExtensionProperty(
+                declaredName = "entries",
+                receiver = "$fullQualifiedName.Companion",
+                type = "List<${classType.descriptiveName()}>",
+                getter = { interpreter, _ ->
+                    ListValue(clazz.enumValues.values.toList() as List<RuntimeValue>, interpreter.symbolTable().assertToDataType(classType), interpreter.symbolTable())
+                }
+            ).also {
+                val transformedName = executionEnvironment.findGeneratedMapping(
+                    type = ExecutionEnvironment.SymbolType.ExtensionProperty,
+                    receiverType = "$fullQualifiedName.Companion",
+                    name = "entries",
+                ).transformedName
+                it.transformedName = transformedName
+                symbolTable().declareExtensionProperty(position, transformedName, it)
             }
         }
     }
@@ -1246,6 +1302,18 @@ class Interpreter(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnv
             thisClazz = symbolTable().findClass(initialResult.type().name)!!.first,
         )
         throw EvaluateRuntimeException(stacktrace = callStack.getStacktrace(position), error = result)
+    }
+
+    fun throwEvalRuntimeException(position: SourcePosition, message: String): Nothing {
+        val stacktrace = callStack.getStacktrace(position)
+        val error = ExceptionValue(
+            currentScope = symbolTable(),
+            message = message,
+            cause = null,
+            stacktrace = stacktrace,
+            thisClazz = ExceptionValue.clazz,
+        )
+        throw EvaluateRuntimeException(stacktrace = stacktrace, error = error)
     }
 
     fun TryNode.eval(): RuntimeValue {

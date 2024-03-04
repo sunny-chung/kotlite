@@ -14,6 +14,8 @@ class ExecutionEnvironment(
     private val extensionProperties: MutableList<ExtensionProperty> = mutableListOf()
     private val providedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
 
+    private val generatedMapping: MutableMap<MappingKey, AnalyzedMapping> = mutableMapOf()
+
     init {
         registerClass(PairValue.clazz)
         PairValue.properties.forEach {
@@ -118,6 +120,18 @@ class ExecutionEnvironment(
                     }
     }
 
+    internal fun registerGeneratedMapping(type: SymbolType, receiverType: String?, parentName: String? = null, name: String, transformedName: String) {
+        val key = MappingKey(type = type, receiverType = receiverType, parentName = parentName, name = name)
+        generatedMapping[key] = AnalyzedMapping(key = key, transformedName = transformedName)
+    }
+
+    internal fun findGeneratedMapping(type: SymbolType, receiverType: String?, parentName: String? = null, name: String): AnalyzedMapping {
+        val key = MappingKey(type = type, receiverType = receiverType, name = name, parentName = parentName)
+        return generatedMapping[key]
+            ?: throw RuntimeException("$type ${receiverType?.let { "$it." }}${parentName?.let { "$it." }}$name is not analyzed")
+    }
+
+
     fun install(module: LibraryModule) {
         module.classes.forEach {
             registerClass(it)
@@ -128,5 +142,12 @@ class ExecutionEnvironment(
         module.functions.forEach {
             registerFunction(it)
         }
+    }
+
+    internal data class MappingKey(val type: SymbolType, val receiverType: String?, val parentName: String? = null, val name: String)
+    internal data class AnalyzedMapping(val key: MappingKey, val transformedName: String)
+
+    internal enum class SymbolType {
+        Function, ExtensionFunction, Property, ExtensionProperty, ValueParameter
     }
 }

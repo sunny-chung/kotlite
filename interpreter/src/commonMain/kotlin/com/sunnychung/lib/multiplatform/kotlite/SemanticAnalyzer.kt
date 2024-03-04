@@ -31,12 +31,16 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
+import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
+import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentInfo
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
@@ -96,7 +100,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
-class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: ExecutionEnvironment) {
+class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: ExecutionEnvironment) {
     val builtinSymbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
     val symbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = builtinSymbolTable)
     var currentScope = builtinSymbolTable
@@ -129,16 +133,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
 
     val supportedOperatorFunctionNames = setOf("get", "set")
 
+    fun ExtensionProperty.generateTransformedName() {
+        this.transformedName = "EP//${this.receiver}/${this.declaredName}/${++functionDefIndex}"
+    }
+
     init {
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
             builtinSymbolTable.declareClass(SourcePosition.BUILTIN, it)
         }
 
         executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
-            Parser(Lexer("TODO", it.type)).type().also { type -> // TODO filename
-                it.typeNode = type
-            }
-            it.transformedName = "EP//${it.receiver}/${it.declaredName}/${++functionDefIndex}"
+            it.generateTransformedName()
             builtinSymbolTable.declareExtensionProperty(SourcePosition.BUILTIN, it.transformedName!!, it)
         }
         val libFunctions = executionEnvironment.getBuiltinFunctions(builtinSymbolTable)
@@ -1131,6 +1136,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         evaluateAndRegisterReturnType(this)
     }
 
+    fun FunctionValueParameterNode.generateTransformedName() {
+        transformedRefName = "$name/${currentScope.scopeLevel}"
+    }
+
     fun FunctionValueParameterNode.visit(modifier: Modifier = Modifier(), functionDeclarationNode: FunctionDeclarationNode?) {
         if (defaultValue is LambdaLiteralNode && type is FunctionTypeNode) {
             defaultValue.parameterTypesUpperBound = (type as FunctionTypeNode).parameterTypes
@@ -1152,7 +1161,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
         val type = functionDeclarationNode?.resolveGenericParameterType(this) ?: type
         currentScope.declareProperty(position = position, name = name, type = type, isMutable = false)
         currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type))
-        transformedRefName = "$name/${currentScope.scopeLevel}"
+        generateTransformedName()
         currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, transformedRefName!!, name)
     }
 
@@ -1405,10 +1414,60 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, executionEnvironment: Executi
                 orderedInitializersAndPropertyDeclarations = emptyList(),
                 declarations = emptyList(),
                 rawMemberProperties = emptyList(),
-                memberFunctions = emptyMap(),
+                memberFunctions = buildList {
+                    if (ClassModifier.enum in modifiers) {
+                        add(CustomFunctionDeclarationNode(CustomFunctionDefinition(
+                            position = position,
+                            receiverType = "$fullQualifiedClassName.Companion",
+                            functionName = "valueOf",
+                            returnType = classType.descriptiveName(),
+                            parameterTypes = listOf(CustomFunctionParameter("value", "String")),
+                            executable = { interpreter, receiver, args, typeArgs ->
+                                throw NotImplementedError()
+                            }
+                        )).also {
+                            it.transformedRefName = it.toSignature(currentScope)
+                            executionEnvironment.registerGeneratedMapping(
+                                type = ExecutionEnvironment.SymbolType.Function,
+                                receiverType = it.receiver?.descriptiveName(),
+                                name = it.name,
+                                transformedName = it.transformedRefName!!,
+                            )
+
+                            it.valueParameters.forEach { p ->
+                                p.generateTransformedName()
+                                executionEnvironment.registerGeneratedMapping(
+                                    type = ExecutionEnvironment.SymbolType.ValueParameter,
+                                    receiverType = it.receiver?.descriptiveName(),
+                                    parentName = it.name,
+                                    name = p.name,
+                                    transformedName = p.transformedRefName!!,
+                                )
+                            }
+                        })
+                    }
+                }.associateBy { it.toSignature(currentScope) },
                 primaryConstructor = null,
             )
         )
+
+        if (ClassModifier.enum in modifiers) {
+            ExtensionProperty(
+                declaredName = "entries",
+                receiver = "$fullQualifiedClassName.Companion",
+                type = "List<${classType.descriptiveName()}>",
+                getter = { _, _ -> throw NotImplementedError() }
+            ).also {
+                it.generateTransformedName()
+                symbolTable.declareExtensionProperty(position, it.transformedName!!, it)
+                executionEnvironment.registerGeneratedMapping(
+                    type = ExecutionEnvironment.SymbolType.ExtensionProperty,
+                    receiverType = it.receiver,
+                    name = it.declaredName,
+                    transformedName = it.transformedName!!,
+                )
+            }
+        }
 
         pushScope(name, ScopeType.Class)
         // copy this class's type parameter to superclass scope, so that

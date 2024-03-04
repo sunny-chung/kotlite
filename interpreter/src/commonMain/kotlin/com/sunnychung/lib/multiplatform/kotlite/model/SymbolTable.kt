@@ -1,8 +1,10 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierException
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
+import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.log
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
@@ -304,6 +306,11 @@ open class SymbolTable(
     fun declareExtensionProperty(position: SourcePosition, transformedName: String, extensionProperty: ExtensionProperty) {
         if (extensionProperties.containsKey(transformedName)) {
             throw DuplicateIdentifierException(position = position, name = transformedName, classifier = IdentifierClassifier.Property)
+        }
+        if (extensionProperty.typeNode == null) {
+            Parser(Lexer(position.filename, extensionProperty.type)).type().also { type ->
+                extensionProperty.typeNode = type
+            }
         }
         if (extensionProperty.receiverType == null) {
             extensionProperty.receiverType = extensionProperty.receiver.toTypeNode("")
