@@ -1661,6 +1661,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
                     it.visit(modifier = modifier, isClassMemberFunction = true)
+
+                    // check type after type inference
+                    it.toSignature(currentScope).also { signature ->
+                        val superClassFunction = superClassFunctions?.get(signature)
+                        if (superClassFunction != null) {
+                            if (currentScope.assertToDataType(it.returnType) != currentScope.assertToDataType(superClassFunction.returnType)) {
+                                throw SemanticException(it.position, "Return type of function `${it.name}` `${it.returnType.descriptiveName()}` is not the same as the overridden one `${superClassFunction.returnType.descriptiveName()}`")
+                            }
+                        }
+                    }
                 }
 
             // enum

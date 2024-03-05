@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis
 
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFails
 
@@ -348,4 +349,76 @@ class ClassInheritanceCheckTest {
         """.trimIndent())
     }
 
+    @Test
+    fun overrideFunctionChangeReturnType() {
+        assertSemanticFail("""
+            open class A {
+                open fun f(): Int = 10
+            }
+            class B: A() {
+                override fun f(): String = "abc"
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun overrideFunctionChangeGenericReturnType() {
+        assertSemanticFail("""
+            open class A<T> {
+                open fun f(): T? = null
+            }
+            class B: A<String>() {
+                override fun f(): Any? = null
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun overrideFunctionAllowedChangeGenericReturnType() {
+        assertSemanticSuccess("""
+            open class A<T> {
+                open fun f(): T? = null
+            }
+            class B: A<Any>() {
+                override fun f(): Any? = null
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun overrideGenericFunctionChangeReturnType1() {
+        assertSemanticFail("""
+            open class A<T> {
+                open fun f(a: T, b: Int): T = a
+            }
+            class B<T>: A<T>() {
+                override fun f(a: T, b: Int): String = "abc"
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun overrideGenericFunctionChangeReturnType2() {
+        assertSemanticFail("""
+            open class A<T> {
+                open fun f(a: T, b: Int): T = a
+            }
+            class B: A<Int>() {
+                override fun f(a: Int, b: Int): String = "abc"
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    @Ignore // TODO fix this
+    fun overrideGenericFunctionAllowedChangeReturnType() {
+        assertSemanticSuccess("""
+            open class A<T> {
+                open fun f(a: T, b: Int): T = a
+            }
+            class B: A<Int>() {
+                override fun f(a: Int, b: Int): Int = 10
+            }
+        """.trimIndent())
+    }
 }
