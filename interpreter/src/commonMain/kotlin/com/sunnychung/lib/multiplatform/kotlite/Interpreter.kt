@@ -337,8 +337,14 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                     .let { resolveSuperKeyword(it) }
 
                 if (transformedRefName != null) { // extension property
-                    (symbolTable().findExtensionProperty(transformedRefName!!)?.setter
-                        ?: throw RuntimeException("Setter not found"))(this@Interpreter, subject, value)
+                    val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!) ?: throw RuntimeException("Extension property `$transformedRefName` not found")
+                    val typeArgumentsMap = extensionProperty.typeArgumentsMap(subject.type())
+                    (extensionProperty.setter ?: throw RuntimeException("Setter not found"))(
+                        this@Interpreter,
+                        subject,
+                        value,
+                        typeArgumentsMap,
+                    )
                     return
                 }
 
@@ -1146,7 +1152,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 declaredName = "entries",
                 receiver = "$fullQualifiedName.Companion",
                 type = "List<${classType.descriptiveName()}>",
-                getter = { interpreter, _ ->
+                getter = { interpreter, _, _ ->
                     ListValue(clazz.enumValues.values.toList() as List<RuntimeValue>, interpreter.symbolTable().assertToDataType(classType), interpreter.symbolTable())
                 }
             ).also {
@@ -1178,8 +1184,10 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 }
             }
 
+            val typeArgumentsMap = extensionProperty.typeArgumentsMap(obj.type())
+
             extensionProperty.getter?.let { getter ->
-                return getter(this@Interpreter, obj)
+                return getter(this@Interpreter, obj, typeArgumentsMap)
             }
         }
         if (memberType == NavigationNode.MemberType.Enum) {
@@ -1417,17 +1425,39 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         callStack.push("<for>", ScopeType.For, position)
 
         fun FunctionCallNode.enrichIterableCall(receiverType: DataType): FunctionCallNode {
-            var type: DataType? = receiverType
-            while (type != null && type.name !in setOf("Iterable", "Iterator")) {
-                type = (type as? ObjectType)?.superType
+            val functionName = (function as NavigationNode).member.name
+            val actualFunction = symbolTable().findFunctionOrExtensionFunctionIncludingSuperclassesByDeclaredName(
+                receiverType.toTypeNode(), functionName
+            ).single()
+            val functionReceiverType = actualFunction.receiver!!
+            val functionTypeParameters = actualFunction.typeParameters
+            val inferredTypeArguments: List<TypeNode>
+
+            if (functionTypeParameters.isNotEmpty()) {
+                var type: DataType? = receiverType
+                while (type != null && type.name != functionReceiverType.name) {
+                    type = (type as? ObjectType)?.superType
+                }
+                if (type == null && type !is ObjectType) {
+                    throw RuntimeException("Enrich fail -- Receiver type of `$functionName` ${functionReceiverType.descriptiveName()} is not found")
+                }
+                val functionReceiverClazzTypeParameters = (type as ObjectType).clazz.typeParameters
+                val functionReceiverClazzTypeArguments = (type as ObjectType).arguments
+                val functionReceiverClazzTypeArgumentsMap = functionReceiverClazzTypeParameters.mapIndexed { i, tp ->
+                    tp.name to functionReceiverClazzTypeArguments[i]
+                }.toMap()
+                inferredTypeArguments = functionTypeParameters.map {
+                    functionReceiverClazzTypeArgumentsMap[it.name]!!.toTypeNode()
+                }
+            } else {
+                inferredTypeArguments = emptyList()
             }
-            if (type == null) throw RuntimeException("Enrich fail -- ${receiverType.descriptiveName} is not an Iterable")
 
             return copy(
                 functionRefName = symbolTable().findFunctionOrExtensionFunctionIncludingSuperclassesByDeclaredName(
-                    receiverType.toTypeNode(), (function as NavigationNode).member.name
+                    receiverType.toTypeNode(), functionName
                 ).single().transformedRefName,
-                inferredTypeArguments = listOf((type as ObjectType).arguments.first().toTypeNode()),
+                inferredTypeArguments = inferredTypeArguments,
             )
         }
 

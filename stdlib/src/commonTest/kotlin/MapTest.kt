@@ -337,4 +337,66 @@ class MapTest {
         assertEquals(2, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(listOf("1: 102", "2: 103", "3: 101"), console.split("\n").sorted().filter { it.isNotEmpty() })
     }
+
+    @Test
+    fun forLoopMapEntry() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+        }
+        val interpreter = interpreter("""
+            var counter = 0
+            val m = mapOf(
+                "abc" to ++counter,
+                "d" to ++counter,
+                "ef" to ++counter,
+            )
+            
+            val typeCheck1: Boolean = m is Map<String, Int>
+            
+            for (it in m) {
+                println("${'$'}{it.key}: ${'$'}{it.value}")
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck1") as BooleanValue).value)
+        assertEquals(listOf("abc: 1", "d: 2", "ef: 3"), console.split("\n").sorted().filter { it.isNotEmpty() })
+    }
+
+    @Test
+    fun forLoopMapValues() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+        }
+        val interpreter = interpreter("""
+            var counter = 100
+            val m = mapOf(
+                "abc" to ++counter,
+                "d" to ++counter,
+                "ef" to ++counter,
+            )
+            
+            val typeCheck1: Boolean = m is Map<String, Int>
+            
+            for (value in m.values) {
+                println("${'$'}value")
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck1") as BooleanValue).value)
+        assertEquals(listOf("101", "102", "103"), console.split("\n").sorted().filter { it.isNotEmpty() })
+    }
 }

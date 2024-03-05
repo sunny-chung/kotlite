@@ -60,10 +60,10 @@ class CustomBuiltinClassTest {
                     receiver = "ConstructableClass",
                     declaredName = "a",
                     type = "String",
-                    getter = { interpreter, receiver ->
+                    getter = { interpreter, receiver, typeArgs ->
                         StringValue((receiver as ConstructableClassValue).value)
                     },
-                    setter = { interpreter, receiver, value ->
+                    setter = { interpreter, receiver, value, typeArgs ->
                         (receiver as ConstructableClassValue).value = (value as StringValue).value
                     }
                 )

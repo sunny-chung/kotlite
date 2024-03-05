@@ -133,7 +133,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         ) }
         .toMap()
 
-    val supportedOperatorFunctionNames = setOf("get", "set", "hasNext", "next")
+    val supportedOperatorFunctionNames = setOf("get", "set", "hasNext", "next", "iterator")
 
     fun ExtensionProperty.generateTransformedName() {
         this.transformedName = "EP//${this.receiver}/${this.declaredName}/${++functionDefIndex}"
@@ -1479,7 +1479,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 declaredName = "entries",
                 receiver = "$fullQualifiedClassName.Companion",
                 type = "List<${classType.descriptiveName()}>",
-                getter = { _, _ -> throw NotImplementedError() }
+                getter = { _, _, _ -> throw NotImplementedError() }
             ).also {
                 it.generateTransformedName()
                 symbolTable.declareExtensionProperty(position, it.transformedName!!, it)

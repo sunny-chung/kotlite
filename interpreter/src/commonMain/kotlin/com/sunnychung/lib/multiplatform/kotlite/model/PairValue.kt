@@ -40,7 +40,7 @@ class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB:
             ),
             "Pair<A, B>",
             "A",
-            getter = { interpreter, receiver ->
+            getter = { interpreter, receiver, typeArgs ->
                 (receiver as PairValue).value.first
             },
         )
@@ -53,7 +53,7 @@ class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB:
             ),
             "Pair<A, B>",
             "B",
-            getter = { interpreter, receiver ->
+            getter = { interpreter, receiver, typeArgs ->
                 (receiver as PairValue).value.second
             },
         )

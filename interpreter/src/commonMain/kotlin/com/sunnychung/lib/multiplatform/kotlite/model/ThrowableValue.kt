@@ -43,7 +43,7 @@ open class ThrowableValue(
                 typeParameters = emptyList(),
                 receiver = "Throwable",
                 type = "String?",
-                getter = { interpreter, receiver ->
+                getter = { interpreter, receiver, typeArgs ->
                     (receiver as ThrowableValue).message?.let { StringValue(it) } ?: NullValue
                 },
             ),
@@ -52,7 +52,7 @@ open class ThrowableValue(
                 typeParameters = emptyList(),
                 receiver = "Throwable",
                 type = "Throwable?",
-                getter = { interpreter, receiver ->
+                getter = { interpreter, receiver, typeArgs ->
                     (receiver as ThrowableValue).cause ?: NullValue
                 },
             ),
@@ -61,7 +61,7 @@ open class ThrowableValue(
                 typeParameters = emptyList(),
                 receiver = "Throwable",
                 type = "String",
-                getter = { interpreter, receiver ->
+                getter = { interpreter, receiver, typeArgs ->
                     val value = receiver as ThrowableValue
                     StringValue(value.externalExceptionClassName ?: value.fullClassName)
                 },

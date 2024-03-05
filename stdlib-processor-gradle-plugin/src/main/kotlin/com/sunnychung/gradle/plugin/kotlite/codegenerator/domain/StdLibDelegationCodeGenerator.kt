@@ -54,6 +54,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.IteratorValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
 import com.sunnychung.lib.multiplatform.kotlite.model.LongType
@@ -181,10 +182,14 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         val symbolTableArg = if (!type.isPrimitive()) {
             ", symbolTable = interpreter.symbolTable()"
         } else ""
+        val translatedTypeName = when (type.name) {
+            "Collection" -> "ListValue"
+            else -> "${type.name}Value"
+        }
         val wrappedValue = if (type.name == "Any") {
             "it as RuntimeValue"
         } else {
-            "${type.name}Value(it$typeArgs$symbolTableArg)"
+            "$translatedTypeName(it$typeArgs$symbolTableArg)"
         }
         val preMap = when (type.name) { // TODO change hardcoded conversions to more generic handling
             "Map", "MutableMap" -> {
@@ -211,6 +216,12 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                             else -> "it.second"
                         } +
                         " }"
+            }
+            "Iterator" -> {
+                ".let { it.wrap(${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
+            }
+            "Collection" -> {
+                ".toList()"
             }
             else -> ""
         }
@@ -308,7 +319,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
     ${indent(4)}),
     receiver = "${receiver!!.descriptiveName().escape()}",
     type = "${type.descriptiveName().escape()}",
-    getter = ${accessors?.getter?.let { """{ interpreter, receiver ->
+    getter = ${accessors?.getter?.let { """{ interpreter, receiver, typeArgs ->
         ${
             if (!receiver!!.name.endsWith(".Companion")) {
                 "val unwrappedReceiver = ${unwrap("receiver", receiver!!)}"
@@ -317,7 +328,7 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
         val result = ${if (receiver!!.name.endsWith(".Companion")) receiver!!.name else "unwrappedReceiver"}.$name
         ${wrap("result", type)}
     }""" } ?: "null"},
-    setter = ${accessors?.setter?.let { """{ interpreter, receiver, value ->
+    setter = ${accessors?.setter?.let { """{ interpreter, receiver, value, typeArgs ->
         ${
             if (!receiver!!.name.endsWith(".Companion")) {
                 "val unwrappedReceiver = ${unwrap("receiver", receiver!!)}"

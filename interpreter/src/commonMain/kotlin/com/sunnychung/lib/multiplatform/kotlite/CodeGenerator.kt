@@ -353,6 +353,8 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         append(name)
         if (declaredType != null) {
             append(": ${declaredType.generate()}")
+        } else if (isPrintDebugInfo) {
+            append("[: ${type.generate()}]")
         }
     }
 }

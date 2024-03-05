@@ -175,6 +175,10 @@ fun <T, R, V> Iterable<T>.zip(
 
 val <K, V> Map<K, V>.size: Int
     get()
+val <K, V> Map<K, V>.keys: Collection<K>
+    get()
+val <K, V> Map<K, V>.values: Collection<V>
+    get()
 
 val <K, V> MapEntry<K, V>.key: K
     get()
@@ -187,6 +191,8 @@ fun <K, V> mutableMapOf(vararg pairs: Pair<K, V>): MutableMap<K, V>
 fun <K, V> Map<K, V>.contains(key: K): Boolean
 fun <K> Map<K, *>.containsKey(key: K): Boolean
 fun <K, V> Map<K, V>.containsValue(value: V): Boolean
+
+operator fun <K, V> Map<K, V>.iterator(): Iterator<MapEntry<K, V>>
 
 fun <T, K, V> Iterable<T>.associate(
     transform: (T) -> Pair<K, V>
