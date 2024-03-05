@@ -142,9 +142,6 @@ class EnumTest {
 
     @Test
     fun enumEntries() {
-        val env = ExecutionEnvironment().apply {
-            registerClass(ListValue.clazz)
-        }
         val interpreter = interpreter("""
             enum class MyEnum(val customName: String, val value: Int = 8) {
                 A("a", 15),
@@ -153,11 +150,15 @@ class EnumTest {
                 D("dddd"),
             }
             val allValues: List<MyEnum> = MyEnum.entries
-        """.trimIndent(), executionEnvironment = env)
+            var sum = 0
+            for (e in allValues) {
+                sum += e.value
+            }
+        """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
-        assertEquals(1, symbolTable.propertyValues.size)
-        // TODO do some actual assertions
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(15 + 2 + 20 + 8, (symbolTable.findPropertyByDeclaredName("sum") as IntValue).value)
     }
 }
