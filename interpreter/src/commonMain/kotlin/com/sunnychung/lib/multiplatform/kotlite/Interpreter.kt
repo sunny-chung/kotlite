@@ -680,20 +680,30 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             }
             val valueParametersWithGenericsResolved = resolvedFunction?.resolvedValueParameterTypes
                 ?: functionNode.valueParameters
+            val varargListValueArgument = if (isVararg) {
+                ListValue(arguments.filterNotNull().toList(), symbolTable().assertToDataType(functionNode.valueParameters.first().type), symbolTable())
+            } else null
             functionNode.valueParameters.forEachIndexed { index, it ->
                 if (!isVararg && !(functionNode is LambdaLiteralNode && it.name == "_")) {
                     val argumentType = valueParametersWithGenericsResolved[index].type
                     symbolTable.declareProperty(callPosition, it.transformedRefName!!, argumentType, false)
                     symbolTable.assign(
-                        it.transformedRefName!!,
-                        replaceArguments[index] ?: arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue)
+                        name = it.transformedRefName!!,
+                        value = replaceArguments[index] ?: arguments[index] ?: (it.defaultValue!!.eval() as RuntimeValue)
                             .also { arguments[index] = it }
+                    )
+                } else if (isVararg) {
+                    val argumentType = varargListValueArgument!!.type().toTypeNode()
+                    symbolTable.declareProperty(callPosition, it.transformedRefName!!, argumentType, false)
+                    symbolTable.assign(
+                        name = it.transformedRefName!!,
+                        value = varargListValueArgument,
                     )
                 }
             }
 
             val arguments = if (isVararg) {
-                arrayOf(ListValue(arguments.filterNotNull().toList(), symbolTable().assertToDataType(functionNode.valueParameters.first().type), symbolTable()))
+                arrayOf(varargListValueArgument)
             } else {
                 arguments
             }

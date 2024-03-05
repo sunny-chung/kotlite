@@ -32,6 +32,10 @@ class ExecutionEnvironment(
         registerClass(ExceptionValue.clazz)
         registerClass(NullPointerExceptionValue.clazz)
         registerClass(TypeCastExceptionValue.clazz)
+
+        registerClass(IterableInterface.clazz)
+        registerClass(CollectionInterface.collectionClazz)
+        registerClass(ListValue.clazz)
     }
 
     fun registerFunction(function: CustomFunctionDefinition) {

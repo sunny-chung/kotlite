@@ -16,15 +16,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class CustomBuiltinExtensionPropertyTest {
-    private val LIST_CLAZZ = ProvidedClassDefinition(
-        fullQualifiedName = "List",
-        typeParameters = listOf(TypeParameterNode(SourcePosition("<Test>", 1, 1), name = "T", typeUpperBound = null)),
-        isInstanceCreationAllowed = false,
-        primaryConstructorParameters = emptyList(),
-        constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-        position = SourcePosition("<Test>", 1, 1),
-    )
-
     @Test
     fun getter() {
         val env = ExecutionEnvironment().apply {
@@ -165,7 +156,6 @@ class CustomBuiltinExtensionPropertyTest {
     @Test
     fun duplicateExtensionPropertyOfGenericClass1() {
         val env = ExecutionEnvironment().apply {
-            registerClass(LIST_CLAZZ)
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "List<Any>",
@@ -185,7 +175,6 @@ class CustomBuiltinExtensionPropertyTest {
     @Test
     fun duplicateExtensionPropertyOfGenericClass2() {
         val env = ExecutionEnvironment().apply {
-            registerClass(LIST_CLAZZ)
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 typeParameters = listOf(TypeParameter("T", "Any")),
@@ -207,7 +196,6 @@ class CustomBuiltinExtensionPropertyTest {
     @Test
     fun duplicateExtensionPropertyOfGenericClass3() {
         val env = ExecutionEnvironment().apply {
-            registerClass(LIST_CLAZZ)
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "List<Any?>",
@@ -228,7 +216,6 @@ class CustomBuiltinExtensionPropertyTest {
     @Test
     fun extensionPropertyOfGenericClassAndMoreSpecificExtensionProperty() {
         val env = ExecutionEnvironment().apply {
-            registerClass(LIST_CLAZZ)
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 typeParameters = listOf(TypeParameter("T", "Any?")),

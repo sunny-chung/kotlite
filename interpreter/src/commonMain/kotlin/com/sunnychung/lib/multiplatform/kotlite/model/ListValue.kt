@@ -12,7 +12,7 @@ class ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: 
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superClassInvocation = "Collection<T>()",
-            superClass = CollectionInterface.clazz,
+            superClass = CollectionInterface.collectionClazz,
             position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
     }

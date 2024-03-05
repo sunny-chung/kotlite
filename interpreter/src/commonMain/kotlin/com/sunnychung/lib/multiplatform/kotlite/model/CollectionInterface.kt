@@ -5,7 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.lexer.BuiltinFilename
 class CollectionInterface {
 
     companion object {
-        val clazz = ProvidedClassDefinition(
+        val collectionClazz = ProvidedClassDefinition(
             fullQualifiedName = "Collection",
             typeParameters = listOf(TypeParameterNode(position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1), name = "T", typeUpperBound = null)),
             isInstanceCreationAllowed = false,
