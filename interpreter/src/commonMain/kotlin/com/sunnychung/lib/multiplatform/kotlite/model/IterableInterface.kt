@@ -13,5 +13,22 @@ class IterableInterface {
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
+
+        val functions = listOf(
+            CustomFunctionDefinition(
+                receiverType = "Iterable<T>",
+                functionName = "iterator",
+                returnType = "Iterator<T>",
+                parameterTypes = emptyList(),
+                typeParameters = listOf(
+                    TypeParameter(name = "T", typeUpperBound = null),
+                ),
+                executable = { interpreter, receiver, args, typeArgs ->
+                    receiver as ListValue
+                    IteratorValue(receiver.value.iterator(), typeArgs["T"]!!, interpreter.symbolTable())
+                },
+                position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
+            ),
+        )
     }
 }

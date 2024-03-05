@@ -19,6 +19,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ForNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
@@ -46,6 +47,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ValueParameterDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
@@ -118,6 +120,8 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is WhenSubjectNode -> this.generate()
             is LabelNode -> this.generate()
             is EnumEntryNode -> this.generate()
+            is ForNode -> this.generate()
+            is ValueParameterDeclarationNode -> this.generate()
     }
 
     protected fun AssignmentNode.generate()
@@ -330,6 +334,25 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             append("(")
             append(arguments.joinToString(", ") { it.generate() })
             append(")")
+        }
+    }
+
+    protected fun ForNode.generate() = buildString {
+        append("for (")
+        if (variables.size == 1) {
+            append(variables.single().generate())
+        } else {
+            append("(")
+            append(variables.joinToString(", ") { it.generate() })
+            append(")")
+        }
+        append(" in ${subject.generate()}) ${body.generate()}")
+    }
+
+    protected fun ValueParameterDeclarationNode.generate() = buildString {
+        append(name)
+        if (declaredType != null) {
+            append(": ${declaredType.generate()}")
         }
     }
 }

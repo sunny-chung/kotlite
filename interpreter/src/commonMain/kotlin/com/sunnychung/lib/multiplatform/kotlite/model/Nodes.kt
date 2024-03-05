@@ -738,3 +738,38 @@ data class EnumEntryNode(
         }
     }
 }
+
+data class ValueParameterDeclarationNode(
+    override val position: SourcePosition,
+    val name: String,
+    val declaredType: TypeNode?,
+    @ModifyByAnalyzer var transformedRefName: String? = null,
+) : ASTNode {
+    @ModifyByAnalyzer
+    var inferredType: TypeNode? = null
+    val type: TypeNode
+        get() = declaredType ?: inferredType
+            ?: throw CannotInferTypeException(position, "value parameter type $name")
+
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Value Parameter '$name'\"]"
+        return self + declaredType?.let {
+            "\n$self--type-->${it.toMermaid()}"
+        }
+    }
+}
+
+data class ForNode(
+    override val position: SourcePosition,
+    val variables: List<ValueParameterDeclarationNode>,
+    val subject: ASTNode,
+    val body: BlockNode,
+) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"For\"]"
+        return self +
+            subject.let { "\n$self--subject-->${it.toMermaid()}" } +
+            body.let { "\n$self--body-->${it.toMermaid()}" } +
+            variables.withIndex().joinToString("") { "\n$self--var[${it.index}]-->${it.value.toMermaid()}" }
+    }
+}

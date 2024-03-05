@@ -46,6 +46,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExceptionValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
+import com.sunnychung.lib.multiplatform.kotlite.model.ForNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallResult
@@ -91,6 +92,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ValueParameterDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
@@ -168,6 +170,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             is WhenSubjectNode -> TODO()
             is LabelNode -> TODO()
             is EnumEntryNode -> TODO()
+            is ForNode -> this.eval()
+            is ValueParameterDeclarationNode -> TODO()
         }
     }
 
@@ -1406,6 +1410,94 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         } finally {
             callStack.pop(ScopeType.WhenOuter)
         }
+    }
+
+    fun ForNode.eval(): RuntimeValue {
+        val subjectValue = subject.eval() as RuntimeValue
+        callStack.push("<for>", ScopeType.For, position)
+
+        fun FunctionCallNode.enrichIterableCall(receiverType: DataType): FunctionCallNode {
+            var type: DataType? = receiverType
+            while (type != null && type.name !in setOf("Iterable", "Iterator")) {
+                type = (type as? ObjectType)?.superType
+            }
+            if (type == null) throw RuntimeException("Enrich fail -- ${receiverType.descriptiveName} is not an Iterable")
+
+            return copy(
+                functionRefName = symbolTable().findFunctionOrExtensionFunctionIncludingSuperclassesByDeclaredName(
+                    receiverType.toTypeNode(), (function as NavigationNode).member.name
+                ).single().transformedRefName,
+                inferredTypeArguments = listOf((type as ObjectType).arguments.first().toTypeNode()),
+            )
+        }
+
+        try {
+            symbolTable().declareProperty(subject.position, "#subject", subjectValue.type().toTypeNode(), false)
+            symbolTable().assign("#subject", subjectValue)
+
+            // TODO move the call lookups to Semantic Analyzer. Currently impossible because runtime class type member always has higher priority than compile-time type
+            val iteratorValue = FunctionCallNode(
+                function = NavigationNode(
+                    position = position,
+                    subject = VariableReferenceNode(position, "#subject"),
+                    operator = ".",
+                    member = ClassMemberReferenceNode(position, "iterator")
+                ),
+                arguments = emptyList(),
+                declaredTypeArguments = emptyList(),
+                position = position,
+                callableType = CallableType.ExtensionFunction,
+            ).enrichIterableCall(subjectValue.type()).eval()
+            symbolTable().declareProperty(subject.position, "#iterator", iteratorValue.type().toTypeNode(), false)
+            symbolTable().assign("#iterator", iteratorValue)
+            val hasNextCall = FunctionCallNode(
+                function = NavigationNode(
+                    position = position,
+                    subject = VariableReferenceNode(position, "#iterator"),
+                    operator = ".",
+                    member = ClassMemberReferenceNode(position, "hasNext")
+                ),
+                arguments = emptyList(),
+                declaredTypeArguments = emptyList(),
+                position = position,
+                callableType = CallableType.ExtensionFunction,
+            ).enrichIterableCall(iteratorValue.type())
+            val nextCall = FunctionCallNode(
+                function = NavigationNode(
+                    position = position,
+                    subject = VariableReferenceNode(position, "#iterator"),
+                    operator = ".",
+                    member = ClassMemberReferenceNode(position, "next")
+                ),
+                arguments = emptyList(),
+                declaredTypeArguments = emptyList(),
+                position = position,
+                callableType = CallableType.ExtensionFunction,
+            ).enrichIterableCall(iteratorValue.type())
+
+            while ((hasNextCall.eval() as BooleanValue).value) {
+                val nextValue = nextCall.eval()
+
+                variables.forEach {
+                    symbolTable().declareProperty(
+                        position = position,
+                        name = it.transformedRefName!!,
+                        type = it.type,
+                        isMutable = false,
+                    )
+                    symbolTable().assign(name = it.transformedRefName!!, value = nextValue)
+                }
+
+                body.eval()
+
+                variables.forEach {
+                    symbolTable().undeclareProperty(it.transformedRefName!!)
+                }
+            }
+        } finally {
+            callStack.pop(ScopeType.For)
+        }
+        return UnitValue
     }
 
     fun StringNode.eval(): StringValue {

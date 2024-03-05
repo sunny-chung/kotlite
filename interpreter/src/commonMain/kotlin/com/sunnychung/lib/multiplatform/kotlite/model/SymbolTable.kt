@@ -303,6 +303,11 @@ open class SymbolTable(
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunction(transformedName) }
     }
 
+    fun findExtensionFunctionsByDeclaredName(receiver: TypeNode, declaredName: String, isThisScopeOnly: Boolean = false): Collection<FunctionDeclarationNode> {
+        return extensionFunctionDeclarations.filter { it.value.receiver?.name == receiver.name && it.value.name == declaredName }.values + // TODO handle generics
+            (Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunctionsByDeclaredName(receiver, declaredName, isThisScopeOnly) } ?: emptyList())
+    }
+
     fun declareExtensionProperty(position: SourcePosition, transformedName: String, extensionProperty: ExtensionProperty) {
         if (extensionProperties.containsKey(transformedName)) {
             throw DuplicateIdentifierException(position = position, name = transformedName, classifier = IdentifierClassifier.Property)
@@ -417,6 +422,29 @@ open class SymbolTable(
 
     open fun functionNameTransform(name: String, function: FunctionDeclarationNode): String {
         return name
+    }
+
+    // this is expensive
+    fun findFunctionOrExtensionFunctionIncludingSuperclassesByDeclaredName(receiver: TypeNode, declaredName: String): Collection<FunctionDeclarationNode> {
+        val clazz = findClass(receiver.name)!!.first
+        clazz.findMemberFunctionsByDeclaredName(declaredName).values
+            .also {
+                if (it.isNotEmpty()) {
+                    return it
+                }
+            }
+
+        var type: DataType? = assertToDataType(receiver)
+        while (type != null) {
+            findExtensionFunctionsByDeclaredName(type.toTypeNode(), declaredName).also {
+                if (it.isNotEmpty()) {
+                    return it
+                }
+            }
+            type = (type as? ObjectType)?.superType
+        }
+
+        throw RuntimeException("Function $declaredName for receiver ${receiver.descriptiveName()} not found")
     }
 
     internal fun registerTransformedSymbol(position: SourcePosition, identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String) {

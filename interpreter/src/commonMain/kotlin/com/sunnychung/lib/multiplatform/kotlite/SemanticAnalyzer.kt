@@ -41,6 +41,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
+import com.sunnychung.lib.multiplatform.kotlite.model.ForNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentInfo
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
@@ -89,6 +90,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.ValueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ValueParameterDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
@@ -131,7 +133,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         ) }
         .toMap()
 
-    val supportedOperatorFunctionNames = setOf("get", "set")
+    val supportedOperatorFunctionNames = setOf("get", "set", "hasNext", "next")
 
     fun ExtensionProperty.generateTransformedName() {
         this.transformedName = "EP//${this.receiver}/${this.declaredName}/${++functionDefIndex}"
@@ -277,6 +279,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is WhenSubjectNode -> this.visit(modifier = modifier)
             is LabelNode -> TODO()
             is EnumEntryNode -> this.visit(modifier = modifier)
+            is ForNode -> this.visit(modifier = modifier)
+            is ValueParameterDeclarationNode -> this.visit(modifier = modifier)
         }
     }
 
@@ -589,7 +593,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
         val visitValueParameters = {
             valueParameters.forEach {
-                it.visit(modifier = modifier, this)
+                it.visit(modifier = modifier, functionDeclarationNode = this, isDeclareProperty = !isVararg)
+            }
+            if (isVararg) {
+                with(valueParameters.single()) {
+                    val type = this@visit.resolveGenericParameterType(this).let {
+                        TypeNode(position, "List", listOf(it), false)
+                    }
+                    currentScope.declareProperty(position = position, name = name, type = type, isMutable = false)
+                    currentScope.assign(
+                        name,
+                        SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type)
+                    )
+                    generateTransformedName()
+                    currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, transformedRefName!!, name)
+                }
             }
         }
 
@@ -1140,7 +1158,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         transformedRefName = "$name/${currentScope.scopeLevel}"
     }
 
-    fun FunctionValueParameterNode.visit(modifier: Modifier = Modifier(), functionDeclarationNode: FunctionDeclarationNode?) {
+    fun FunctionValueParameterNode.visit(modifier: Modifier = Modifier(), functionDeclarationNode: FunctionDeclarationNode?, isDeclareProperty: Boolean = true) {
         if (defaultValue is LambdaLiteralNode && type is FunctionTypeNode) {
             defaultValue.parameterTypesUpperBound = (type as FunctionTypeNode).parameterTypes
         }
@@ -1158,11 +1176,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         if (declaredType == null && inferredType == null) {
             throw SemanticException(position, "Cannot infer lambda parameter type")
         }
-        val type = functionDeclarationNode?.resolveGenericParameterType(this) ?: type
-        currentScope.declareProperty(position = position, name = name, type = type, isMutable = false)
-        currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type))
-        generateTransformedName()
-        currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, transformedRefName!!, name)
+        if (isDeclareProperty) {
+            val type = functionDeclarationNode?.resolveGenericParameterType(this) ?: type
+            currentScope.declareProperty(position = position, name = name, type = type, isMutable = false)
+            currentScope.assign(
+                name,
+                SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type)
+            )
+            generateTransformedName()
+            currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, transformedRefName!!, name)
+        }
     }
 
     fun FunctionCallArgumentNode.visit(modifier: Modifier = Modifier()) {
@@ -1912,6 +1935,69 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         ).also { it.visit(modifier = modifier, isSkipConstructionSecurityCheck = true) }
     }
 
+    fun ForNode.visit(modifier: Modifier = Modifier()) {
+        subject.visit(modifier = modifier)
+        val subjectType = subject.type().toDataType()
+
+        pushScope(
+            scopeName = "<for>",
+            scopeType = ScopeType.For,
+            returnType = null,
+        )
+
+        symbolTable.declareProperty(subject.position, "#subject", subjectType.toTypeNode(), false)
+        symbolTable.assign("#subject", SemanticDummyRuntimeValue(subjectType))
+
+        val call = FunctionCallNode(
+            function = NavigationNode(
+                position,
+                VariableReferenceNode(position, "#subject"),
+                ".",
+                ClassMemberReferenceNode(position, "iterator")
+            ),
+            arguments = emptyList(),
+            declaredTypeArguments = emptyList(),
+            position = position,
+            callableType = CallableType.ExtensionFunction,
+        )
+        call.visit(modifier = modifier)
+
+        val returnType = call.returnType!!.toDataType()
+        val iteratorType = TypeNode(SourcePosition.NONE, "Iterator", listOf(TypeNode(SourcePosition.NONE, "*", null, false)), false).toDataType()
+        if (!iteratorType.isAssignableFrom(returnType)) {
+            throw SemanticException(subject.position, "Expression in a for-loop is required to have an `iterator()` method with a return type of Iterator<T>")
+        }
+
+        val iteratingType = (returnType as ObjectType).arguments.first()
+
+        variables.forEach { it.visit(modifier = modifier, iteratingType = iteratingType) } // TODO don't hardcode one iterating type
+        body.visit(modifier = modifier)
+        popScope()
+    }
+
+    fun ValueParameterDeclarationNode.visit(modifier: Modifier = Modifier(), iteratingType: DataType) {
+        if (declaredType != null) {
+            if (!declaredType.toDataType().isAssignableFrom(iteratingType)) {
+                throw TypeMismatchException(position, iteratingType.descriptiveName, declaredType.descriptiveName())
+            }
+        } else {
+            inferredType = iteratingType.toTypeNode()
+        }
+
+        currentScope.declareProperty(position = position, name = name, type = type, isMutable = false)
+        currentScope.assign(
+            name = name,
+            value = SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type)
+        )
+        transformedRefName = "$name/${currentScope.scopeLevel}"
+        currentScope.registerTransformedSymbol(
+            position = position,
+            identifierClassifier = IdentifierClassifier.Property,
+            transformedName = transformedRefName!!,
+            originalName = name
+        )
+    }
+
     fun analyze() = scriptNode.visit()
 
     ////////////////////////////////////
@@ -1969,6 +2055,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is WhenSubjectNode -> TODO()
             is LabelNode -> TODO()
             is EnumEntryNode -> TODO()
+            is ForNode -> typeRegistry["Unit"]!!
+            is ValueParameterDeclarationNode -> TODO()
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {

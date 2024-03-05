@@ -33,7 +33,16 @@ class ExecutionEnvironment(
         registerClass(NullPointerExceptionValue.clazz)
         registerClass(TypeCastExceptionValue.clazz)
 
+        registerClass(IteratorValue.clazz)
+        IteratorValue.functions.forEach {
+            registerFunction(it)
+        }
+
         registerClass(IterableInterface.clazz)
+        IterableInterface.functions.forEach {
+            registerFunction(it)
+        }
+        
         registerClass(CollectionInterface.collectionClazz)
         registerClass(ListValue.clazz)
     }

@@ -25,6 +25,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ForNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionBodyFormat
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallArgumentNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
@@ -58,6 +59,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.UnaryOpNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ValueParameterDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.VariableReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenConditionNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
@@ -2372,7 +2374,7 @@ class Parser(protected val lexer: Lexer) {
      *     {NL}
      *     (controlStructureBody | ';')
      */
-    fun whileStatement(): ASTNode {
+    fun whileStatement(): WhileNode {
         val t = eat(TokenType.Identifier, "while")
         repeatedNL()
         eat(TokenType.Operator, "(")
@@ -2391,6 +2393,38 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * forStatement:
+     *     'for'
+     *     {NL}
+     *     '('
+     *     {annotation}
+     *     (variableDeclaration | multiVariableDeclaration)
+     *     'in'
+     *     expression
+     *     ')'
+     *     {NL}
+     *     [controlStructureBody]
+     */
+    fun forStatement(): ForNode {
+        val t = eat(TokenType.Identifier, "for")
+        repeatedNL()
+        eat(TokenType.Operator, "(")
+        val varToken = currentToken
+        val (varName, varType) = variableDeclaration() // TODO support multiVariableDeclaration
+        eat(TokenType.Identifier, "in")
+        val expr = expression()
+        eat(TokenType.Operator, ")")
+        repeatedNL()
+        val loopBody = controlStructureBody(ScopeType.For) // intended to be mandatory. no point to allow infinite loops
+        return ForNode(
+            position = t.position,
+            variables = listOf(ValueParameterDeclarationNode(varToken.position, varName, varType)),
+            subject = expr,
+            body = loopBody,
+        )
+    }
+
+    /**
      * loopStatement:
      *     forStatement
      *     | whileStatement
@@ -2399,6 +2433,7 @@ class Parser(protected val lexer: Lexer) {
     fun loopStatement(): ASTNode {
         if (currentToken.type != TokenType.Identifier) throw UnexpectedTokenException(currentToken)
         return when (currentToken.value) {
+            "for" -> forStatement()
             "while" -> whileStatement()
             else -> TODO()
         }
