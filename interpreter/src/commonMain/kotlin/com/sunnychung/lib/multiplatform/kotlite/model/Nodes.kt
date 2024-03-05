@@ -168,7 +168,7 @@ open class VariableReferenceNode(override val position: SourcePosition, val vari
  * Member names are the exact identifiers in Kotlin code
  */
 enum class FunctionModifier {
-    operator, open, override
+    operator, open, override, abstract
 }
 
 enum class FunctionValueParameterModifier {
@@ -176,7 +176,7 @@ enum class FunctionValueParameterModifier {
 }
 
 enum class ClassModifier {
-    open, enum
+    open, enum, abstract
 }
 
 enum class PropertyModifier {
@@ -227,7 +227,7 @@ open class FunctionDeclarationNode(
     val receiver: TypeNode? = null,
     val declaredReturnType: TypeNode?,
     override val valueParameters: List<FunctionValueParameterNode>,
-    val body: BlockNode,
+    val body: BlockNode?,
     override val typeParameters: List<TypeParameterNode> = emptyList(),
     val declaredModifiers: Set<FunctionModifier> = emptySet(),
     @ModifyByAnalyzer var transformedRefName: String? = null,
@@ -247,7 +247,7 @@ open class FunctionDeclarationNode(
         val self = "${generateId()}[\"Function Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
         return (declaredReturnType?.let { "$self-- type -->${it.toMermaid()}\n" } ?: "") +
                 (receiver?.let { "$self-- receiver -->${it.toMermaid()}\n" } ?: "") +
-                "$self-->${body.toMermaid()}\n"
+                (body?.let { "$self--body-->${it.toMermaid()}\n" } ?: "")
     }
 
     fun resolveGenericParameterType(parameter: FunctionValueParameterNode): TypeNode {
@@ -256,7 +256,7 @@ open class FunctionDeclarationNode(
 
     override fun execute(interpreter: Interpreter, receiver: RuntimeValue?, arguments: List<RuntimeValue>, typeArguments: Map<String, DataType>): RuntimeValue {
         with (interpreter) {
-            return body.eval()
+            return body?.eval() ?: throw RuntimeException("This function is not implemented")
         }
     }
 
@@ -267,7 +267,7 @@ open class FunctionDeclarationNode(
         typeParameters: List<TypeParameterNode> = this.typeParameters,
         valueParameters: List<FunctionValueParameterNode> = this.valueParameters,
         modifiers: Set<FunctionModifier> = this.modifiers,
-        body: BlockNode = this.body,
+        body: BlockNode? = this.body,
         transformedRefName: String? = this.transformedRefName,
         inferredReturnType: TypeNode? = this.inferredReturnType,
     ): FunctionDeclarationNode {
@@ -410,7 +410,7 @@ data class ClassDeclarationNode(
     val enumEntries: List<EnumEntryNode> = emptyList(),
     @ModifyByAnalyzer var fullQualifiedName: String = name,
 ) : ASTNode {
-    @ModifyByAnalyzer val inferredModifiers: Set<ClassModifier> = mutableSetOf()
+    @ModifyByAnalyzer val inferredModifiers: MutableSet<ClassModifier> = mutableSetOf()
     val modifiers: Set<ClassModifier>
         get() = declaredModifiers + inferredModifiers
 

@@ -8,7 +8,6 @@ import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
-import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
@@ -101,6 +100,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassSemanticAnalyzer
 
 class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: ExecutionEnvironment) {
     val builtinSymbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
@@ -560,7 +560,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         }
         this.isVararg = isVararg
 
-        if (declaredModifiers.contains(FunctionModifier.override)) {
+        if (FunctionModifier.override in declaredModifiers || FunctionModifier.abstract in declaredModifiers) {
             inferredModifiers += FunctionModifier.open
         }
 
@@ -693,18 +693,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
         }
 
-        body.visit(modifier = modifier)
+        if (body != null) {
+            body.visit(modifier = modifier)
 
-        // TODO check for return statement
+            // TODO check for return statement
 
-        val valueType = body.type().toDataType()
-        if (declaredReturnType == null && body.format == FunctionBodyFormat.Expression) {
-            inferredReturnType = body.type()
-            variantsOfThis.forEach { it.inferredReturnType = inferredReturnType }
-        } else {
-            val subjectType = returnType.resolveGenericParameterType(typeParameters).toDataType()
-            if (subjectType !is UnitType && !subjectType.isAssignableFrom(valueType)) {
-                throw TypeMismatchException(position, subjectType.nameWithNullable, valueType.nameWithNullable)
+            val valueType = body.type().toDataType()
+            if (declaredReturnType == null && body.format == FunctionBodyFormat.Expression) {
+                inferredReturnType = body.type()
+                variantsOfThis.forEach { it.inferredReturnType = inferredReturnType }
+            } else {
+                val subjectType = returnType.resolveGenericParameterType(typeParameters).toDataType()
+                if (subjectType !is UnitType && !subjectType.isAssignableFrom(valueType)) {
+                    throw TypeMismatchException(position, subjectType.nameWithNullable, valueType.nameWithNullable)
+                }
             }
         }
 
@@ -715,7 +717,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         evaluateAndRegisterReturnType(this)
     }
 
-    fun FunctionCallNode.visit(modifier: Modifier = Modifier(), isSkipConstructionSecurityCheck: Boolean = false) {
+    fun FunctionCallNode.visit(modifier: Modifier = Modifier(), isSkipConstructionSecurityCheck: Boolean = false, isSuperClassInvocation: Boolean = false) {
         arguments.forEachIndexed { i, _ ->
             arguments.forEachIndexed { j, _ ->
                 if (i < j && arguments[i].name != null && arguments[j].name != null && arguments[i].name == arguments[j].name) {
@@ -763,8 +765,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
                 if (callableType == CallableType.Constructor) {
                     val clazz = resolution.definition as ClassDefinition
-                    if (!isSkipConstructionSecurityCheck && !clazz.isInstanceCreationAllowed) {
-                        throw SemanticException(position, "Instances of class ${clazz.fullQualifiedName} cannot be created directly via constructor")
+                    if (!isSkipConstructionSecurityCheck) {
+                        if ((isSuperClassInvocation && !clazz.isInstanceCreationAllowed) || (!isSuperClassInvocation && !clazz.isInstanceCreationByUserAllowed())) {
+                            throw SemanticException(
+                                position,
+                                "Instances of class ${clazz.fullQualifiedName} cannot be created directly via constructor"
+                            )
+                        }
                     }
                 }
 
@@ -837,6 +844,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 }
                 val resolution = resolutions.firstOrNull()
                     ?: throw SemanticException(position, "No matching function `${function.member.name}` found for type ${receiverType.nameWithNullable}")
+
+                if (function.subject is VariableReferenceNode && function.subject.variableName == "super") {
+                    if (resolution.definition is FunctionDeclarationNode && FunctionModifier.abstract in resolution.definition.modifiers) {
+                        throw SemanticException(function.member.position, "Cannot direct access abstract members")
+                    }
+                }
 
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
@@ -1405,6 +1418,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 throw SemanticException(superClassInvocation.position, "Enum class cannot inherit classes")
             }
         }
+        if (ClassModifier.abstract in modifiers) {
+            inferredModifiers += ClassModifier.open
+        }
 
         // Declare nullable class type
         declarationScope.declareClass(
@@ -1534,7 +1550,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 currentScope.declareTypeAlias(it.position, it.name, it.typeUpperBound)
             }
             primaryConstructor?.visit(modifier = modifier)
-            superClassInvocation?.visit(modifier = modifier)
+            superClassInvocation?.visit(modifier = modifier, isSuperClassInvocation = true)
             if (superClassInvocation != null) {
                 temporarilySwitchToScopeAndRun(superClassScope) {
                     val type = superClassInvocation.type()
@@ -1586,7 +1602,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 memberFunctions = declarations
                     .filterIsInstance<FunctionDeclarationNode>()
                     .associateBy {
-                        it.toSignature(currentScope as SemanticAnalyzerSymbolTable).also { signature ->
+                        it.toSignature(currentScope).also { signature ->
                             log.v { "Class `$name` member function `${it.name}` signature = `$signature`" }
                             val superClassFunction = superClassFunctions?.get(signature)
                             if (superClassFunction != null) {
@@ -1672,6 +1688,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         }
                     }
                 }
+
+            ClassSemanticAnalyzer(symbolTable = symbolTable, position = position, classDefinition = classDefinition)
+                .check()
 
             // enum
             val knownEnumNames = mutableSetOf<String>()

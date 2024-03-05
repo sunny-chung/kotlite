@@ -923,4 +923,99 @@ class ClassInheritanceTest {
         assertEquals(14, (symbolTable.findPropertyByDeclaredName("s") as IntValue).value)
         assertEquals(21, (symbolTable.findPropertyByDeclaredName("t") as IntValue).value)
     }
+
+    @Test
+    fun implementAbstractFunctions() {
+        val interpreter = interpreter("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            open class B : A() {
+                override fun f() = 9
+            }
+            abstract class C : A()
+            class D : C() {
+                override fun f(): Int = 12
+            }
+            class E : B()
+            val a = B().f()
+            val b = D().f()
+            val c = E().f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(9, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(9, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun abstractFunctionOverridesImplementation() {
+        val interpreter = interpreter("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            open class B : A() {
+                override fun f() = 9
+            }
+            abstract class C : B() {
+                abstract override fun f(): Int
+            }
+            class D : C() {
+                override fun f(): Int = 12
+            }
+            class E : B()
+            val a = B().f()
+            val b = D().f()
+            val c = E().f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(9, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(9, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun callAbstractFunction1() {
+        val interpreter = interpreter("""
+            abstract class A {
+                abstract fun f(): Int
+                fun g(x: Int) = x + f()
+            }
+            open class B : A() {
+                override fun f() = 9
+            }
+            val a = B().g(10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(19, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
+
+    @Test
+    fun callAbstractFunction2() {
+        val interpreter = interpreter("""
+            abstract class A {
+                abstract fun f(): Int
+                fun g(x: Int) = x + f()
+            }
+            open class B : A() {
+                override fun f() = 9
+            }
+            val o: A = B()
+            val a = o.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(9, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
 }

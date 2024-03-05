@@ -421,4 +421,116 @@ class ClassInheritanceCheckTest {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun abstractFunctionOverridesImplementationChangeReturnType1() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            open class B : A() {
+                override fun f() = 9
+            }
+            abstract class C : B() {
+                abstract override fun f()
+            }
+            class D : C() {
+                override fun f(): Int = 12
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun abstractFunctionOverridesImplementationChangeReturnType2() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            open class B : A() {
+                override fun f() = 9
+            }
+            abstract class C : B() {
+                abstract override fun f(): Double
+            }
+            class D : C() {
+                override fun f(): Int = 12
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun cannotConstructAbstractClass1() {
+        assertSemanticFail("""
+            abstract class A
+            val x = A()
+        """.trimIndent())
+    }
+
+    @Test
+    fun cannotConstructAbstractClass2() {
+        assertSemanticFail("""
+            open class A
+            abstract class B: A()
+            val x = B()
+        """.trimIndent())
+    }
+
+    @Test
+    fun classWithAbstractFunctionMustBeMarkedAsAbstract() {
+        assertSemanticFail("""
+            open class A {
+                abstract fun f(): Int
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun classWithInheritedAbstractFunctionMustBeMarkedAsAbstract1() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            class B: A()
+        """.trimIndent())
+    }
+
+    @Test
+    fun classWithInheritedAbstractFunctionMustBeMarkedAsAbstract2() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            open class B: A() {
+                override fun f() = 10
+            }
+            abstract class C: B() {
+                abstract override fun f(): Int
+            }
+            open class D : C()
+        """.trimIndent())
+    }
+
+    @Test
+    fun cannotCallAbstractFunctionDirectly1() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            open class B: A() {
+                override fun f() = super.f()
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun cannotCallAbstractFunctionDirectly2() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            abstract class B: A() {
+                fun g() = super.f()
+            }
+        """.trimIndent())
+    }
 }

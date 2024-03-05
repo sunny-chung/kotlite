@@ -68,7 +68,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 val ACCEPTED_MODIFIERS = setOf(
-    "open", "override", "operator", "vararg", "enum"
+    "open", "override", "operator", "vararg", "enum", "abstract"
 )
 
 /**
@@ -1922,6 +1922,7 @@ class Parser(protected val lexer: Lexer) {
             "operator" -> FunctionModifier.operator
             "open" -> FunctionModifier.open
             "override" -> FunctionModifier.override
+            "abstract" -> FunctionModifier.abstract
             else -> throw ParseException("Modifier `$it` cannot be applied to function")
         }
     }.toSet()
@@ -1961,25 +1962,16 @@ class Parser(protected val lexer: Lexer) {
         } else {
             null
         }
-        // TODO make functionBody optional for interfaces
-        if (!isProcessBody) {
-            return FunctionDeclarationNode(
-                position = t.position,
-                name = name,
-                receiver = receiver,
-                declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false),
-                valueParameters = valueParameters,
-                body = dummyBlockNode(),
-                typeParameters = typeParameters,
-                declaredModifiers = modifiers,
-            )
+        val body = if (!isProcessBody || FunctionModifier.abstract in modifiers) {
+            null
+        } else {
+            functionBody()
         }
-        val body = functionBody()
         return FunctionDeclarationNode(
             position = t.position,
             name = name,
             receiver = receiver,
-            declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false).takeIf { body.format == FunctionBodyFormat.Block },
+            declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false).takeIf { body?.format == FunctionBodyFormat.Block },
             valueParameters = valueParameters,
             body = body,
             typeParameters = typeParameters,
@@ -2190,6 +2182,7 @@ class Parser(protected val lexer: Lexer) {
         when (it) {
             "open" -> ClassModifier.open
             "enum" -> ClassModifier.enum
+            "abstract" -> ClassModifier.abstract
             else -> throw ParseException("Modifier `$it` cannot be applied to class")
         }
     }.toSet()

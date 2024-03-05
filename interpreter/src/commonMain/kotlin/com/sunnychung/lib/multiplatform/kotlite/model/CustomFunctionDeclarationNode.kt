@@ -50,7 +50,7 @@ class CustomFunctionDeclarationNode(
         typeParameters: List<TypeParameterNode>,
         valueParameters: List<FunctionValueParameterNode>,
         modifiers: Set<FunctionModifier>,
-        body: BlockNode,
+        body: BlockNode?,
         transformedRefName: String?,
         inferredReturnType: TypeNode?,
     ): FunctionDeclarationNode {

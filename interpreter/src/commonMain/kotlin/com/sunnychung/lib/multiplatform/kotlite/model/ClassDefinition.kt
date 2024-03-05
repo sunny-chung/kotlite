@@ -64,6 +64,8 @@ open class ClassDefinition(
         rawMemberProperties.forEach { addProperty(currentScope, it) }
     }
 
+    fun isInstanceCreationByUserAllowed() = isInstanceCreationAllowed && ClassModifier.abstract !in modifiers
+
     /**
      * Only for SemanticAnalyzer use during parsing class declarations.
      */

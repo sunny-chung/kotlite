@@ -184,7 +184,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "${function.generate()}${debug("<f:$functionRefName>")}${if (typeArguments.isNotEmpty()) "<${typeArguments.joinToString(", ") { it.descriptiveName() }}>" else ""}(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
-        = "${modifiers.joinToString("") { "$it " }}fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()} ${body.generate()}"
+        = "${modifiers.joinToString("") { "$it " }}fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()}${body?.let { " ${it.generate()}" } ?: ""}"
 
     protected fun FunctionValueParameterNode.generate()
         = "${modifiers.joinToString("") { "$it " }}$name<$transformedRefName>: ${type.generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"
