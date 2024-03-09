@@ -402,10 +402,11 @@ data class ClassInstanceInitializerNode(override val position: SourcePosition, v
 data class ClassDeclarationNode(
     override val position: SourcePosition,
     val name: String,
+    val isInterface: Boolean, // TODO change to enum
     val declaredModifiers: Set<ClassModifier>,
     val typeParameters: List<TypeParameterNode>,
     val primaryConstructor: ClassPrimaryConstructorNode?,
-    val superClassInvocation: FunctionCallNode?,
+    val superInvocations: List<ASTNode>?,
     val declarations: List<ASTNode>,
     val enumEntries: List<EnumEntryNode> = emptyList(),
     @ModifyByAnalyzer var fullQualifiedName: String = name,
@@ -415,9 +416,10 @@ data class ClassDeclarationNode(
         get() = declaredModifiers + inferredModifiers
 
     override fun toMermaid(): String {
-        val self = "${generateId()}[\"Class Declaration Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
+        val self = "${generateId()}[\"${if (!isInterface) "Class" else "Interface"} Declaration Node `$name` modifiers=[${modifiers.joinToString(", ")}]\"]"
         return "$self\n" +
                 (primaryConstructor?.let { "$self-- primary constructor -->${it.toMermaid()}\n" } ?: "") +
+                (superInvocations?.joinToString("") { "$self--super-->${it.toMermaid()}\n" } ?: "") +
                 declarations.joinToString("") { "$self-->${it.toMermaid()}\n" }
     }
 }

@@ -1036,6 +1036,24 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             isNullable = false,
         )
 
+        val interfaceInvocations: List<TypeNode>
+        val superClassInvocation: FunctionCallNode?
+        if (isInterface) {
+            superInvocations?.firstOrNull { it is FunctionCallNode }
+                ?.let {
+                    throw RuntimeException("Interface cannot inherit a class")
+                }
+            interfaceInvocations = superInvocations?.filterIsInstance<TypeNode>() ?: emptyList()
+            superClassInvocation = null
+        } else {
+            val superClassInvocations = superInvocations?.filterIsInstance<FunctionCallNode>()
+            if ((superClassInvocations?.size ?: 0) > 1) {
+                throw RuntimeException("A class can only inherit at most one other class")
+            }
+            interfaceInvocations = superInvocations?.filterIsInstance<TypeNode>() ?: emptyList()
+            superClassInvocation = superClassInvocations?.firstOrNull()
+        }
+
         val superClass = (superClassInvocation?.function as? TypeNode)
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
@@ -1081,6 +1099,15 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 declarations = declarations,
                 superClassInvocation = superClassInvocation,
                 superClass = superClass,
+                superInterfaceTypes = interfaceInvocations,
+                superInterfaces = interfaceInvocations.map {
+                    val clazz = symbolTable().findClass(it.name)?.first
+                        ?: throw RuntimeException("Interface ${it.name} cannot be found")
+                    if (!clazz.isInterface) {
+                        throw RuntimeException("${it.name} is not an interface")
+                    }
+                    clazz
+                },
             ).also { clazz = it })
             // register extension functions in global scope
             declarations

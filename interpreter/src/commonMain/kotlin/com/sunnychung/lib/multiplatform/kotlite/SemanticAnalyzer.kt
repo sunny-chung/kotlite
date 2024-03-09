@@ -1414,12 +1414,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             if (ClassModifier.open in modifiers) {
                 throw SemanticException(position, "An enum class cannot be applied with an 'open' modifier")
             }
-            if (superClassInvocation != null) {
-                throw SemanticException(superClassInvocation.position, "Enum class cannot inherit classes")
+            if (!superInvocations.isNullOrEmpty()) {
+                throw SemanticException(position, "Enum class cannot inherit classes or interfaces")
             }
         }
         if (ClassModifier.abstract in modifiers) {
             inferredModifiers += ClassModifier.open
+        }
+        if (isInterface) {
+            val unsupportedModifiers = modifiers - setOf(ClassModifier.abstract, ClassModifier.open)
+            if (unsupportedModifiers.isNotEmpty()) {
+                throw SemanticException(position, "Modifiers ${unsupportedModifiers.joinToString(", ")} are not applicable to interfaces")
+            }
+            inferredModifiers += ClassModifier.open
+            inferredModifiers += ClassModifier.abstract
         }
 
         // Declare nullable class type
@@ -1429,6 +1437,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 currentScope = currentScope,
                 name = "$name?",
                 fullQualifiedName = "$fullQualifiedClassName?",
+                isInterface = isInterface,
                 modifiers = emptySet(),
                 typeParameters = typeParameters,
                 isInstanceCreationAllowed = false,
@@ -1516,11 +1525,30 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             currentScope.declareTypeAlias(it.position, it.name, it.typeUpperBound)
         }
 
+        val interfaceInvocations: List<TypeNode>
+        val superClassInvocation: FunctionCallNode?
+        if (isInterface) {
+            superInvocations?.firstOrNull { it is FunctionCallNode }
+                ?.let {
+                    throw SemanticException(it.position, "Interface cannot inherit a class")
+                }
+            interfaceInvocations = superInvocations?.filterIsInstance<TypeNode>() ?: emptyList()
+            superClassInvocation = null
+        } else {
+            val superClassInvocations = superInvocations?.filterIsInstance<FunctionCallNode>()
+            if ((superClassInvocations?.size ?: 0) > 1) {
+                throw SemanticException(superClassInvocations!![1].position, "A class can only inherit at most one other class")
+            }
+            interfaceInvocations = superInvocations?.filterIsInstance<TypeNode>() ?: emptyList()
+            superClassInvocation = superClassInvocations?.firstOrNull()
+        }
+
         pushScope(name, ScopeType.Class)
         val superClassScope = currentScope
         val superClass = (superClassInvocation?.function as? TypeNode)
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
+            ?.also { if (it.isInterface) throw SemanticException(superClassInvocation!!.position, "Interface cannot be constructed") }
         if (superClass != null && ClassModifier.open !in superClass.modifiers) {
             throw SemanticException(superClassInvocation!!.position, "A class can only extend from an open class")
         }
@@ -1561,6 +1589,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 }
             }
 
+            if (isInterface) {
+                if (primaryConstructor != null) {
+                    throw SemanticException(primaryConstructor.position, "Interface cannot have a constructor")
+                }
+                declarations.forEach {
+                    when (it) {
+                        is FunctionDeclarationNode -> if (it.body != null) {
+                            throw SemanticException(it.position, "Concrete functions in interfaces are not supported")
+                        }
+                        is PropertyDeclarationNode -> throw SemanticException(it.position, "Properties in interfaces are not supported")
+                        else -> throw SemanticException(it.position, "Declarations other than abstract functions in interfaces are not supported")
+                    }
+                }
+            }
+
             val nonPropertyArguments = primaryConstructor?.parameters
                 ?.filter { !it.isProperty }
             primaryConstructor?.parameters?.forEach {
@@ -1579,9 +1622,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 currentScope = currentScope!!,
                 name = name,
                 fullQualifiedName = fullQualifiedName,
+                isInterface = isInterface,
                 modifiers = modifiers,
                 typeParameters = typeParameters,
-                isInstanceCreationAllowed = true,
+                isInstanceCreationAllowed = !isInterface,
                 primaryConstructor = primaryConstructor,
                 rawMemberProperties = primaryConstructor?.parameters
                     ?.filter { it.isProperty }
@@ -1624,6 +1668,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 declarations = declarations,
                 superClassInvocation = superClassInvocation,
                 superClass = superClass,
+                superInterfaceTypes = interfaceInvocations,
+                superInterfaces = interfaceInvocations.map {
+                    val clazz = currentScope.findClass(it.name)?.first
+                        ?: throw SemanticException(it.position, "Interface ${it.name} cannot be found")
+                    if (!clazz.isInterface) {
+                        throw SemanticException(it.position, "${it.name} is not an interface")
+                    }
+                    clazz
+                },
             )
             declarationScope.declareClass(position, classDefinition)
 

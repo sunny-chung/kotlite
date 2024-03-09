@@ -145,10 +145,10 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
     protected fun BreakNode.generate() = "break"
 
     protected fun ClassDeclarationNode.generate()
-        = "${modifiers.joinToString("") { "$it " }}class $name" +
+        = "${modifiers.joinToString("") { "$it " }}${if (isInterface) "interface" else "class"} $name" +
             (typeParameters.emptyToNull()?.let { parameters -> "<${parameters.joinToString(", ") {it.generate()}}> " } ?: " ") +
             (primaryConstructor?.let { "${it.generate()} " } ?: "") +
-            (superClassInvocation?.let { ": ${it.generate()} " } ?: "") +
+            (superInvocations?.let { ": ${it.joinToString(", ") { it.generate()} } " } ?: "") +
             "{\n" + buildString {
                 ++indentLevel
                 if (enumEntries.isNotEmpty()) {

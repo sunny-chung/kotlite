@@ -12,6 +12,8 @@ open class ClassDefinition(
     val name: String,
     val fullQualifiedName: String = name, // TODO
 
+    val isInterface: Boolean = false,
+
     /**
      * If it is an object class, no new instance can be created
      */
@@ -31,13 +33,21 @@ open class ClassDefinition(
     private val memberFunctions: Map<String, FunctionDeclarationNode>,
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
+    val superInterfaceTypes: List<TypeNode> = emptyList(),
     val superClassInvocation: FunctionCallNode? = null,
-    val superClass: ClassDefinition? = null
+    val superClass: ClassDefinition? = null,
+    val superInterfaces: List<ClassDefinition> = emptyList(),
 ) {
 
     var enumValues: Map<String, ClassInstance> = emptyMap()
 
     init {
+        if (isInterface) {
+            if (superClass != null || superClassInvocation != null) {
+                throw RuntimeException("Interface cannot extend from a class")
+            }
+        }
+
         if (superClass != null && superClassInvocation == null) {
             throw RuntimeException("superClassInvocation must be provided if there is a supper class")
         }
@@ -70,6 +80,10 @@ open class ClassDefinition(
      * Only for SemanticAnalyzer use during parsing class declarations.
      */
     internal fun addProperty(currentScope: SymbolTable?, it: PropertyDeclarationNode) {
+        if (isInterface) {
+            throw RuntimeException("Properties in interfaces are not supported")
+        }
+
         val type = (currentScope!!.typeNodeToPropertyType(
             it.type,
             it.isMutable
@@ -143,6 +157,13 @@ open class ClassDefinition(
      */
     fun getAllMemberFunctions(): Map<String, FunctionDeclarationNode> {
         return memberFunctions mergeIfNotExists (superClass?.getAllMemberFunctions() ?: emptyMap())
+    }
+
+    /**
+     * Key: Function signature
+     */
+    fun getMemberFunctionsDeclaredInThisClass(): Map<String, FunctionDeclarationNode> {
+        return memberFunctions
     }
 
     fun findMemberFunctionsWithIndexByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, Int>> =
