@@ -152,4 +152,29 @@ class InterfaceCheckTest {
             class A: I1, I2
         """.trimIndent())
     }
+
+    @Test
+    fun cannotCallInterfaceFunctionDirectly1() {
+        assertSemanticFail("""
+            interface I {
+                fun f(): Int
+            }
+            open class B: I {
+                override fun f(): Int = super.f()
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun cannotCallInterfaceFunctionDirectly2() {
+        assertSemanticFail("""
+            interface I {
+                fun f(): Int
+            }
+            abstract class A : I
+            open class B: A() {
+                override fun f(): Int = super.f()
+            }
+        """.trimIndent())
+    }
 }

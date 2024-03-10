@@ -184,7 +184,16 @@ open class ClassDefinition(
      * Key: Function signature
      */
     fun getAllMemberFunctions(): Map<String, FunctionDeclarationNode> {
-        return memberFunctions mergeIfNotExists (superClass?.getAllMemberFunctions() ?: emptyMap())
+        return memberFunctions.let { functionsInThisClass ->
+            var result = functionsInThisClass
+            if (superClass != null) {
+                result = result mergeIfNotExists superClass.getAllMemberFunctions()
+            }
+            superInterfaces.forEach {
+                result = result mergeIfNotExists it.getAllMemberFunctions()
+            }
+            result
+        }
     }
 
     /**

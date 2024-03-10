@@ -89,4 +89,35 @@ class InterfaceTest {
         assertEquals(25, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(37, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun invokeInheritedFunction() {
+        val interpreter = interpreter("""
+            interface I {
+                fun f(x: Int): Int
+            }
+            abstract class Base : I
+            class A : Base() {
+                override fun f(x: Int) = 2 * x
+            }
+            class B : Base() {
+                override fun f(x: Int) = 3 * x
+            }
+            fun getInstance(x: Int): I {
+                return if (x > 0) {
+                    A()
+                } else {
+                    B()
+                }
+            }
+            val a = getInstance(1).f(12)
+            val b = getInstance(-1).f(12)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(24, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(36, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }
