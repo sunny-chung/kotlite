@@ -80,10 +80,10 @@ ${config.typeAliases.toList().joinToString { "typealias ${it.first} = ${it.secon
 abstract class Abstract${name}LibModule : LibraryModule("$name") {
     override val classes = emptyList<ProvidedClassDefinition>()
 
-    override val properties = listOf<ExtensionProperty>(${extensionProperties.joinToString("") { "\n${it.generate(SourcePosition(name, 1, 1), indent(8))},\n" }}
+    override val properties = listOf<ExtensionProperty>(${extensionProperties.joinToString("") { "\n${it.generate(SourcePosition(name, it.position.lineNum, it.position.col), indent(8))},\n" }}
     )
     
-    override val functions = listOf<CustomFunctionDefinition>(${functionInterfaces.joinToString("") { "\n${it.generate(SourcePosition(name, 1, 1), indent(8))},\n" }}
+    override val functions = listOf<CustomFunctionDefinition>(${functionInterfaces.joinToString("") { "\n${it.generate(SourcePosition(name, it.position.lineNum, it.position.col), indent(8))},\n" }}
     )
 }
 """
