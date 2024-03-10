@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 
 open class ClassDefinition(
@@ -44,12 +45,38 @@ open class ClassDefinition(
     init {
         if (isInterface) {
             if (superClass != null || superClassInvocation != null) {
-                throw RuntimeException("Interface cannot extend from a class")
+                throw SemanticException(SourcePosition.NONE, "Interface cannot extend from a class")
             }
         }
 
         if (superClass != null && superClassInvocation == null) {
-            throw RuntimeException("superClassInvocation must be provided if there is a supper class")
+            throw SemanticException(SourcePosition.NONE, "superClassInvocation must be provided if there is a super class")
+        } else if (superClass == null && superClassInvocation != null) {
+            throw SemanticException(SourcePosition.NONE, "superClass must be provided if there is a super class invocation")
+        } else if (superClass != null && superClassInvocation != null) {
+            if (superClass.fullQualifiedName != (superClassInvocation.function as TypeNode).name) {
+                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass.fullQualifiedName} VS ${(superClassInvocation.function as TypeNode).name}")
+            }
+        }
+
+        superInterfaces.forEach { def ->
+            superInterfaceTypes.singleOrNull { it.name == def.name }
+                ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaceTypes on the super interface type ${def.name}")
+        }
+
+        superInterfaceTypes.forEach { type ->
+            superInterfaces.singleOrNull { it.fullQualifiedName == type.name }
+                ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaces on the super interface type ${type.name}")
+        }
+
+        if (superClass != null && superClass.isInterface) {
+            throw SemanticException(SourcePosition.NONE, "superClass ${superClass.name} is not a class but an interface")
+        }
+
+        superInterfaces.forEach { def ->
+            if (!def.isInterface) {
+                throw SemanticException(SourcePosition.NONE, "superInterfaces ${def.name} is not an interface but a class")
+            }
         }
     }
 
