@@ -20,7 +20,7 @@ fun String.dropLast(n: Int): String
 fun String.dropLastWhile(predicate: (Char) -> Boolean): String
 fun String.dropWhile(predicate: (Char) -> Boolean): String
 fun String.endsWith(suffix: String, ignoreCase: Boolean = false): Boolean
-fun String?.equals(other: String?, ignoreCase: Boolean = false)
+fun String?.equals(other: String?, ignoreCase: Boolean = false): Boolean
 fun String.filter(predicate: (Char) -> Boolean): String
 fun String.filterIndexed(predicate: (Int, Char) -> Boolean): String
 fun String.filterNot(predicate: (Char) -> Boolean): String
