@@ -620,7 +620,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             ?.let { function ->
                 val subjectType = subject?.type() as? ObjectType
                 subjectType?.let { subjectType ->
-                    ClassMemberResolver(subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
+                    ClassMemberResolver(symbolTable(), subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
                 }
             }
         val resolvedFunction = (functionNode as? FunctionDeclarationNode)
@@ -632,8 +632,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         val typeParametersReplacedWithArguments = (
                 extraTypeResolutions + // add `extraTypeResolutions` at first because class type arguments have a lower precedence
                 (classResolver?.let { resolver ->
-                    resolvedFunction?.classTreeIndex?.let { index ->
-                        resolver.genericResolutions[index].second.map {
+                    resolvedFunction?.enclosingTypeName?.let { typeName ->
+                        resolver.genericResolutionsByTypeName[typeName]!!.map {
                             TypeParameterNode(it.value.position, it.key, it.value)
                         }
                     }
@@ -1069,6 +1069,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 currentScope = callStack.currentSymbolTable(),
                 name = name,
                 modifiers = modifiers,
+                isInterface = isInterface,
                 fullQualifiedName = fullQualifiedName,
                 typeParameters = typeParameters,
                 isInstanceCreationAllowed = true,
@@ -1462,8 +1463,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 
             if (functionTypeParameters.isNotEmpty()) {
                 var type: DataType? = receiverType
-                while (type != null && type.name != functionReceiverType.name) {
-                    type = (type as? ObjectType)?.superType
+                if (type != null && type.name != functionReceiverType.name) {
+                    type = (type as? ObjectType)?.findSuperType(functionReceiverType.name)
                 }
                 if (type == null && type !is ObjectType) {
                     throw RuntimeException("Enrich fail -- Receiver type of `$functionName` ${functionReceiverType.descriptiveName()} is not found")

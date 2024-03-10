@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
+import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
@@ -625,7 +626,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
             val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException(position, "Class `${receiver.descriptiveName()}` not found")
             if (clazz.superClass != null) {
-                val superClassTypeResolutions = ClassMemberResolver(clazz, typeNode.arguments).genericResolutions.let { it[it.lastIndex - 1] }.second
+                val superClassTypeResolutions = ClassMemberResolver(currentScope, clazz, typeNode.arguments).genericResolutionsByTypeName[clazz.fullQualifiedName]!!
                 val superClassType = TypeNode(
                     SourcePosition.NONE,
                     clazz.superClass.name,
@@ -1009,8 +1010,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     if (tpUpperBounds[resolvedArgumentTypeName] !is ObjectType) return
 
                     var t: DataType? = currentScope.assertToDataType(tpResolutions[resolvedArgumentTypeName]!!)
-                    while (t is ObjectType && t.name != tpUpperBounds[resolvedArgumentTypeName]!!.name) {
-                        t = t.superType
+//                    while (t is ObjectType && t.name != tpUpperBounds[resolvedArgumentTypeName]!!.name) {
+//                        t = t.superType
+//                    }
+                    if (t is ObjectType && t.name != tpUpperBounds[resolvedArgumentTypeName]!!.name) {
+                        t = t.findSuperType(tpUpperBounds[resolvedArgumentTypeName]!!.name)
                     }
                     (tpUpperBounds[resolvedArgumentTypeName] as? ObjectType)?.arguments?.forEachIndexed { i, it ->
                         if (tpUpperBounds.containsKey(it.name)) {
@@ -1059,15 +1063,18 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         (function as NavigationNode).subject.type(ResolveTypeModifier(isSkipGenerics = isSkipGenerics))
 
                     var type = argumentType.toDataType() as? ObjectType
-                    val resolver = type?.let { ClassMemberResolver(it.clazz, it.arguments.map { it.toTypeNode() }) }
-                    while (type != null && type.name != parameterType.name) {
-//                        type = (type as? ObjectType)?.clazz?.superClass?.let {
-//                            val typeResolutions = resolver!!.genericResolutions[it.index].second
-//                            ObjectType(it, it.typeParameters.map {
-//                                typeResolutions[it.name]!!.toDataType()
-//                            }, superType = null)
-//                        }
-                        type = type.superType
+                    val resolver = type?.let { ClassMemberResolver(currentScope, it.clazz, it.arguments.map { it.toTypeNode() }) }
+//                    while (type != null && type.name != parameterType.name) {
+////                        type = (type as? ObjectType)?.clazz?.superClass?.let {
+////                            val typeResolutions = resolver!!.genericResolutions[it.index].second
+////                            ObjectType(it, it.typeParameters.map {
+////                                typeResolutions[it.name]!!.toDataType()
+////                            }, superType = null)
+////                        }
+//                        type = type.superType
+//                    }
+                    if (type != null && type.name != parameterType.name) {
+                        type = type.findSuperType(parameterType.name)
                     }
 
                     if (type != null) {
@@ -1552,7 +1559,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         if (superClass != null && ClassModifier.open !in superClass.modifiers) {
             throw SemanticException(superClassInvocation!!.position, "A class can only extend from an open class")
         }
-        val superClassFunctions = superClass?.getAllMemberFunctions()
+        val superInterfaces = interfaceInvocations.map {
+            val clazz = currentScope.findClass(it.name)?.first
+                ?: throw SemanticException(it.position, "Interface ${it.name} cannot be found")
+            if (!clazz.isInterface) {
+                throw SemanticException(it.position, "${it.name} is not an interface")
+            }
+            clazz
+        }
+        val superClassFunctions = (listOfNotNull(superClass) + superInterfaces)
+            .map { it.getAllMemberFunctions() }
+            .fold(mutableMapOf<String, FunctionDeclarationNode>()) { acc, map ->
+                acc.putAll(map)
+                acc
+            }
         val superClassProperties = superClass?.getAllMemberProperties()
 
         fun checkForOverriddenProperties(property: PropertyDeclarationNode) {
@@ -1597,6 +1617,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     when (it) {
                         is FunctionDeclarationNode -> if (it.body != null) {
                             throw SemanticException(it.position, "Concrete functions in interfaces are not supported")
+                        } else {
+                            it.inferredModifiers += FunctionModifier.abstract
+                            it.inferredModifiers += FunctionModifier.open
                         }
                         is PropertyDeclarationNode -> throw SemanticException(it.position, "Properties in interfaces are not supported")
                         else -> throw SemanticException(it.position, "Declarations other than abstract functions in interfaces are not supported")
@@ -1669,14 +1692,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 superClassInvocation = superClassInvocation,
                 superClass = superClass,
                 superInterfaceTypes = interfaceInvocations,
-                superInterfaces = interfaceInvocations.map {
-                    val clazz = currentScope.findClass(it.name)?.first
-                        ?: throw SemanticException(it.position, "Interface ${it.name} cannot be found")
-                    if (!clazz.isInterface) {
-                        throw SemanticException(it.position, "${it.name} is not an interface")
-                    }
-                    clazz
-                },
+                superInterfaces = superInterfaces,
             )
             declarationScope.declareClass(position, classDefinition)
 
@@ -2221,7 +2237,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 //            return subjectArguments[typeParameterIndex]
         }
 
-        val resolver = ClassMemberResolver(clazz, subjectType.arguments)
+        val resolver = ClassMemberResolver(currentScope, clazz, subjectType.arguments)
         if (lookupType == IdentifierClassifier.Property) {
             /**
              * As of Kotlin 1.9, resolution order is Companion Property > Enum Entry
@@ -2361,12 +2377,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         fun superTypeTree(type: DataType): List<DataType> {
             val types = mutableListOf(type)
             if (type !is ObjectType) return types
-            var type: ObjectType = type
-            while (type.superType != null) {
-                type = type.superType!!
-                types += type
-            }
-            return types
+//            var type: ObjectType = type
+//            while (type.superType != null) {
+//                type = type.superType!!
+//                types += type
+//            }
+//            return types
+            return types + type.superTypes
         }
 
         fun superTypeOf(type1: TypeNode, type2: TypeNode): TypeNode {

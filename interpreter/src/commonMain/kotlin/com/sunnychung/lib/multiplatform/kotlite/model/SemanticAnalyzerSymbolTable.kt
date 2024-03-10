@@ -130,10 +130,11 @@ class SemanticAnalyzerSymbolTable(
 //                    scope = this
 //                )
 //            }.let { thisScopeCandidates += it }
-            ClassMemberResolver(receiverClass, null).findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName).map { lookup ->
+            ClassMemberResolver(this, receiverClass, null).findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName).map { lookup ->
                 val it = lookup.value.function
                 // TODO this is slow, O(n^2). optimize this
                 ClassMemberResolver(
+                    this,
                     receiverClass,
                     (receiverType as ObjectType).arguments.map { it.toTypeNode() }
                 ).findMemberFunctionWithIndexByTransformedNameLinearSearch(it.transformedRefName!!).let { lookup2 ->
@@ -287,10 +288,11 @@ class SemanticAnalyzerSymbolTable(
     fun findExtensionFunctionsIncludingSuperClasses(receiverType: DataType, functionName: String, isThisScopeOnly: Boolean = false): List<ExtensionFunctionLookupResult> {
         val result = mutableListOf<ExtensionFunctionLookupResult>()
 
-        var type: DataType? = receiverType
-        val resolver = (type as? ObjectType)?.let { ClassMemberResolver(it.clazz, it.arguments.map { it.toTypeNode() }) }
-        var classTreeIndex = (type as? ObjectType)?.clazz?.index ?: 0
-        while (type != null) {
+//        var type: DataType = receiverType
+//        val resolver = (type as? ObjectType)?.let { ClassMemberResolver(this, it.clazz, it.arguments.map { it.toTypeNode() }) }
+//        var classTreeIndex = (type as? ObjectType)?.clazz?.index ?: 0
+
+        (listOf(receiverType) + ((receiverType as? ObjectType)?.superTypes ?: emptyList())).forEach { type ->
             findExtensionFunctions(type, functionName, isThisScopeOnly)
                 .let { lookups ->
                     result.addAll(lookups.map {
@@ -308,7 +310,8 @@ class SemanticAnalyzerSymbolTable(
 //                    assertToDataType(typeResolutions[it.name]!!)
 //                })
 //            }
-            type = (type as? ObjectType)?.superType
+
+//            type = (type as? ObjectType)?.superType
         }
 
         return result
@@ -364,12 +367,13 @@ class SemanticAnalyzerSymbolTable(
     }
 
     fun findExtensionPropertyByDeclarationIncludingSuperClasses(resolvedReceiver: TypeNode, declaredName: String, isThisScopeOnly: Boolean = false): Pair<String, ExtensionProperty>? {
-        var receiverType: DataType? = assertToDataType(resolvedReceiver)
-        while (receiverType != null) {
-            findExtensionPropertyByDeclaration(receiverType.toTypeNode(), declaredName)?.let {
+        var receiverType: DataType = assertToDataType(resolvedReceiver)
+//        while (receiverType != null) {
+        (listOf(receiverType) + ((receiverType as? ObjectType)?.superTypes ?: emptyList())).forEach { type ->
+            findExtensionPropertyByDeclaration(type.toTypeNode(), declaredName)?.let {
                 return it
             }
-            receiverType = (receiverType as? ObjectType)?.superType
+//            receiverType = (receiverType as? ObjectType)?.superType
         }
         return null
     }

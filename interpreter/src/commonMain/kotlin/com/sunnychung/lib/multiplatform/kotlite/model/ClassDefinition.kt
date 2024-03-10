@@ -88,8 +88,9 @@ open class ClassDefinition(
             it.type,
             it.isMutable
         ) ?: if (it.type.name == name) {
-            val superType = currentScope!!.resolveObjectType(this, this.typeParameters.map { TypeNode(it.position, it.name, null, false) }, it.type.isNullable, upToIndex = index - 1)
-            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable, superType), it.isMutable)
+            val type = currentScope!!.resolveObjectType(this, this.typeParameters.map { TypeNode(it.position, it.name, null, false) }, it.type.isNullable, upToIndex = index - 1)
+            PropertyType(type!!, it.isMutable)
+//            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable, superType), it.isMutable)
 //            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
         } else throw RuntimeException("Unknown type ${it.type.name}"))
         (memberPropertyTypes as MutableMap)[it.name] = type
@@ -170,6 +171,20 @@ open class ClassDefinition(
         memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
             (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
 
+    fun findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, String>> =
+        memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to fullQualifiedName } mergeIfNotExists
+            (Unit.takeIf { !inThisClassOnly }?.let {
+                val result = mutableMapOf<String, Pair<FunctionDeclarationNode, String>>()
+                superClass?.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly)
+                    ?.also { result += it }
+                superInterfaces.forEach { def ->
+                    def.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly)?.also {
+                        result += it
+                    }
+                }
+                result
+            } ?: emptyMap() )
+
     fun findMemberFunctionsByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, FunctionDeclarationNode> =
         findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly).mapValues { it.value.first }
 
@@ -184,6 +199,23 @@ open class ClassDefinition(
         memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName, inThisClassOnly) }
 
+    fun findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
+        memberFunctions[transformedName]?.let { it to fullQualifiedName } ?:
+            Unit.takeIf { !inThisClassOnly }?.let {
+                superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly)
+                    ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly) }
+            }
+
+    /**
+     * For semantic analyzer use only. In SA, `memberFunctions` is not indexed by transformedRefName.
+     */
+    fun findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
+        memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to fullQualifiedName } ?:
+            Unit.takeIf { !inThisClassOnly }?.let {
+                superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly)
+                    ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly) }
+            }
+
     fun findMemberFunctionByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): FunctionDeclarationNode? =
         findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly)?.first
 
@@ -194,5 +226,9 @@ open class ClassDefinition(
 
     open fun construct(interpreter: Interpreter, callArguments: Array<RuntimeValue>, typeArguments: Array<DataType>, callPosition: SourcePosition): ClassInstance {
         return interpreter.constructClassInstance(callArguments, callPosition, typeArguments, this@ClassDefinition)
+    }
+
+    override fun toString(): String {
+        return "ClassDefinition($fullQualifiedName)"
     }
 }

@@ -72,6 +72,20 @@ class InterfaceCheckTest {
     }
 
     @Test
+    fun interfaceCannotInheritItself() {
+        assertSemanticFail("""
+            interface A : A
+        """.trimIndent())
+    }
+
+    @Test
+    fun interfaceCannotHaveConstructor() {
+        assertSemanticFail("""
+            interface A(val value: String)
+        """.trimIndent())
+    }
+
+    @Test
     fun interfaceCannotBeConstructed() {
         assertSemanticFail("""
             interface A

@@ -112,7 +112,17 @@ data object StarType : DataType {
         return true
     }
 }
-data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>, override val isNullable: Boolean = false, val superType: ObjectType?) : DataType {
+
+/**
+ * @param superTypes It should contain a flattened and non-repetitive list of all super classes and interfaces
+ */
+data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>, override val isNullable: Boolean = false, val superTypes: List<ObjectType>) : DataType {
+    init {
+        if (superTypes.distinctBy { it.name }.size != superTypes.size) {
+            throw RuntimeException("superTypes of type ${clazz.fullQualifiedName} have repeated types")
+        }
+    }
+
     override val name: String = clazz.fullQualifiedName
     override val descriptiveName: String = "${name}${
         arguments.emptyToNull()?.let { "<${it.joinToString(", ") { it.descriptiveName }}>" } ?: ""
@@ -152,8 +162,11 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 //            it.value == scope.assertToDataType(resolutions.second[tp.name]!!)
 //        }
         var otherType: ObjectType = other
-        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
-            otherType = otherType.superType!!
+//        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
+//            otherType = otherType.superType!!
+//        }
+        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) {
+            otherType = otherType.findSuperType(clazz.fullQualifiedName) ?: return false
         }
         if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) return false
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
@@ -196,8 +209,11 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 //            it.value.isConvertibleFrom(scope.assertToDataType(resolutions.second[tp.name]!!))
 //        }
         var otherType: ObjectType = other
-        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
-            otherType = otherType.superType!!
+//        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
+//            otherType = otherType.superType!!
+//        }
+        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) {
+            otherType = otherType.findSuperType(clazz.fullQualifiedName) ?: return false
         }
         if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) return false
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
@@ -213,6 +229,10 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     override fun isSubTypeOf(other: DataType): Boolean {
         if (other !is ObjectType || other == this) return false
         return other.isConvertibleFrom(this)
+    }
+
+    fun findSuperType(typeName: String): ObjectType? {
+        return superTypes.firstOrNull { it.name == typeName }
     }
 
     override fun toTypeNode(): TypeNode {
