@@ -11,8 +11,8 @@ class ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: 
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-            superClassInvocation = "Collection<T>()",
-            superClass = CollectionInterface.collectionClazz,
+            superInterfaceTypeNames = listOf("Collection<T>"),
+            superInterfaces = listOf(CollectionInterface.collectionClazz),
             position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
     }

@@ -189,4 +189,29 @@ class ListTest {
         assertEquals(4, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(4, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
+
+    @Test
+    fun onEachAndFold() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            fun f(l: List<Int>): Int {
+                return l
+                    .onEach { println(it) }
+                    .fold(0) { acc, it -> acc + it }
+            }
+            val a = f(mutableListOf(1, 2, 3, 4, 5))
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("1\n2\n3\n4\n5\n", console.toString())
+    }
 }

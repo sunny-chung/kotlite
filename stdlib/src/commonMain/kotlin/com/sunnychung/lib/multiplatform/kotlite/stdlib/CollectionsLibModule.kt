@@ -16,6 +16,7 @@ class CollectionsLibModule : AbstractCollectionsLibModule() {
 //        CollectionInterface.collectionClazz,
 //        ListValue.clazz,
 
+        CollectionInterface.mutableCollectionClazz,
         MutableListValue.clazz,
         MapValue.clazz,
         MutableMapValue.clazz,

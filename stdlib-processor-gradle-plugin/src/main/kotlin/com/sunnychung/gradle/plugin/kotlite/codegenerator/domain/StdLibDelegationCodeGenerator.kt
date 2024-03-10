@@ -108,8 +108,28 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         it.name to (it.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true))
     }
 
+//    private fun resolveTypeParameterNodeRetainTypeParameters(node: TypeNode): TypeNode {
+//        if (typeParameters.containsKey(node.name) && node.arguments == null) {
+//            return TypeNode(node.position, node.name, TypeNode(node.position, node.name, null, false))
+//        }
+//        return TypeNode(node.position, node.name, node.arguments?.map { resolveTypeParameterNodeRetainTypeParameters(it) }, node.isNullable)
+//    }
+
+    val typeParameterNodesRetainTypeParameters = typeParameterNodes.map { TypeParameterNode(
+        it.position, it.name, if (it.typeUpperBound == null && typeParameters.containsKey(it.name)) {
+            TypeNode(SourcePosition.NONE, it.name, null, false)
+        } else {
+//            it.typeUpperBound?.let { resolveTypeParameterNodeRetainTypeParameters(it) }
+            it.typeUpperBound
+        }
+    ) }
+
     fun resolve(type: TypeNode): TypeNode {
         return type.resolveGenericParameterTypeToUpperBound(typeParameterNodes)
+    }
+
+    fun resolveForWrap(type: TypeNode): TypeNode {
+        return type.resolveGenericParameterTypeToUpperBound(typeParameterNodes, isKeepTypeParameter = true)
     }
 
     fun FunctionDeclarationNode.generate(position: SourcePosition, indent: String): String {
@@ -158,7 +178,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
 
     // kotlin value -> Interpreter runtime value
     fun wrap(variableName: String, _type: TypeNode): String {
-        val type = resolve(_type)
+        val type = resolveForWrap(_type)
 
         fun TypeNode.toDataTypeCode(): String {
             return if (typeParameters.containsKey(this.name)) {
@@ -170,7 +190,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             }
         }
 
-        val typeArgs = _type.arguments.let { typeArgs ->
+        val typeArgs = type.arguments.let { typeArgs ->
             if (typeArgs.isNullOrEmpty()) {
                 ""
             } else {
@@ -178,7 +198,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                     it.toDataTypeCode()
                 }
             }
-        } + " /* _t = ${_type.descriptiveName()}; t = ${type.descriptiveName()} */"
+        } + " /* _t = ${_type.descriptiveName()}; t.name = ${type.name}; t = ${type.descriptiveName()} */"
         val symbolTableArg = if (!type.isPrimitive()) {
             ", symbolTable = interpreter.symbolTable()"
         } else ""
@@ -186,7 +206,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             "Collection" -> "ListValue"
             else -> "${type.name}Value"
         }
-        val wrappedValue = if (type.name == "Any") {
+        val wrappedValue = if (type.name == "Any" || (typeParameters.containsKey(type.name) && typeParameters[type.name]!!.name == "Any")) {
             "it as RuntimeValue"
         } else {
             "$translatedTypeName(it$typeArgs$symbolTableArg)"

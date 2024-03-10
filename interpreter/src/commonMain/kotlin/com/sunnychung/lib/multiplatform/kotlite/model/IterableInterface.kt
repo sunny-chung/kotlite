@@ -2,11 +2,14 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.lexer.BuiltinFilename
 
+class IterableValue(value: Iterable<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable) : DelegatedValue<Iterable<RuntimeValue>>(value, IterableInterface.clazz, listOf(typeArgument), symbolTable)
+
 class IterableInterface {
 
     companion object {
         val clazz = ProvidedClassDefinition(
             fullQualifiedName = "Iterable",
+            isInterface = true,
             typeParameters = listOf(TypeParameterNode(SourcePosition.BUILTIN, name = "T", typeUpperBound = null)),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
