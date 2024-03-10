@@ -1971,7 +1971,7 @@ class Parser(protected val lexer: Lexer) {
             position = t.position,
             name = name,
             receiver = receiver,
-            declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false).takeIf { body?.format == FunctionBodyFormat.Block },
+            declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false).takeIf { body == null || body.format == FunctionBodyFormat.Block },
             valueParameters = valueParameters,
             body = body,
             typeParameters = typeParameters,

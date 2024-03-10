@@ -166,7 +166,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             } else if (this.isPrimitive()) {
                 "${this.name}Type(isNullable = ${this.isNullable})"
             } else {
-                "ObjectType(${this.name}Value.clazz, listOf<DataType>(${this.arguments?.joinToString(", ") { it.toDataTypeCode() }}), superType = null)"
+                "ObjectType(${this.name}Value.clazz, listOf<DataType>(${this.arguments?.joinToString(", ") { it.toDataTypeCode() }}), superTypes = emptyList())"
             }
         }
 
