@@ -28,7 +28,7 @@ class SemanticAnalyzerSymbolTable(
             .first
     }
 
-    private fun declareTempTypeAlias(typeAliasAndUpperBounds: List<Pair<String, TypeNode>>) {
+    internal fun declareTempTypeAlias(typeAliasAndUpperBounds: List<Pair<String, TypeNode>>) {
         val alias = mutableMapOf<String, DataType>()
         // update tempTypeAlias first, because other type parameters may depend on previous type parameters in the same event
         // e.g. `<T, L : List<T>>`
@@ -38,7 +38,7 @@ class SemanticAnalyzerSymbolTable(
         }
     }
 
-    private fun popTempTypeAlias() {
+    internal fun popTempTypeAlias() {
         tempTypeAlias.removeLast()
     }
 

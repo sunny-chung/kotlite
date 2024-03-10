@@ -118,6 +118,8 @@ open class TypeNode(override val position: SourcePosition, val name: String, val
         result = 31 * result + isNullable.hashCode()
         return result
     }
+
+    override fun toString(): String = descriptiveName()
 }
 
 data class PropertyDeclarationNode(

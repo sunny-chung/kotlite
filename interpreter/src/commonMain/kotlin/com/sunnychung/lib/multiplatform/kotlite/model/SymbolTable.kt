@@ -165,7 +165,19 @@ open class SymbolTable(
                         val superType = resolve(it)
                         log.v { "superType ${superType.descriptiveName} with super types ${superType.superTypes}" }
                         listOf(superType) + superType.superTypes
-                     },
+                     }
+                    .groupBy { it.name }
+                    .mapValues {
+                        it.value.indices.forEach { i ->
+                            if (i > 0) {
+                                if (it.value[i].arguments != it.value[i - 1].arguments) {
+                                    throw RuntimeException("Type arguments of repeated type ${it.key} are not consistent -- ${it.value[i].arguments} VS ${it.value[i - 1].arguments}")
+                                }
+                            }
+                        }
+                        it.value.first()
+                    }
+                    .values.toList(),
             )
         }
 

@@ -26,8 +26,6 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
 
     init {
         val genericResolutions: MutableList<Pair<ClassDefinition, Map<String, TypeNode>>> = mutableListOf()
-        val interfaceResolutions: MutableMap<String, Map<String, TypeNode>> = mutableMapOf()
-        val interfaceDefinitions: MutableMap<String, ClassDefinition> = mutableMapOf()
 
         val genericResolutionsByTypeName: MutableMap<String, Map<String, TypeNode>> = mutableMapOf()
         val genericUpperBoundsByTypeName: MutableMap<String, Map<String, TypeNode>> = mutableMapOf()
@@ -35,9 +33,9 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
 
         fun checkAndPutResolution(typeDef: ClassDefinition, resolvedTypeArguments: Map<String, TypeNode>, destination: MutableMap<String, Map<String, TypeNode>>) {
             if (destination.containsKey(typeDef.name)) {
-                val previousResolution = interfaceResolutions[typeDef.name]!!
-                if (typeArguments == null || previousResolution.size != typeArguments.size) {
-                    throw RuntimeException("Inconsistent type argument resolution for type ${typeDef.name}")
+                val previousResolution = destination[typeDef.name]!!
+                if (resolvedTypeArguments == null || previousResolution.size != resolvedTypeArguments.size) {
+                    throw RuntimeException("Inconsistent type argument resolution for type ${typeDef.name} -- ${previousResolution} VS ${resolvedTypeArguments}")
                 }
                 val changes = mutableMapOf<String, TypeNode>()
                 resolvedTypeArguments.forEach {
@@ -55,7 +53,7 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
                     }
                 }
                 if (changes.isNotEmpty()) {
-                    destination[typeDef.name] = interfaceResolutions[typeDef.name]!! + changes
+                    destination[typeDef.name] = destination[typeDef.name]!! + changes
                 }
             } else {
                 destination[typeDef.name] = resolvedTypeArguments
@@ -88,6 +86,10 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
             }
         }
 
+        if (typeArguments == null && symbolTable is SemanticAnalyzerSymbolTable) {
+            symbolTable.declareTempTypeAlias(clazz.typeParameters.map { it.name to it.typeUpperBoundOrAny() })
+        }
+
         val firstTypeArgumentMap = clazz.typeParameters.mapIndexed { index, tp ->
             tp.name to (typeArguments?.get(index) ?: TypeNode(tp.position, tp.name, null, false))
         }.toMap()
@@ -116,6 +118,11 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
             clazz = superClass
         }
         genericResolutions.reverse()
+
+        if (typeArguments == null && symbolTable is SemanticAnalyzerSymbolTable) {
+            symbolTable.popTempTypeAlias()
+        }
+
         this.genericResolutions = genericResolutions.toList()
         this.genericResolutionsByTypeName = genericResolutionsByTypeName.toMap()
         this.genericUpperBoundsByTypeName = genericUpperBoundsByTypeName.toMap()
