@@ -268,6 +268,13 @@ class SemanticAnalyzerSymbolTable(
             else -> throw UnsupportedOperationException()
         }
 
+    fun toDataType(type: Any, typeParameters: List<TypeParameterNode>): DataType =
+        when (type) {
+            is FunctionValueParameterNode -> assertToDataTypeWithTypeParameters(type.type, typeParameters)
+            is DataType -> type
+            else -> throw UnsupportedOperationException()
+        }
+
     // only use in semantic analyzer
     // this operation is expensive
     fun findMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>, modifierFilter: SearchFunctionModifier): List<FindCallableResult> {
@@ -294,6 +301,27 @@ class SemanticAnalyzerSymbolTable(
                         callables.any { it.receiverType != null && assertToDataTypeWithTypeParameters(it.receiverType, it.typeParameters) == callableReceiverType && it.type == CallableType.ClassMemberFunction }
                     } else {
                         false
+                    }
+                }
+            }
+            .let { callables -> // filter for functions that have strictly more specific value parameters
+                callables.filterNot { callable ->
+                    // find for any eligible other callable that is strictly more specific to callable
+                    callables.any { otherCallable ->
+                        if (callable === otherCallable) return@any false
+                        if (callable.arguments.size != otherCallable.arguments.size) return@any false
+                        val valueParameterTypes = callable.arguments.map { toDataType(it, callable.typeParameters) }
+                        val otherValueParameterTypes = otherCallable.arguments.map { toDataType(it, otherCallable.typeParameters) }
+                        var isOtherMoreSpecific = false
+                        valueParameterTypes.indices.forEach {  i ->
+                            if (!otherValueParameterTypes[i].isAssignableTo(valueParameterTypes[i])) {
+                                return@any false
+                            }
+                            if (!isOtherMoreSpecific && otherValueParameterTypes[i].isSubTypeOf(valueParameterTypes[i])) {
+                                isOtherMoreSpecific = true
+                            }
+                        }
+                        isOtherMoreSpecific // return true if otherCallable is more specific than callable
                     }
                 }
             }

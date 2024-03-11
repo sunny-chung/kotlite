@@ -331,4 +331,22 @@ class FunctionResolutionTest {
         assertEquals(24, (symbolTable.findPropertyByDeclaredName("b1") as IntValue).value)
         assertEquals(25, (symbolTable.findPropertyByDeclaredName("b2") as IntValue).value)
     }
+
+    @Test
+    fun functionOverloadWithMoreSpecificTypeParameter() {
+        val interpreter = interpreter("""
+            open class A
+            class B : A()
+            fun f(x: A) = 10
+            fun f(x: B) = 12
+            val a = f(A())
+            val b = f(B())
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }
