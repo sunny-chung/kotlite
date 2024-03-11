@@ -177,8 +177,8 @@ class SemanticAnalyzerSymbolTable(
         }
         thisScopeCandidates = thisScopeCandidates
             .filter { callable ->
-                when (modifierFilter) {
-                    SearchFunctionModifier.OperatorFunctionOnly -> {
+                when (modifierFilter.typeFilter) {
+                    SearchFunctionModifier.Type.OperatorFunctionOnly -> {
                         if (callable.definition is FunctionDeclarationNode) {
                             callable.definition.modifiers.contains(FunctionModifier.operator)
                         } else {
@@ -186,7 +186,7 @@ class SemanticAnalyzerSymbolTable(
                         }
                     }
 
-                    SearchFunctionModifier.NoRestriction, SearchFunctionModifier.ConstructorOnly -> true
+                    else -> true
                 }
             }
             .filter { callable ->
@@ -284,6 +284,13 @@ class SemanticAnalyzerSymbolTable(
         return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter)
             .distinctBy { it.definition }
             .distinctBy { FunctionDistinctId(it.receiverType, it.originalName, it.arguments.map { toTypeNode(it) }) }
+            .let { callables ->
+                modifierFilter.returnType?.let { requiredReturnType ->
+                    callables.filter {
+                        requiredReturnType.isConvertibleFrom(assertToDataTypeWithTypeParameters(it.returnType, it.typeParameters))
+                    }
+                } ?: callables
+            }
             .let { callables -> // subclass callables override superclass
                 callables.filterNot { callable ->
                     if (callable.receiverType != null) {
@@ -463,10 +470,18 @@ fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable
     }
 }
 
-enum class SearchFunctionModifier {
-    OperatorFunctionOnly,
-    ConstructorOnly,
-    NoRestriction,
+data class SearchFunctionModifier(val typeFilter: Type? = null, val returnType: DataType? = null) {
+    enum class Type {
+        OperatorFunctionOnly,
+        ConstructorOnly,
+        NoRestriction,
+    }
+
+    companion object {
+        val OperatorFunctionOnly = SearchFunctionModifier(typeFilter = Type.OperatorFunctionOnly)
+        val ConstructorOnly = SearchFunctionModifier(typeFilter = Type.ConstructorOnly)
+        val NoRestriction = SearchFunctionModifier()
+    }
 }
 
 data class ExtensionFunctionLookupResult(

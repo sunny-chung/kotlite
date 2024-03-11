@@ -284,7 +284,7 @@ class OperatorFunctionTest {
             val cval = c.value
             val b = c % A<Int>(11)
             val bval = b.value
-            val a = c / B<Int>(2)
+            val a = c / b
             val aval: Int = a.value
         """.trimIndent())
         interpreter.eval()
@@ -293,6 +293,29 @@ class OperatorFunctionTest {
         assertEquals(6, symbolTable.propertyValues.size)
         assertEquals(15, (symbolTable.findPropertyByDeclaredName("cval") as IntValue).value)
         assertEquals(34, (symbolTable.findPropertyByDeclaredName("bval") as IntValue).value)
-        assertEquals(1, (symbolTable.findPropertyByDeclaredName("aval") as IntValue).value)
+        assertEquals(-223, (symbolTable.findPropertyByDeclaredName("aval") as IntValue).value)
+    }
+
+    @Test
+    fun timesAssignWithCustomTimesOperator() {
+        val interpreter = interpreter("""
+            class PowerCoefficient(val value: Int)
+            operator fun Int.times(coefficient: PowerCoefficient): Int {
+                var i = 0
+                var result = 1
+                while (++i <= coefficient.value) {
+                    result *= this
+                }
+                return result
+            }
+            val a: Int = 5 * PowerCoefficient(4)
+            val b = 7 * PowerCoefficient(5)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(625, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(16807, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
 }

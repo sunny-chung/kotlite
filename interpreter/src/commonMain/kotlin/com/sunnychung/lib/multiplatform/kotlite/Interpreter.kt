@@ -402,6 +402,10 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             result as RuntimeValue
         } else {
             val existing = read()
+            preAssignmentFunctionCall?.let { func ->
+                write(func.eval(replaceArguments = mapOf(0 to result)))
+                return
+            }
             val newResult = when (operator) {
                 "+=" -> {
                     if (subject.declaredType() is StringType) {

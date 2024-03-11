@@ -77,4 +77,15 @@ class OperatorTypeTest {
             y[0] += 5.67
         """.trimIndent())
     }
+
+    @Test
+    fun augmentedAssignmentWrongPreAssignmentOperatorType() {
+        assertSemanticFail("""
+            class A
+            class B
+            operator fun A.plus(x: B): B = B()
+            var a = A()
+            a += B()
+        """.trimIndent())
+    }
 }

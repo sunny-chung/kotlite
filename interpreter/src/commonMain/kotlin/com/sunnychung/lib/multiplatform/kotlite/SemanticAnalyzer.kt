@@ -223,6 +223,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         }
     }
 
+    fun operatorToFunctionName(operator: String) = when (operator) {
+        "+" -> "plus"
+        "-" -> "minus"
+        "*" -> "times"
+        "/" -> "div"
+        "%" -> "rem"
+        else -> null
+    }
+
     data class Modifier(
         /**
          * This would skip visiting lambdas.
@@ -354,14 +363,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
         node1.visit(modifier = modifier)
         node2.visit(modifier = modifier)
-        val functionName = when (operator) {
-            "+" -> "plus"
-            "-" -> "minus"
-            "*" -> "times"
-            "/" -> "div"
-            "%" -> "rem"
-            else -> null
-        }
+        val functionName = if (operator in setOf("+", "-", "*", "/", "%")) {
+            operatorToFunctionName(operator)
+        } else null
         val node1Type = node1.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
         val node2Type = node2.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
         if (functionName != null && currentScope.findMatchingCallables(
@@ -437,8 +441,34 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         val valueType = value.type().toDataType()
 
         if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
+            val preAssignmentOperator = operator.removeSuffix("=")
+            val functionName = operatorToFunctionName(preAssignmentOperator)!!
+
+            if (currentScope.findMatchingCallables(
+                currentScope,
+                functionName,
+                subjectType,
+                listOf(FunctionCallArgumentInfo(name = null, type = valueType)),
+                modifierFilter = SearchFunctionModifier(
+                    typeFilter = SearchFunctionModifier.Type.OperatorFunctionOnly,
+                    returnType = subjectType
+                ),
+            ).isNotEmpty()) {
+                preAssignmentFunctionCall = FunctionCallNode(
+                    function = NavigationNode(position, subjectRawType, ".", ClassMemberReferenceNode(position, functionName)),
+                    arguments = listOf(FunctionCallArgumentNode(position = value.position, index = 0, value = value)),
+                    declaredTypeArguments = emptyList(),
+                    position = position,
+                    modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+                ).also { it.visit(modifier = modifier) }
+                return
+            }
+
             if (operator == "+=" && subjectType is StringType) {
                 return // string can concat anything
+            }
+            if (!subjectType.isNonNullNumberType()) {
+                throw SemanticException(position, "Missing `$functionName` operator function for type ${subjectType.descriptiveName}")
             }
             if (!valueType.isNonNullNumberType()) {
                 throw TypeMismatchException(position, "non-null number type", valueType.nameWithNullable)

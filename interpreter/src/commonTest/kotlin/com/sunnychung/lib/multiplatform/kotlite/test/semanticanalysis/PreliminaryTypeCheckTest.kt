@@ -38,7 +38,7 @@ class PreliminaryTypeCheckTest {
 
     @Test
     fun assignValueNullable3() {
-        assertTypeCheckFail("""
+        assertSemanticFail("""
             var a: Double? = 10.0
             a += null
         """.trimIndent())
