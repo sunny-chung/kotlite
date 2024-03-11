@@ -2,11 +2,13 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.Parser
+import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 
 class ProvidedClassDefinition(
     val position: SourcePosition,
     fullQualifiedName: String,
+    isInterface: Boolean = false,
     typeParameters: List<TypeParameterNode>,
     isInstanceCreationAllowed: Boolean,
     private val primaryConstructorParameters: List<CustomFunctionParameter>,
@@ -14,10 +16,13 @@ class ProvidedClassDefinition(
     modifiers: Set<ClassModifier> = emptySet(),
     superClassInvocation: String? = null,
     superClass: ClassDefinition? = null,
+    superInterfaceTypeNames: List<String> = emptyList(),
+    superInterfaces: List<ClassDefinition> = emptyList(),
 ) : ClassDefinition(
     currentScope = null,
     name = fullQualifiedName.substringAfterLast('.'),
     fullQualifiedName = fullQualifiedName,
+    isInterface = isInterface,
     modifiers = modifiers,
     typeParameters = typeParameters,
     isInstanceCreationAllowed = isInstanceCreationAllowed,
@@ -48,9 +53,14 @@ class ProvidedClassDefinition(
         }
     ),
     superClassInvocation = superClassInvocation?.let {
-        Parser(Lexer(position.filename, it)).delegationSpecifiers()
+        Parser(Lexer(position.filename, it)).delegationSpecifiers().single() as? FunctionCallNode
+            ?: throw SemanticException(position, "Missing value parameters in super class invocation")
     },
     superClass = superClass,
+    superInterfaceTypes = superInterfaceTypeNames.map {
+        Parser(Lexer(position.filename, it)).typeReference()
+    },
+    superInterfaces = superInterfaces,
 ) {
     override fun construct(
         interpreter: Interpreter,
@@ -68,6 +78,7 @@ class ProvidedClassDefinition(
     fun copyNullableClassDefinition() = ProvidedClassDefinition(
         fullQualifiedName = "$fullQualifiedName?",
         typeParameters = typeParameters,
+        isInterface = isInterface,
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = {_, _, _ -> throw UnsupportedOperationException()},

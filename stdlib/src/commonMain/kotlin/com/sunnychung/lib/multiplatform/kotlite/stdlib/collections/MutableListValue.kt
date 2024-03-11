@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.stdlib.collections
 
+import com.sunnychung.lib.multiplatform.kotlite.model.CollectionInterface
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ListValue
@@ -18,6 +19,8 @@ class MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType,
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+            superInterfaceTypeNames = listOf("MutableCollection<T>"),
+            superInterfaces = listOf(CollectionInterface.mutableCollectionClazz),
             superClassInvocation = "List<T>()",
             superClass = ListValue.clazz,
             position = SourcePosition("Collections", 1, 1),

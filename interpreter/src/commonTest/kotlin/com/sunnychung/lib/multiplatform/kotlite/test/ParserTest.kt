@@ -156,4 +156,13 @@ class ParserTest {
             ).script()
         }
     }
+
+    @Test
+    fun nonAbstractFunctionMustHaveBody() {
+        assertFailsWith<ExpectTokenMismatchException> {
+            parser("""
+                fun f()
+            """.trimIndent()).script()
+        }
+    }
 }

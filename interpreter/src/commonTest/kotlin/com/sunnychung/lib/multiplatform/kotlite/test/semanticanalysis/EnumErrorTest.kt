@@ -34,6 +34,16 @@ class EnumErrorTest {
     }
 
     @Test
+    fun enumClassCannotInheritInterface() {
+        assertSemanticFail("""
+            interface SomeInterface
+            enum class MyEnum : SomeInterface {
+                A, B, C, D
+            }
+        """.trimIndent())
+    }
+
+    @Test
     fun enumClassCannotBeOpen() {
         assertSemanticFail("""
             open enum class MyEnum {
@@ -45,8 +55,7 @@ class EnumErrorTest {
     @Test
     fun enumClassConstructorMismatch1() {
         assertSemanticFail("""
-            open class SomeClass
-            enum class MyEnum : SomeClass() {
+            enum class MyEnum {
                 A, B, C(123), D
             }
         """.trimIndent())
@@ -55,8 +64,7 @@ class EnumErrorTest {
     @Test
     fun enumClassConstructorMismatch2() {
         assertSemanticFail("""
-            open class SomeClass
-            enum class MyEnum(val value: Int) : SomeClass() {
+            enum class MyEnum(val value: Int) {
                 A(12), B(23), C(123, 4), D(45)
             }
         """.trimIndent())
@@ -65,8 +73,7 @@ class EnumErrorTest {
     @Test
     fun enumClassConstructorMismatch3() {
         assertSemanticFail("""
-            open class SomeClass
-            enum class MyEnum(val value: Int) : SomeClass() {
+            enum class MyEnum(val value: Int) {
                 A(12), B(23), C("123"), D(45)
             }
         """.trimIndent())
@@ -75,8 +82,7 @@ class EnumErrorTest {
     @Test
     fun enumClassConstructorMismatch4() {
         assertSemanticFail("""
-            open class SomeClass
-            enum class MyEnum(val value: Int) : SomeClass() {
+            enum class MyEnum(val value: Int) {
                 A(12), B(23), C, D(45)
             }
         """.trimIndent())

@@ -13,7 +13,8 @@ fun <T : Any> listOfNotNull(vararg elements: T?): List<T>
 fun <T> List(size: Int, init: (index: Int) -> T): List<T>
 fun <T> MutableList(size: Int, init: (index: Int) -> T): MutableList<T>
 
-fun <T> MutableList<T>.addAll(elements: Iterable<T>): Boolean
+fun <T> MutableCollection<T>.add(element: T): Boolean
+fun <T> MutableCollection<T>.addAll(elements: Iterable<T>): Boolean
 fun <T> Iterable<T>.all(predicate: (T) -> Boolean): Boolean
 fun <T> Iterable<T>.any(predicate: (T) -> Boolean): Boolean
 fun <T> List<T>.asReversed(): List<T>
@@ -26,6 +27,7 @@ fun <T> List<T>.binarySearch(
 fun <T, R> Iterable<T>.chunked(size: Int, transform: (List<T>) -> R): List<R>
 fun <T> Iterable<T>.contains(element: T): Boolean
 fun <T> List<T>.containsAll(elements: List<T>): Boolean
+fun <T> MutableCollection<T>.clear()
 fun <T> Iterable<T>.count(predicate: (T) -> Boolean): Int
 fun <T> Iterable<T>.count(): Int
 fun <T> Iterable<T>.distinct(): List<T>
@@ -112,29 +114,35 @@ fun <T, R : Any> Iterable<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?)
 fun <T, R : Any> Iterable<T>.mapNotNull(transform: (T) -> R?): List<R>
 fun <T> Iterable<T>.minus(element: T): List<T>
 fun <T> Iterable<T>.minus(elements: Iterable<T>): List<T>
-fun <T> MutableList<T>.minusAssign(element: T)
+fun <T> MutableCollection<T>.minusAssign(element: T)
 fun <T> Iterable<T>.minusElement(element: T): List<T>
 fun <T> Iterable<T>.none(predicate: (T) -> Boolean): Boolean
 fun <T> Iterable<T>.none(): Boolean
+//fun <T, C : Iterable<T>> C.onEach(action: (T) -> Unit): C
 fun <T> List<T>.onEach(action: (T) -> Unit): List<T>
 fun <T> List<T>.onEachIndexed(action: (index: Int, T) -> Unit): List<T>
 fun <T> List<T>?.orEmpty(): List<T>
+fun <T> Iterable<T>.partition(predicate: (T) -> Boolean): Pair<List<T>, List<T>>
 fun <T> Iterable<T>.plus(element: T): List<T>
 fun <T> Iterable<T>.plus(elements: List<T>): List<T>
-fun <T> MutableList<T>.plusAssign(element: T)
-fun <T> MutableList<T>.plusAssign(elements: Iterable<T>)
+fun <T> MutableCollection<T>.plusAssign(element: T)
+fun <T> MutableCollection<T>.plusAssign(elements: Iterable<T>)
 fun <T> Iterable<T>.plusElement(element: T): List<T>
 fun <T> List<T>.random(): T
 fun <T> List<T>.randomOrNull(): T?
-fun <T> MutableList<T>.removeAll(elements: Iterable<T>): Boolean
+fun <T> MutableCollection<T>.remove(element: T): Boolean
+fun <T> MutableCollection<T>.removeAll(elements: Collection<T>): Boolean
 fun <T> MutableList<T>.removeAll(predicate: (T) -> Boolean): Boolean
 fun <T> MutableList<T>.removeAt(index: Int): T
 fun <T> MutableList<T>.removeFirst(): T
 fun <T> MutableList<T>.removeFirstOrNull(): T?
 fun <T> MutableList<T>.removeLast(): T
 fun <T> MutableList<T>.removeLastOrNull(): T?
+fun <T> MutableCollection<T>.retainAll(elements: Collection<T>): Boolean
 fun <T> MutableList<T>.retainAll(predicate: (T) -> Boolean): Boolean
 fun <T> Iterable<T>.reversed(): List<T>
+fun <T, R> Iterable<T>.scan(initial: R, operation: (acc: R, T) -> R): List<R>
+fun <T, R> Iterable<T>.scanIndexed(initial: R, operation: (index: Int, acc: R, T) -> R): List<R>
 operator fun <T> MutableList<T>.set(index: Int, element: T): T
 fun <T> MutableList<T>.shuffle()
 fun <T> Iterable<T>.shuffled(): List<T>
@@ -194,6 +202,17 @@ fun <K, V> Map<K, V>.containsValue(value: V): Boolean
 
 operator fun <K, V> Map<K, V>.iterator(): Iterator<MapEntry<K, V>>
 
+fun <K, V> Map<K, V>.all(
+    predicate: (MapEntry<K, V>) -> Boolean
+): Boolean
+
+fun <K, V> Map<K, V>.any(): Boolean
+fun <K, V> Map<K, V>.any(
+    predicate: (MapEntry<K, V>) -> Boolean
+): Boolean
+
+//fun <K, V> Map<K, V>.asIterable(): Iterable<MapEntry<K, V>>
+
 fun <T, K, V> Iterable<T>.associate(
     transform: (T) -> Pair<K, V>
 ): Map<K, V>
@@ -210,6 +229,7 @@ fun <K, V> Iterable<K>.associateWith(
     valueSelector: (K) -> V
 ): Map<K, V>
 
+fun <K, V> MutableMap<K, V>.clear()
 fun <K, V> Map<K, V>.count(): Int
 fun <K, V> Map<K, V>.count(predicate: (MapEntry<K, V>) -> Boolean): Int
 //fun <K, V> emptyMap(): Map<K, V>
@@ -217,6 +237,15 @@ fun <K, V> Map<K, V>.filter(predicate: (MapEntry<K, V>) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterKeys(predicate: (K) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterNot(predicate: (MapEntry<K, V>) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterValues(predicate: (V) -> Boolean): Map<K, V>
+fun <K, V, R : Any> Map<K, V>.firstNotNullOf(
+    transform: (MapEntry<K, V>) -> R?
+): R
+fun <K, V, R : Any> Map<K, V>.firstNotNullOfOrNull(
+    transform: (MapEntry<K, V>) -> R?
+): R?
+fun <K, V, R> Map<K, V>.flatMap(
+    transform: (MapEntry<K, V>) -> Iterable<R>
+): List<R>
 fun <K, V> Map<K, V>.forEach(action: (MapEntry<K, V>) -> Unit)
 operator fun <K, V> Map<K, V>.get(key: K): V?
 fun <K, V> Map<K, V>.getOrElse(key: K, defaultValue: () -> V): V
@@ -233,11 +262,13 @@ fun <K, V> Map<K, V>.isNotEmpty(): Boolean
 fun <K, V> Map<K, V>?.isNullOrEmpty(): Boolean
 fun <K, V, R> Map<K, V>.map(transform: (MapEntry<K, V>) -> R): List<R>
 fun <K, V, R> Map<K, V>.mapKeys(transform: (MapEntry<K, V>) -> R): Map<R, V>
+fun <K, V, R : Any> Map<K, V>.mapNotNull(transform: (MapEntry<K, V>) -> R?): List<R>
 fun <K, V, R> Map<K, V>.mapValues(transform: (MapEntry<K, V>) -> R): Map<K, R>
 fun <K, V> Map<K, V>.minus(key: K): Map<K, V>
 fun <K, V> Map<K, V>.minus(keys: List<K>): Map<K, V>
 fun <K, V> MutableMap<K, V>.minusAssign(key: K)
 fun <K, V> MutableMap<K, V>.minusAssign(keys: List<K>)
+fun <K, V> Map<K, V>.none(): Boolean
 fun <K, V> Map<K, V>.none(predicate: (MapEntry<K, V>) -> Boolean): Boolean
 fun <K, V> Map<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): Map<K, V>
 fun <K, V> MutableMap<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): MutableMap<K, V>
@@ -248,6 +279,7 @@ fun <K, V> Map<K, V>.plus(pair: Pair<K, V>): Map<K, V>
 fun <K, V> Map<K, V>.plus(pairs: List<Pair<K, V>>): Map<K, V>
 fun <K, V> MutableMap<K, V>.plusAssign(pair: Pair<K, V>)
 fun <K, V> MutableMap<K, V>.plusAssign(pairs: List<Pair<K, V>>)
+fun <K, V> MutableMap<K, V>.put(key: K, value: V): V?
 fun <K, V> MutableMap<K, V>.putAll(pairs: List<Pair<K, V>>)
 fun <K, V> MutableMap<K, V>.remove(key: K): V?
 operator fun <K, V> MutableMap<K, V>.set(key: K, value: V)

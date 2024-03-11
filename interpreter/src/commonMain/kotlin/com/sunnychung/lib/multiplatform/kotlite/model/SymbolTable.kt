@@ -133,22 +133,55 @@ open class SymbolTable(
     }
 
     fun resolveObjectType(clazz: ClassDefinition, typeArguments: List<TypeNode>?, isNullable: Boolean, upToIndex: Int = -1): ObjectType? {
-        val genericResolver = ClassMemberResolver(clazz, typeArguments ?: emptyList())
-        var superType: ObjectType? = null
-        genericResolver.genericResolutions.forEachIndexed { index, resolutions ->
-            if (upToIndex >= 0 && index > upToIndex) return superType
-            val clazz = resolutions.first
-            superType = ObjectType(
-                clazz = clazz,
-                arguments = clazz.typeParameters.map { tp ->
-                    val argument = resolutions.second[tp.name]!!
+        val genericResolver = ClassMemberResolver(this, clazz, typeArguments ?: emptyList())
+//        var superType: ObjectType? = null
+//        genericResolver.genericResolutions.forEachIndexed { index, resolutions ->
+//            if (upToIndex >= 0 && index > upToIndex) return superType
+//            val clazz = resolutions.first
+//            superType = ObjectType(
+//                clazz = clazz,
+//                arguments = clazz.typeParameters.map { tp ->
+//                    val argument = resolutions.second[tp.name]!!
+//                    assertToDataType(argument)
+//                },
+//                isNullable = isNullable,
+//                superType = superType
+//            )
+//        }
+//        return superType
+
+        fun resolve(type: ClassDefinition): ObjectType {
+            val resolution = genericResolver.genericResolutionsByTypeName[type.name]!!
+            return ObjectType(
+                clazz = type,
+                arguments = type.typeParameters.map { tp ->
+                    val argument = resolution[tp.name]!!
                     assertToDataType(argument)
                 },
                 isNullable = isNullable,
-                superType = superType
+                superTypes = (listOfNotNull(type.superClass) + type.superInterfaces)
+                    .flatMap {
+                        log.v { "resolve ${it.name} from ${type.name}" }
+                        val superType = resolve(it)
+                        log.v { "superType ${superType.descriptiveName} with super types ${superType.superTypes}" }
+                        listOf(superType) + superType.superTypes
+                     }
+                    .groupBy { it.name }
+                    .mapValues {
+                        it.value.indices.forEach { i ->
+                            if (i > 0) {
+                                if (it.value[i].arguments != it.value[i - 1].arguments) {
+                                    throw RuntimeException("Type arguments of repeated type ${it.key} are not consistent -- ${it.value[i].arguments} VS ${it.value[i - 1].arguments}")
+                                }
+                            }
+                        }
+                        it.value.first()
+                    }
+                    .values.toList(),
             )
         }
-        return superType
+
+        return resolve(clazz)
     }
 
     fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
@@ -434,14 +467,15 @@ open class SymbolTable(
                 }
             }
 
-        var type: DataType? = assertToDataType(receiver)
-        while (type != null) {
+        var type: DataType = assertToDataType(receiver)
+//        while (type != null) {
+        (listOf(type) + ((type as? ObjectType)?.superTypes ?: emptyList())).forEach { type ->
             findExtensionFunctionsByDeclaredName(type.toTypeNode(), declaredName).also {
                 if (it.isNotEmpty()) {
                     return it
                 }
             }
-            type = (type as? ObjectType)?.superType
+//            type = (type as? ObjectType)?.superType
         }
 
         throw RuntimeException("Function $declaredName for receiver ${receiver.descriptiveName()} not found")

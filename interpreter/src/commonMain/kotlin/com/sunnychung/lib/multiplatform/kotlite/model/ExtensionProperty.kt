@@ -24,8 +24,11 @@ class ExtensionProperty(
     fun typeArgumentsMap(actualReceiverType: DataType): Map<String, DataType> {
         return if (typeParameters.isNotEmpty()) {
             var type: DataType? = actualReceiverType
-            while (type != null && type.name != receiverType!!.name) {
-                type = (type as? ObjectType)?.superType
+//            while (type != null && type.name != receiverType!!.name) {
+//                type = (type as? ObjectType)?.superType
+//            }
+            if (type != null && type.name != receiverType!!.name) {
+                type = (type as? ObjectType)?.findSuperType(receiverType!!.name)
             }
             if (type == null || type !is ObjectType) {
                 throw RuntimeException("Cannot find receiver type ${receiverType!!.name}")

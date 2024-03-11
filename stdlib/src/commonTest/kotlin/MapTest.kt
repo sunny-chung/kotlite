@@ -178,7 +178,7 @@ class MapTest {
             var counter = 100
             m["bcd"] = ++counter
             m["ab"] = ++counter
-            m["bcd"] = ++counter
+            m.put("bcd", ++counter)
             m["hi"] = ++counter
             val size2: Int = m.size
             val f: Int? = m["ab"]

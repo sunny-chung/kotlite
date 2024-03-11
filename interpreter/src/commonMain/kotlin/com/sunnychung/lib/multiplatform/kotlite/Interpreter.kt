@@ -620,7 +620,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             ?.let { function ->
                 val subjectType = subject?.type() as? ObjectType
                 subjectType?.let { subjectType ->
-                    ClassMemberResolver(subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
+                    ClassMemberResolver(symbolTable(), subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
                 }
             }
         val resolvedFunction = (functionNode as? FunctionDeclarationNode)
@@ -632,8 +632,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         val typeParametersReplacedWithArguments = (
                 extraTypeResolutions + // add `extraTypeResolutions` at first because class type arguments have a lower precedence
                 (classResolver?.let { resolver ->
-                    resolvedFunction?.classTreeIndex?.let { index ->
-                        resolver.genericResolutions[index].second.map {
+                    resolvedFunction?.enclosingTypeName?.let { typeName ->
+                        resolver.genericResolutionsByTypeName[typeName]!!.map {
                             TypeParameterNode(it.value.position, it.key, it.value)
                         }
                     }
@@ -1036,6 +1036,24 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             isNullable = false,
         )
 
+        val interfaceInvocations: List<TypeNode>
+        val superClassInvocation: FunctionCallNode?
+        if (isInterface) {
+            superInvocations?.firstOrNull { it is FunctionCallNode }
+                ?.let {
+                    throw RuntimeException("Interface cannot inherit a class")
+                }
+            interfaceInvocations = superInvocations?.filterIsInstance<TypeNode>() ?: emptyList()
+            superClassInvocation = null
+        } else {
+            val superClassInvocations = superInvocations?.filterIsInstance<FunctionCallNode>()
+            if ((superClassInvocations?.size ?: 0) > 1) {
+                throw RuntimeException("A class can only inherit at most one other class")
+            }
+            interfaceInvocations = superInvocations?.filterIsInstance<TypeNode>() ?: emptyList()
+            superClassInvocation = superClassInvocations?.firstOrNull()
+        }
+
         val superClass = (superClassInvocation?.function as? TypeNode)
             ?.let { declarationScope.findClass(it.name) ?: throw RuntimeException("Super class `${it.name}` not found") }
             ?.first
@@ -1051,6 +1069,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 currentScope = callStack.currentSymbolTable(),
                 name = name,
                 modifiers = modifiers,
+                isInterface = isInterface,
                 fullQualifiedName = fullQualifiedName,
                 typeParameters = typeParameters,
                 isInstanceCreationAllowed = true,
@@ -1081,6 +1100,15 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 declarations = declarations,
                 superClassInvocation = superClassInvocation,
                 superClass = superClass,
+                superInterfaceTypes = interfaceInvocations,
+                superInterfaces = interfaceInvocations.map {
+                    val clazz = symbolTable().findClass(it.name)?.first
+                        ?: throw RuntimeException("Interface ${it.name} cannot be found")
+                    if (!clazz.isInterface) {
+                        throw RuntimeException("${it.name} is not an interface")
+                    }
+                    clazz
+                },
             ).also { clazz = it })
             // register extension functions in global scope
             declarations
@@ -1435,8 +1463,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 
             if (functionTypeParameters.isNotEmpty()) {
                 var type: DataType? = receiverType
-                while (type != null && type.name != functionReceiverType.name) {
-                    type = (type as? ObjectType)?.superType
+                if (type != null && type.name != functionReceiverType.name) {
+                    type = (type as? ObjectType)?.findSuperType(functionReceiverType.name)
                 }
                 if (type == null && type !is ObjectType) {
                     throw RuntimeException("Enrich fail -- Receiver type of `$functionName` ${functionReceiverType.descriptiveName()} is not found")

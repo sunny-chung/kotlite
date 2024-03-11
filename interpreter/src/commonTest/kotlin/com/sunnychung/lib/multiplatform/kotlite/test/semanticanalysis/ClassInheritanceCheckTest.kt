@@ -7,6 +7,14 @@ import kotlin.test.assertFails
 class ClassInheritanceCheckTest {
 
     @Test
+    fun classMustBeExtendedWithConstructor() {
+        assertSemanticFail("""
+            open class A
+            class B : A
+        """.trimIndent())
+    }
+
+    @Test
     fun cannotExtendFromNonOpenClass() {
         assertSemanticFail("""
             class A

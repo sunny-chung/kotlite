@@ -16,7 +16,7 @@ fun TypeNode.resolveGenericParameterTypeArguments(typeArguments: Map<String, Typ
     })
 }
 
-fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypeParameterNode>): TypeNode {
+fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypeParameterNode>, isKeepTypeParameter: Boolean = false): TypeNode {
     if (typeParameters.isEmpty()) return this
 
     fun resolve(type: TypeNode): TypeNode {
@@ -35,7 +35,12 @@ fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypePa
             // 3. A<B, C> => (Kotlin: Type arguments are not allowed for type parameter)
             val genericParameter = typeParameters.firstOrNull { it.name == type.name }
             if (genericParameter != null) { // case 1
-                val genericResolvedType = genericParameter.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, isNullable = true)
+                val genericResolvedType = genericParameter.typeUpperBound
+                    ?: if (isKeepTypeParameter) {
+                        TypeNode(SourcePosition.NONE, type.name, null, isNullable = false)
+                    } else {
+                        TypeNode(SourcePosition.NONE, "Any", null, isNullable = true)
+                    }
                 TypeNode(
                     genericResolvedType.position,
                     genericResolvedType.name,

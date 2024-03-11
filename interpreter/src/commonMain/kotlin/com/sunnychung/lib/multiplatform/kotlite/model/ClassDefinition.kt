@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 
 open class ClassDefinition(
@@ -11,6 +12,8 @@ open class ClassDefinition(
 
     val name: String,
     val fullQualifiedName: String = name, // TODO
+
+    val isInterface: Boolean = false,
 
     /**
      * If it is an object class, no new instance can be created
@@ -31,15 +34,49 @@ open class ClassDefinition(
     private val memberFunctions: Map<String, FunctionDeclarationNode>,
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
+    val superInterfaceTypes: List<TypeNode> = emptyList(),
     val superClassInvocation: FunctionCallNode? = null,
-    val superClass: ClassDefinition? = null
+    val superClass: ClassDefinition? = null,
+    val superInterfaces: List<ClassDefinition> = emptyList(),
 ) {
 
     var enumValues: Map<String, ClassInstance> = emptyMap()
 
     init {
+        if (isInterface) {
+            if (superClass != null || superClassInvocation != null) {
+                throw SemanticException(SourcePosition.NONE, "Interface cannot extend from a class")
+            }
+        }
+
         if (superClass != null && superClassInvocation == null) {
-            throw RuntimeException("superClassInvocation must be provided if there is a supper class")
+            throw SemanticException(SourcePosition.NONE, "superClassInvocation must be provided if there is a super class")
+        } else if (superClass == null && superClassInvocation != null) {
+            throw SemanticException(SourcePosition.NONE, "superClass must be provided if there is a super class invocation")
+        } else if (superClass != null && superClassInvocation != null) {
+            if (superClass.fullQualifiedName != (superClassInvocation.function as TypeNode).name) {
+                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass.fullQualifiedName} VS ${(superClassInvocation.function as TypeNode).name}")
+            }
+        }
+
+        superInterfaces.forEach { def ->
+            superInterfaceTypes.singleOrNull { it.name == def.name }
+                ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaceTypes on the super interface type ${def.name}")
+        }
+
+        superInterfaceTypes.forEach { type ->
+            superInterfaces.singleOrNull { it.fullQualifiedName == type.name }
+                ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaces on the super interface type ${type.name}")
+        }
+
+        if (superClass != null && superClass.isInterface) {
+            throw SemanticException(SourcePosition.NONE, "superClass ${superClass.name} is not a class but an interface")
+        }
+
+        superInterfaces.forEach { def ->
+            if (!def.isInterface) {
+                throw SemanticException(SourcePosition.NONE, "superInterfaces ${def.name} is not an interface but a class")
+            }
         }
     }
 
@@ -70,12 +107,17 @@ open class ClassDefinition(
      * Only for SemanticAnalyzer use during parsing class declarations.
      */
     internal fun addProperty(currentScope: SymbolTable?, it: PropertyDeclarationNode) {
+        if (isInterface) {
+            throw RuntimeException("Properties in interfaces are not supported")
+        }
+
         val type = (currentScope!!.typeNodeToPropertyType(
             it.type,
             it.isMutable
         ) ?: if (it.type.name == name) {
-            val superType = currentScope!!.resolveObjectType(this, this.typeParameters.map { TypeNode(it.position, it.name, null, false) }, it.type.isNullable, upToIndex = index - 1)
-            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable, superType), it.isMutable)
+            val type = currentScope!!.resolveObjectType(this, this.typeParameters.map { TypeNode(it.position, it.name, null, false) }, it.type.isNullable, upToIndex = index - 1)
+            PropertyType(type!!, it.isMutable)
+//            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable, superType), it.isMutable)
 //            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable), it.isMutable)
         } else throw RuntimeException("Unknown type ${it.type.name}"))
         (memberPropertyTypes as MutableMap)[it.name] = type
@@ -142,16 +184,48 @@ open class ClassDefinition(
      * Key: Function signature
      */
     fun getAllMemberFunctions(): Map<String, FunctionDeclarationNode> {
-        return memberFunctions mergeIfNotExists (superClass?.getAllMemberFunctions() ?: emptyMap())
+        return memberFunctions.let { functionsInThisClass ->
+            var result = functionsInThisClass
+            if (superClass != null) {
+                result = result mergeIfNotExists superClass.getAllMemberFunctions()
+            }
+            superInterfaces.forEach {
+                result = result mergeIfNotExists it.getAllMemberFunctions()
+            }
+            result
+        }
     }
 
+    /**
+     * Key: Function signature
+     */
+    fun getMemberFunctionsDeclaredInThisClass(): Map<String, FunctionDeclarationNode> {
+        return memberFunctions
+    }
+
+    @Deprecated("use findMemberFunctionsWithEnclosingTypeNameByDeclaredName")
     fun findMemberFunctionsWithIndexByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, Int>> =
         memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
             (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
 
-    fun findMemberFunctionsByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, FunctionDeclarationNode> =
-        findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly).mapValues { it.value.first }
+    fun findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, String>> =
+        memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to fullQualifiedName } mergeIfNotExists
+            (Unit.takeIf { !inThisClassOnly }?.let {
+                val result = mutableMapOf<String, Pair<FunctionDeclarationNode, String>>()
+                superClass?.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly)
+                    ?.also { result += it }
+                superInterfaces.forEach { def ->
+                    def.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly)?.also {
+                        result += it
+                    }
+                }
+                result
+            } ?: emptyMap() )
 
+    fun findMemberFunctionsByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, FunctionDeclarationNode> =
+        findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly).mapValues { it.value.first }
+
+    @Deprecated("use findMemberFunctionWithEnclosingTypeNameByTransformedName")
     fun findMemberFunctionWithIndexByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
         memberFunctions[transformedName]?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly) }
@@ -163,8 +237,25 @@ open class ClassDefinition(
         memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName, inThisClassOnly) }
 
+    fun findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
+        memberFunctions[transformedName]?.let { it to fullQualifiedName } ?:
+            Unit.takeIf { !inThisClassOnly }?.let {
+                superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly)
+                    ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly) }
+            }
+
+    /**
+     * For semantic analyzer use only. In SA, `memberFunctions` is not indexed by transformedRefName.
+     */
+    fun findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
+        memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to fullQualifiedName } ?:
+            Unit.takeIf { !inThisClassOnly }?.let {
+                superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly)
+                    ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly) }
+            }
+
     fun findMemberFunctionByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): FunctionDeclarationNode? =
-        findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly)?.first
+        findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly)?.first
 
     fun findDeclarations(filter: (clazz: ClassDefinition, declaration: ASTNode) -> Boolean): List<ASTNode> {
         return declarations.filter { filter(this, it) } +
@@ -173,5 +264,9 @@ open class ClassDefinition(
 
     open fun construct(interpreter: Interpreter, callArguments: Array<RuntimeValue>, typeArguments: Array<DataType>, callPosition: SourcePosition): ClassInstance {
         return interpreter.constructClassInstance(callArguments, callPosition, typeArguments, this@ClassDefinition)
+    }
+
+    override fun toString(): String {
+        return "ClassDefinition($fullQualifiedName)"
     }
 }

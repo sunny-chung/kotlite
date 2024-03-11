@@ -1971,7 +1971,7 @@ class Parser(protected val lexer: Lexer) {
             position = t.position,
             name = name,
             receiver = receiver,
-            declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false).takeIf { body?.format == FunctionBodyFormat.Block },
+            declaredReturnType = type ?: TypeNode(t.position, "Unit", null, false).takeIf { body == null || body.format == FunctionBodyFormat.Block },
             valueParameters = valueParameters,
             body = body,
             typeParameters = typeParameters,
@@ -2087,7 +2087,7 @@ class Parser(protected val lexer: Lexer) {
      * anonymousInitializer:
      *     'init' {NL} block
      */
-    fun classMemberDeclarations(): List<ASTNode> {
+    fun classMemberDeclarations(isInterface: Boolean): List<ASTNode> {
         val declarations = mutableListOf<ASTNode>()
         while (!isCurrentTokenExcludingNL(TokenType.Symbol, "}")) {
             declarations += if (isCurrentToken(TokenType.Identifier, "init")) {
@@ -2096,7 +2096,7 @@ class Parser(protected val lexer: Lexer) {
                 val block = block(ScopeType.Initializer)
                 ClassInstanceInitializerNode(position = t.position, block = block)
             } else {
-                declaration()
+                declaration(isInterface = isInterface)
             }
 
             if (isSemi()) {
@@ -2114,10 +2114,10 @@ class Parser(protected val lexer: Lexer) {
      *     {NL}
      *     '}'
      */
-    fun classBody(): List<ASTNode> {
+    fun classBody(isInterface: Boolean): List<ASTNode> {
         eat(TokenType.Symbol, "{")
         repeatedNL()
-        val declarations = classMemberDeclarations()
+        val declarations = classMemberDeclarations(isInterface = isInterface)
         repeatedNL()
         eat(TokenType.Symbol, "}")
         return declarations
@@ -2138,17 +2138,27 @@ class Parser(protected val lexer: Lexer) {
      *     | ('suspend' {NL} functionType)
      *
      */
-    fun delegationSpecifiers(): FunctionCallNode {
-        /* only support exactly one constructorInvocation */
-        return constructorInvocation()
+    fun delegationSpecifiers(): List<ASTNode> {
+        return buildList {
+            add(constructorInvocationOrUserType())
+            while (isCurrentTokenExcludingNL(TokenType.Symbol, ",")) {
+                repeatedNL()
+                eat(TokenType.Symbol, ",")
+                repeatedNL()
+                add(constructorInvocationOrUserType())
+            }
+        }
     }
     /**
      * constructorInvocation:
      *     userType {NL} valueArguments
      *
      */
-    fun constructorInvocation(): FunctionCallNode {
+    fun constructorInvocationOrUserType(): ASTNode {
         val type = typeReference()
+        if (!isCurrentTokenExcludingNL(TokenType.Operator, "(")) {
+            return type
+        }
         repeatedNL()
         val arguments = valueArguments()
         return FunctionCallNode(
@@ -2253,7 +2263,11 @@ class Parser(protected val lexer: Lexer) {
      */
     fun classDeclaration(modifiers: Set<String>): ClassDeclarationNode {
         val modifiers = modifiers.toClassModifiers()
-        val t = eat(TokenType.Identifier, "class")
+        if (!currentToken.`is`(TokenType.Identifier, "class") && !currentToken.`is`(TokenType.Identifier, "interface")) {
+            throw ExpectTokenMismatchException("\"class\" or \"interface\"", currentToken.position)
+        }
+        val t = eat(TokenType.Identifier)
+        val isInterface = t.value == "interface"
         repeatedNL()
         val name = userDefinedIdentifier()
         var token = currentTokenExcludingNL()
@@ -2268,7 +2282,7 @@ class Parser(protected val lexer: Lexer) {
             repeatedNL()
             primaryConstructor().also { token = currentTokenExcludingNL() }
         } else null
-        val superClassInvocation = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
+        val superInvocations = if (isCurrentTokenExcludingNL(TokenType.Symbol, ":")) {
             repeatedNL()
             eat(TokenType.Symbol, ":")
             repeatedNL()
@@ -2283,16 +2297,17 @@ class Parser(protected val lexer: Lexer) {
                 enumEntries = enumEntries_
                 declarations = declarations_
             } else {
-                declarations = classBody()
+                declarations = classBody(isInterface = isInterface)
             }
         }
         return ClassDeclarationNode(
             position = t.position,
             name = name,
+            isInterface = isInterface,
             declaredModifiers = modifiers,
             typeParameters = typeParameters,
             primaryConstructor = primaryConstructor,
-            superClassInvocation = superClassInvocation as FunctionCallNode?,
+            superInvocations = superInvocations,
             declarations = declarations,
             enumEntries = enumEntries,
         )
@@ -2306,7 +2321,7 @@ class Parser(protected val lexer: Lexer) {
      *     | propertyDeclaration
      *     | typeAlias
      */
-    fun declaration(): ASTNode {
+    fun declaration(isInterface: Boolean): ASTNode {
         if (currentToken.type != TokenType.Identifier) {
 //            throw ParseException("Expected an identifier but missing")
             throw UnexpectedTokenException(currentToken)
@@ -2315,8 +2330,8 @@ class Parser(protected val lexer: Lexer) {
         while (true) {
             when (currentToken.value as String) {
                 "val", "var" -> return propertyDeclaration(modifiers ?: emptySet())
-                "fun" -> return functionDeclaration(modifiers ?: emptySet())
-                "class" -> return classDeclaration(modifiers ?: emptySet())
+                "fun" -> return functionDeclaration(modifiers ?: emptySet(), isProcessBody = !isInterface)
+                "class", "interface" -> return classDeclaration(modifiers ?: emptySet())
                 in ACCEPTED_MODIFIERS -> {
                     if (modifiers == null) {
                         modifiers = modifiers()
@@ -2439,7 +2454,8 @@ class Parser(protected val lexer: Lexer) {
     fun statement(): ASTNode { // TODO complete
         if (currentToken.type == TokenType.Identifier) {
             when (currentToken.value) {
-                "val", "var", "fun", "class", in ACCEPTED_MODIFIERS -> return declaration()
+                "interface" -> return declaration(isInterface = true)
+                "val", "var", "fun", "class", in ACCEPTED_MODIFIERS -> return declaration(isInterface = false)
                 "for", "while", "do" -> return loopStatement()
             }
         }
