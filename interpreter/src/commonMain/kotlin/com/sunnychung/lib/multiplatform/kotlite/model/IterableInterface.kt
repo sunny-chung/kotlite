@@ -27,8 +27,8 @@ class IterableInterface {
                     TypeParameter(name = "T", typeUpperBound = null),
                 ),
                 executable = { interpreter, receiver, args, typeArgs ->
-                    receiver as ListValue
-                    IteratorValue(receiver.value.iterator(), typeArgs["T"]!!, interpreter.symbolTable())
+                    val delegatedValue = (receiver as DelegatedValue<*>).value as Iterable<RuntimeValue>
+                    IteratorValue(delegatedValue.iterator(), typeArgs["T"]!!, interpreter.symbolTable())
                 },
                 position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
             ),

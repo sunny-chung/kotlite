@@ -243,6 +243,17 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     override fun toTypeNode(): TypeNode {
         return TypeNode(SourcePosition.NONE, name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
     }
+
+    fun asTypeWithErasedTypeParameters(symbolTable: SymbolTable): ObjectType {
+        return copy(arguments = arguments.mapIndexed { index, t ->
+            val tp = clazz.typeParameters[index]
+            TypeParameterType(
+                name = tp.name,
+                isNullable = t.isNullable,
+                upperBound = symbolTable.assertToDataType(tp.typeUpperBoundOrAny())
+            )
+        })
+    }
 }
 
 /**

@@ -100,4 +100,64 @@ class SetTest {
         interpreter.eval()
         assertEquals(listOf("1", "2", "3"), console.split("\n").sorted().filter { it.isNotEmpty() })
     }
+
+    @Test
+    fun plusMinusAssignOperators() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val set1 = setOf(1, 2, 2, 3, 2)
+            val set2 = setOf(2, 3, 9, 8)
+            var set = set1 + set2 - 9
+            set -= 2
+            val size = set.size
+            
+            set.forEach {
+                println(it)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("size") as IntValue).value)
+        assertEquals(listOf("1", "3", "8"), console.split("\n").sorted().filter { it.isNotEmpty() })
+    }
+
+    @Test
+    fun mutableSetPlusMinusAssignOperators() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val set1 = setOf(1, 2, 2, 3, 2)
+            val set2 = setOf(2, 3, 9, 8)
+            val set = mutableSetOf(15, 7)
+            set += set1
+            set -= set2
+            set += -6
+            set += 9
+            set -= 7
+            val size = set.size
+            
+            set.forEach {
+                println(it)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("size") as IntValue).value)
+        assertEquals(listOf(-6, 1, 9, 15), console.split("\n").filter { it.isNotEmpty() }.map { it.toInt() }.sorted())
+    }
 }

@@ -214,4 +214,65 @@ class ListTest {
         assertEquals(15, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals("1\n2\n3\n4\n5\n", console.toString())
     }
+
+    @Test
+    fun plusMinusOperators() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val list1 = listOf(1, 7, 4, 9)
+            val list2 = listOf(2, 1, 3)
+            val list3 = listOf(3, 4)
+            var list = list1 + list2 - list3
+            list += 5
+            val a = list.size
+            for (e in list) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("1\n7\n9\n2\n1\n5\n", console.toString())
+    }
+
+    @Test
+    fun plusAssignMinusAssignOperators() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val list1 = listOf(1, 7, 4, 9)
+            val list2 = listOf(2, 1, 3)
+            val list3 = listOf(3, 4)
+            val list = mutableListOf<Int>()
+            list += list1
+            list += list2
+            list -= list3
+            list += 5
+            list -= 1
+            list -= 13579
+            val a = list.size
+            for (e in list) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("7\n9\n2\n1\n5\n", console.toString())
+    }
 }

@@ -112,9 +112,10 @@ fun <T, R> Iterable<T>.map(transform: (T) -> R): List<R>
 fun <T, R> Iterable<T>.mapIndexed(transform: (index: Int, T) -> R): List<R>
 fun <T, R : Any> Iterable<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
 fun <T, R : Any> Iterable<T>.mapNotNull(transform: (T) -> R?): List<R>
-fun <T> Iterable<T>.minus(element: T): List<T>
-fun <T> Iterable<T>.minus(elements: Iterable<T>): List<T>
-fun <T> MutableCollection<T>.minusAssign(element: T)
+operator fun <T> Iterable<T>.minus(element: T): List<T>
+operator fun <T> Iterable<T>.minus(elements: Iterable<T>): List<T>
+operator fun <T> MutableCollection<T>.minusAssign(element: T)
+operator fun <T> MutableCollection<T>.minusAssign(elements: Iterable<T>)
 fun <T> Iterable<T>.minusElement(element: T): List<T>
 fun <T> Iterable<T>.none(predicate: (T) -> Boolean): Boolean
 fun <T> Iterable<T>.none(): Boolean
@@ -123,10 +124,10 @@ fun <T> List<T>.onEach(action: (T) -> Unit): List<T>
 fun <T> List<T>.onEachIndexed(action: (index: Int, T) -> Unit): List<T>
 fun <T> List<T>?.orEmpty(): List<T>
 fun <T> Iterable<T>.partition(predicate: (T) -> Boolean): Pair<List<T>, List<T>>
-fun <T> Iterable<T>.plus(element: T): List<T>
-fun <T> Iterable<T>.plus(elements: List<T>): List<T>
-fun <T> MutableCollection<T>.plusAssign(element: T)
-fun <T> MutableCollection<T>.plusAssign(elements: Iterable<T>)
+operator fun <T> Iterable<T>.plus(element: T): List<T>
+operator fun <T> Iterable<T>.plus(elements: List<T>): List<T>
+operator fun <T> MutableCollection<T>.plusAssign(element: T)
+operator fun <T> MutableCollection<T>.plusAssign(elements: Iterable<T>)
 fun <T> Iterable<T>.plusElement(element: T): List<T>
 fun <T> List<T>.random(): T
 fun <T> List<T>.randomOrNull(): T?
@@ -264,10 +265,10 @@ fun <K, V, R> Map<K, V>.map(transform: (MapEntry<K, V>) -> R): List<R>
 fun <K, V, R> Map<K, V>.mapKeys(transform: (MapEntry<K, V>) -> R): Map<R, V>
 fun <K, V, R : Any> Map<K, V>.mapNotNull(transform: (MapEntry<K, V>) -> R?): List<R>
 fun <K, V, R> Map<K, V>.mapValues(transform: (MapEntry<K, V>) -> R): Map<K, R>
-fun <K, V> Map<K, V>.minus(key: K): Map<K, V>
-fun <K, V> Map<K, V>.minus(keys: List<K>): Map<K, V>
-fun <K, V> MutableMap<K, V>.minusAssign(key: K)
-fun <K, V> MutableMap<K, V>.minusAssign(keys: List<K>)
+operator fun <K, V> Map<K, V>.minus(key: K): Map<K, V>
+operator fun <K, V> Map<K, V>.minus(keys: List<K>): Map<K, V>
+operator fun <K, V> MutableMap<K, V>.minusAssign(key: K)
+operator fun <K, V> MutableMap<K, V>.minusAssign(keys: List<K>)
 fun <K, V> Map<K, V>.none(): Boolean
 fun <K, V> Map<K, V>.none(predicate: (MapEntry<K, V>) -> Boolean): Boolean
 fun <K, V> Map<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): Map<K, V>
@@ -275,10 +276,10 @@ fun <K, V> MutableMap<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): MutableMap
 fun <K, V> Map<K, V>.onEachIndexed(action: (index: Int, MapEntry<K, V>) -> Unit): Map<K, V>
 fun <K, V> MutableMap<K, V>.onEachIndexed(action: (index: Int, MapEntry<K, V>) -> Unit): MutableMap<K, V>
 fun <K, V> Map<K, V>?.orEmpty(): Map<K, V>
-fun <K, V> Map<K, V>.plus(pair: Pair<K, V>): Map<K, V>
-fun <K, V> Map<K, V>.plus(pairs: List<Pair<K, V>>): Map<K, V>
-fun <K, V> MutableMap<K, V>.plusAssign(pair: Pair<K, V>)
-fun <K, V> MutableMap<K, V>.plusAssign(pairs: List<Pair<K, V>>)
+operator fun <K, V> Map<K, V>.plus(pair: Pair<K, V>): Map<K, V>
+operator fun <K, V> Map<K, V>.plus(pairs: List<Pair<K, V>>): Map<K, V>
+operator fun <K, V> MutableMap<K, V>.plusAssign(pair: Pair<K, V>)
+operator fun <K, V> MutableMap<K, V>.plusAssign(pairs: List<Pair<K, V>>)
 fun <K, V> MutableMap<K, V>.put(key: K, value: V): V?
 fun <K, V> MutableMap<K, V>.putAll(pairs: List<Pair<K, V>>)
 fun <K, V> MutableMap<K, V>.remove(key: K): V?
@@ -303,12 +304,12 @@ operator fun <T> Set<T>.iterator(): Iterator<T>
 /*infix*/ fun <T> Iterable<T>.intersect(
     other: Iterable<T>
 ): Set<T>
-/*operator*/ fun <T> Set<T>.minus(element: T): Set<T>
-/*operator*/ fun <T> Set<T>.minus(elements: Iterable<T>): Set<T>
+operator fun <T> Set<T>.minus(element: T): Set<T>
+operator fun <T> Set<T>.minus(elements: Iterable<T>): Set<T>
 fun <T> Set<T>.minusElement(element: T): Set<T>
 fun <T> Set<T>?.orEmpty(): Set<T>
-/*operator*/ fun <T> Set<T>.plus(element: T): Set<T>
-/*operator*/ fun <T> Set<T>.plus(elements: Iterable<T>): Set<T>
+operator fun <T> Set<T>.plus(element: T): Set<T>
+operator fun <T> Set<T>.plus(elements: Iterable<T>): Set<T>
 fun <T> Set<T>.plusElement(element: T): Set<T>
 /*infix*/ fun <T> Iterable<T>.subtract(other: Iterable<T>): Set<T>
 fun <T> Iterable<T>.toMutableSet(): MutableSet<T>

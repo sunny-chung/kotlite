@@ -502,22 +502,24 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         val operatorFunctionName = operatorToFunctionName(operator)
         var isPreAssignFunctionAvailable = false
 
+        val subjectTypeWithErasedGenerics = (subjectType as? ObjectType)?.asTypeWithErasedTypeParameters(currentScope) ?: subjectType
+
         if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
             isPreAssignFunctionAvailable = currentScope.findMatchingCallables(
                 currentSymbolTable = currentScope,
                 originalName = preAssignFunctionName!!,
-                receiverType = subjectType,
+                receiverType = subjectTypeWithErasedGenerics,
                 arguments = listOf(FunctionCallArgumentInfo(name = null, type = valueType)),
                 modifierFilter = SearchFunctionModifier(
                     typeFilter = SearchFunctionModifier.Type.OperatorFunctionOnly,
-                    returnType = subjectType
+                    returnType = subjectTypeWithErasedGenerics
                 ),
             ).isNotEmpty()
 
             if (currentScope.findMatchingCallables(
                     currentSymbolTable = currentScope,
                     originalName = operatorFunctionName!!,
-                    receiverType = subjectType,
+                    receiverType = subjectTypeWithErasedGenerics,
                     arguments = listOf(FunctionCallArgumentInfo(name = null, type = valueType)),
                     modifierFilter = SearchFunctionModifier(
                         typeFilter = SearchFunctionModifier.Type.OperatorFunctionOnly,
@@ -551,7 +553,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
             if (isPreAssignFunctionAvailable) {
                 preAssignFunctionCall = FunctionCallNode(
-                    function = NavigationNode(position, subjectRawType, ".", ClassMemberReferenceNode(position, preAssignFunctionName!!)),
+                    function = NavigationNode(position, subject, ".", ClassMemberReferenceNode(position, preAssignFunctionName!!)),
                     arguments = listOf(FunctionCallArgumentNode(position = value.position, index = 0, value = value)),
                     declaredTypeArguments = emptyList(),
                     position = position,

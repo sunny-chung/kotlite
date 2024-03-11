@@ -131,7 +131,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             is NullNode -> this.eval()
             is PropertyDeclarationNode -> this.eval()
             is ScriptNode -> this.eval()
-            is TypeNode -> this.eval()
+            is TypeNode -> throw UnsupportedOperationException()
             is UnaryOpNode -> this.eval()
             is VariableReferenceNode -> this.eval()
             is FunctionDeclarationNode -> this.eval()
