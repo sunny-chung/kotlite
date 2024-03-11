@@ -1660,7 +1660,7 @@ class Parser(protected val lexer: Lexer) {
         }
 
         val nextToken = currentTokenExcludingNL()
-        val accessors = when (nextToken.value.takeIf { nextToken.type == TokenType.Identifier }) {
+        val accessors = when (nextToken.value.takeIf { initialValue == null && nextToken.type == TokenType.Identifier }) {
             "get" -> {
                 repeatedNL()
                 if (type == null) { // TODO make type infer possible
