@@ -88,4 +88,16 @@ class OperatorTypeTest {
             a += B()
         """.trimIndent())
     }
+
+    @Test
+    fun ambiguousAugmentedAssignment() {
+        assertSemanticFail("""
+            class A
+            class B
+            operator fun A.plus(x: B): A = A()
+            operator fun A.plusAssign(x: B) {}
+            var a = A()
+            a += B()
+        """.trimIndent())
+    }
 }

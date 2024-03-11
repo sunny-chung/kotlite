@@ -157,12 +157,17 @@ data class AssignmentNode(val subject: ASTNode, val operator: String, val value:
     /**
      * Used to replace the call of the operator, e.g. "+=".
      */
-    @ModifyByAnalyzer var functionCall: FunctionCallNode? = null
+    @ModifyByAnalyzer var wholeFunctionCall: FunctionCallNode? = null
 
     /**
-     * Only used when functionCall is null. Used to replace the call of the operator excluding assignment, e.g. "+".
+     * Only used when wholeFunctionCall is null. Used to replace the call of the operator excluding assignment, e.g. "+".
      */
-    @ModifyByAnalyzer var preAssignmentFunctionCall: FunctionCallNode? = null
+    @ModifyByAnalyzer var preAssignFunctionCall: FunctionCallNode? = null
+
+    /**
+     * Only used when wholeFunctionCall is null. Used to replace the call of the assignment, e.g. "=".
+     */
+    @ModifyByAnalyzer var assignFunctionCall: FunctionCallNode? = null
 
     override val position: SourcePosition get() = subject.position
 

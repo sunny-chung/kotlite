@@ -318,4 +318,47 @@ class OperatorFunctionTest {
         assertEquals(625, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(16807, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun minusAssign() {
+        val interpreter = interpreter("""
+            class DoubledIntContainer(var value: Int) {
+                operator fun minusAssign(other: Int) {
+                    value -= other * 2
+                }
+            }
+            val x = DoubledIntContainer(29)
+            x -= 4
+            val a: Int = x.value
+            x -= 3
+            val b: Int = x.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun genericsPlusAssign() {
+        val interpreter = interpreter("""
+            class NumberContainer<T>(var value: Int)
+            operator fun <T> NumberContainer<T>.plusAssign(other: T) {
+                value += other as Int
+            }
+            val x = NumberContainer<Int>(29)
+            x += 3
+            val a: Int = x.value
+            x += 20
+            val b: Int = x.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(32, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(52, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

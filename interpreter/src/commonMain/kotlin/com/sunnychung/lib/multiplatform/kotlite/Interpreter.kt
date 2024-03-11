@@ -388,11 +388,16 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         }
         val result = value.eval() as RuntimeValue
 
+        wholeFunctionCall?.let { func ->
+            func.eval(replaceArguments = mapOf(0 to result))
+            return
+        }
+
         val read = { subject.eval() as RuntimeValue }
         val write = { value: RuntimeValue ->
-            if (functionCall != null) {
+            if (assignFunctionCall != null) {
                 // TODO any less "hacky" way to implement?
-                functionCall!!.eval(replaceArguments = mapOf(functionCall!!.arguments.lastIndex to value))
+                assignFunctionCall!!.eval(replaceArguments = mapOf(assignFunctionCall!!.arguments.lastIndex to value))
             } else {
                 subject.write(value)
             }
@@ -402,7 +407,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             result as RuntimeValue
         } else {
             val existing = read()
-            preAssignmentFunctionCall?.let { func ->
+            preAssignFunctionCall?.let { func ->
                 write(func.eval(replaceArguments = mapOf(0 to result)))
                 return
             }

@@ -280,7 +280,9 @@ class SemanticAnalyzerSymbolTable(
     fun findMatchingCallables(currentSymbolTable: SymbolTable, originalName: String, receiverType: DataType?, arguments: List<FunctionCallArgumentInfo>, modifierFilter: SearchFunctionModifier): List<FindCallableResult> {
         data class FunctionDistinctId(val receiverType: TypeNode?, val fucnctionName: String, val arguments: List<TypeNode>)
 
-        val receiverClass = receiverType?.let { (findClass(it.nameWithNullable) ?: throw RuntimeException("Class ${it.nameWithNullable} not found")).first }
+        val receiverClass = receiverType
+            ?.let { if (it is TypeParameterType) it.upperBound else it }
+            ?.let { (findClass(it.nameWithNullable) ?: throw RuntimeException("Class ${it.nameWithNullable} not found")).first }
         return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter)
             .distinctBy { it.definition }
             .distinctBy { FunctionDistinctId(it.receiverType, it.originalName, it.arguments.map { toTypeNode(it) }) }

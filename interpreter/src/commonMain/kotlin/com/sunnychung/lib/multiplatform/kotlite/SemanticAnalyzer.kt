@@ -5,7 +5,6 @@ import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
-import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
@@ -134,7 +133,23 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         ) }
         .toMap()
 
-    val supportedOperatorFunctionNames = setOf("get", "set", "hasNext", "next", "iterator", "plus", "minus", "times", "div", "rem")
+    val supportedOperatorFunctionNames = setOf(
+        "get",
+        "set",
+        "hasNext",
+        "next",
+        "iterator",
+        "plus",
+        "minus",
+        "times",
+        "div",
+        "rem",
+        "plusAssign",
+        "minusAssign",
+        "timesAssign",
+        "divAssign",
+        "remAssign",
+    )
 
     fun ExtensionProperty.generateTransformedName() {
         this.transformedName = "EP//${this.receiver}/${this.declaredName}/${++functionDefIndex}"
@@ -229,6 +244,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "*" -> "times"
         "/" -> "div"
         "%" -> "rem"
+        "+=" -> "plusAssign"
+        "-=" -> "minusAssign"
+        "*=" -> "timesAssign"
+        "/=" -> "divAssign"
+        "%=" -> "remAssign"
         else -> null
     }
 
@@ -390,44 +410,81 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         type()
     }
 
+    /**
+     * Quoted from Kotlin official documentation:
+     *
+     * For the assignment operations, for example a += b, the compiler performs the following steps:
+     *
+     *     If the function from the right column is available:
+     *
+     *         If the corresponding binary function (that means plus() for plusAssign()) is available too, a is a mutable variable, and the return type of plus is a subtype of the type of a, report an error (ambiguity).
+     *
+     *         Make sure its return type is Unit, and report an error otherwise.
+     *
+     *         Generate code for a.plusAssign(b).
+     *
+     *     Otherwise, try to generate code for a = a + b (this includes a type check: the type of a + b must be a subtype of a).
+     */
     fun AssignmentNode.visit(modifier: Modifier = Modifier()) {
         if (subject !is VariableReferenceNode && subject !is NavigationNode && subject !is IndexOpNode) {
             throw SemanticException(position, "$subject cannot be assigned")
         }
-        when (subject) {
-            is VariableReferenceNode -> {
-                subject.visit(modifier = modifier)
-                val variableName = subject.variableName
-                val l = checkPropertyWriteAccess(this, variableName)
-                if (transformedRefName == null) {
-                    transformedRefName = "$variableName/$l"
+
+        fun visitSubject(isRead: Boolean, isWrite: Boolean) {
+            when (subject) {
+                is VariableReferenceNode -> {
+                    if (isRead) {
+                        subject.visit(modifier = modifier)
+                    }
+                    if (isWrite) {
+                        val variableName = subject.variableName
+                        val l = checkPropertyWriteAccess(this, variableName)
+                        if (transformedRefName == null) {
+                            transformedRefName = "$variableName/$l"
+                        }
+                    }
                 }
-
-//                log.v { "Assign $variableName type ${subject.type()} <- type ${value.type()}" }
+                is NavigationNode -> {
+                    if (isWrite) {
+                        subject.visit(modifier = modifier, isCheckWriteAccess = true)
+                    }
+                }
+                is IndexOpNode -> {
+                    subject.visit(modifier = modifier, isWriteOnly = isWrite && operator == "=")
+                    if (isWrite) {
+                        assignFunctionCall = FunctionCallNode(
+                            /**
+                             * e.g. `x[0] = v`, subject == x[0], subject.subject == x
+                             */
+                            function = NavigationNode(
+                                position,
+                                subject.subject,
+                                ".",
+                                ClassMemberReferenceNode(position, "set")
+                            ),
+                            arguments = subject.arguments.mapIndexed { index, it ->
+                                FunctionCallArgumentNode(position = it.position, index = index, value = it)
+                            } + listOf(
+                                FunctionCallArgumentNode(
+                                    position = value.position,
+                                    index = subject.arguments.size,
+                                    value = value
+                                )
+                            ),
+                            declaredTypeArguments = emptyList(),
+                            position = position,
+                            modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+                        )
+                        assignFunctionCall!!.visit(modifier)
+                    }
+                }
+                else -> throw SemanticException(position, "$subject cannot be assigned")
             }
-            is NavigationNode -> {
-                subject.visit(modifier = modifier, isCheckWriteAccess = true)
-                // TODO handle NavigationNode
-
-//                log.v { "Assign ${subject.member.name} type ${subject.type()} <- type ${value.type()}" }
-            }
-            is IndexOpNode -> {
-                subject.visit(modifier = modifier, isWriteOnly = operator == "=")
-                functionCall = FunctionCallNode(
-                    /**
-                     * e.g. `x[0] = v`, subject == x[0], subject.subject == x
-                     */
-                    function = NavigationNode(position, subject.subject, ".", ClassMemberReferenceNode(position, "set")),
-                    arguments = subject.arguments.mapIndexed { index, it ->
-                        FunctionCallArgumentNode(position = it.position, index = index, value = it)
-                    } + listOf(FunctionCallArgumentNode(position = value.position, index = subject.arguments.size, value = value)),
-                    declaredTypeArguments = emptyList(),
-                    position = position,
-                    modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
-                )
-                functionCall!!.visit(modifier)
-            }
-            else -> throw SemanticException(position, "$subject cannot be assigned")
+        }
+        if (operator == "=") {
+            visitSubject(isRead = true, isWrite = true)
+        } else {
+            visitSubject(isRead = true, isWrite = false)
         }
         val subjectRawType = subject.type()
         val subjectType = subjectRawType.toDataType()
@@ -440,22 +497,61 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         value.visit(modifier = modifier)
         val valueType = value.type().toDataType()
 
-        if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
-            val preAssignmentOperator = operator.removeSuffix("=")
-            val functionName = operatorToFunctionName(preAssignmentOperator)!!
+        val preAssignOperator = operator.removeSuffix("=")
+        val preAssignFunctionName = operatorToFunctionName(preAssignOperator)
+        val operatorFunctionName = operatorToFunctionName(operator)
+        var isPreAssignFunctionAvailable = false
 
-            if (currentScope.findMatchingCallables(
-                currentScope,
-                functionName,
-                subjectType,
-                listOf(FunctionCallArgumentInfo(name = null, type = valueType)),
+        if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
+            isPreAssignFunctionAvailable = currentScope.findMatchingCallables(
+                currentSymbolTable = currentScope,
+                originalName = preAssignFunctionName!!,
+                receiverType = subjectType,
+                arguments = listOf(FunctionCallArgumentInfo(name = null, type = valueType)),
                 modifierFilter = SearchFunctionModifier(
                     typeFilter = SearchFunctionModifier.Type.OperatorFunctionOnly,
                     returnType = subjectType
                 ),
-            ).isNotEmpty()) {
-                preAssignmentFunctionCall = FunctionCallNode(
-                    function = NavigationNode(position, subjectRawType, ".", ClassMemberReferenceNode(position, functionName)),
+            ).isNotEmpty()
+
+            if (currentScope.findMatchingCallables(
+                    currentSymbolTable = currentScope,
+                    originalName = operatorFunctionName!!,
+                    receiverType = subjectType,
+                    arguments = listOf(FunctionCallArgumentInfo(name = null, type = valueType)),
+                    modifierFilter = SearchFunctionModifier(
+                        typeFilter = SearchFunctionModifier.Type.OperatorFunctionOnly,
+                        returnType = UnitType()
+                    ),
+                ).isNotEmpty()
+            ) {
+                if (isPreAssignFunctionAvailable) {
+                    // TODO check for whether `subject` is mutable before throwing exception
+                    throw SemanticException(position, "Both `$operatorFunctionName` and `$preAssignFunctionName` operator functions are available. The call is ambiguous.")
+                }
+                wholeFunctionCall = FunctionCallNode(
+                    function = NavigationNode(position, subject, ".", ClassMemberReferenceNode(position, operatorFunctionName)),
+                    arguments = listOf(FunctionCallArgumentNode(position = value.position, index = 0, value = value)),
+                    declaredTypeArguments = emptyList(),
+                    position = position,
+                    modifierFilter = SearchFunctionModifier(
+                        typeFilter = SearchFunctionModifier.Type.OperatorFunctionOnly,
+                        returnType = UnitType()
+                    ),
+                ).also { it.visit(modifier = modifier) }
+                return // the subject can be immutable
+            }
+        }
+
+        // check for subject is mutable
+        if (operator != "=") {
+            visitSubject(isRead = false, isWrite = true)
+        }
+
+        if (operator in setOf("+=", "-=", "*=", "/=", "%=")) {
+            if (isPreAssignFunctionAvailable) {
+                preAssignFunctionCall = FunctionCallNode(
+                    function = NavigationNode(position, subjectRawType, ".", ClassMemberReferenceNode(position, preAssignFunctionName!!)),
                     arguments = listOf(FunctionCallArgumentNode(position = value.position, index = 0, value = value)),
                     declaredTypeArguments = emptyList(),
                     position = position,
@@ -468,7 +564,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 return // string can concat anything
             }
             if (!subjectType.isNonNullNumberType()) {
-                throw SemanticException(position, "Missing `$functionName` operator function for type ${subjectType.descriptiveName}")
+                throw SemanticException(position, "Missing `$operatorFunctionName` or `$preAssignFunctionName` operator function for type ${subjectType.descriptiveName}")
             }
             if (!valueType.isNonNullNumberType()) {
                 throw TypeMismatchException(position, "non-null number type", valueType.nameWithNullable)
