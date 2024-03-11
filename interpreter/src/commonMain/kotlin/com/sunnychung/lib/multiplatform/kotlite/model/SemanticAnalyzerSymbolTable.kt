@@ -67,6 +67,7 @@ class SemanticAnalyzerSymbolTable(
                 val owner = findFunctionOwner(functionNameTransform(originalName, it.first))
                 FindCallableResult(
                     transformedName = it.first.transformedRefName!!,
+                    originalName = it.first.name,
                     owner = owner,
                     type = if (owner == null) CallableType.Function else CallableType.ClassMemberFunction,
                     isVararg = it.first.isVararg,
@@ -82,6 +83,7 @@ class SemanticAnalyzerSymbolTable(
             findClass(originalName, isThisScopeOnly = true)?.let {
                 thisScopeCandidates += FindCallableResult(
                     transformedName = it.first.fullQualifiedName,
+                    originalName = it.first.name,
                     owner = null,
                     type = CallableType.Constructor,
                     isVararg = false,
@@ -102,6 +104,7 @@ class SemanticAnalyzerSymbolTable(
                 val owner = findPropertyOwner(transformedName)?.ownerRefName
                 thisScopeCandidates += FindCallableResult(
                     transformedName = transformedName,
+                    originalName = originalName,
                     owner = owner,
                     type = CallableType.Property,
                     isVararg = false,
@@ -140,6 +143,7 @@ class SemanticAnalyzerSymbolTable(
                 ).findMemberFunctionWithIndexByTransformedNameLinearSearch(it.transformedRefName!!).let { lookup2 ->
                     FindCallableResult(
                         transformedName = it.transformedRefName!!,
+                        originalName = it.name,
                         owner = null,
                         type = CallableType.ClassMemberFunction,
                         isVararg = it.isVararg,
@@ -157,6 +161,7 @@ class SemanticAnalyzerSymbolTable(
             findExtensionFunctionsIncludingSuperClasses(receiverType!!, originalName, isThisScopeOnly = true).map {
                 FindCallableResult(
                     transformedName = it.function.transformedRefName!!,
+                    originalName = it.function.name,
                     owner = null,
                     type = CallableType.ExtensionFunction,
                     isVararg = it.function.isVararg,

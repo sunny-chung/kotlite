@@ -841,7 +841,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         }
                     }
                 if (resolutions.size > 1) {
-                    throw SemanticException(position, "Ambiguous function call for `${function.member.name}`. ${resolutions.size} candidates match.")
+                    throw SemanticException(position, "Ambiguous function call for `${function.member.name}`. ${resolutions.size} candidates match:\n${resolutions.joinToString("") { "- ${it.toDisplayableSignature()}\n" }}")
                 }
                 val resolution = resolutions.firstOrNull()
                     ?: throw SemanticException(position, "No matching function `${function.member.name}` found for type ${receiverType.nameWithNullable}")
