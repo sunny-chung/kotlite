@@ -749,14 +749,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     is TypeNode -> function.name
                     else -> throw UnsupportedOperationException()
                 }
-                val resolution = currentScope.findMatchingCallables(
+                val resolutions = currentScope.findMatchingCallables(
                     currentSymbolTable = currentScope,
                     originalName = functionName,
                     receiverType = null,
                     arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
                     modifierFilter = if (function is TypeNode) SearchFunctionModifier.ConstructorOnly else modifierFilter!!,
-                )
-                    .firstOrNull()
+                ).distinctBy { it.signature }
+                if (resolutions.size > 1) {
+                    throw SemanticException(position, "Ambiguous function call for `${functionName}`. ${resolutions.size} candidates match:\n${resolutions.joinToString("") { "- ${it.toDisplayableSignature()}\n" }}")
+                }
+                val resolution = resolutions.firstOrNull()
                     ?: throw SemanticException(position, "No matching function `${functionName}` found")
                 if (function is VariableReferenceNode) {
                     function.ownerRef = resolution.owner?.let { PropertyOwnerInfo(it) }

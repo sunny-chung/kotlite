@@ -9,8 +9,8 @@ class FunctionResolutionTest {
     @Test
     fun functionsHaveHigherPriorityThanPropertiesWithinSameScope() {
         val interpreter = interpreter("""
-            fun f(): Int = 2
             val f = { 3 }
+            fun f(): Int = 2
             val a = f()
         """.trimIndent())
         interpreter.eval()

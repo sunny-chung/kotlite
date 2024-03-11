@@ -3,6 +3,17 @@ package com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis
 import kotlin.test.Test
 
 class CallableTypeTest {
+    @Test
+    fun ambiguousCall() {
+        assertSemanticFail("""
+            open class A
+            open class B : A()
+            open class C : B()
+            fun f(x: A, y: B) = 10
+            fun f(x: B, y: A) = 12
+            f(C(), C())
+        """.trimIndent())
+    }
 
     @Test
     fun invalidCallable1() {

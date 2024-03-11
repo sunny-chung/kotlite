@@ -103,7 +103,7 @@ open class TypeNode(override val position: SourcePosition, val name: String, val
         if (this === other) return true
         if (other !is TypeNode) return false
 
-        if (position != other.position) return false
+//        if (position != other.position) return false
         if (name != other.name) return false
         if (arguments != other.arguments) return false
         if (isNullable != other.isNullable) return false
@@ -112,7 +112,7 @@ open class TypeNode(override val position: SourcePosition, val name: String, val
     }
 
     override fun hashCode(): Int {
-        var result = position.hashCode()
+        var result = 0 // position.hashCode()
         result = 31 * result + name.hashCode()
         result = 31 * result + (arguments?.hashCode() ?: 0)
         result = 31 * result + isNullable.hashCode()
