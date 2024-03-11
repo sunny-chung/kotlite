@@ -325,6 +325,13 @@ class SemanticAnalyzerSymbolTable(
                     }
                 }
             }
+            .distinctBy {
+                if (it.type == CallableType.ExtensionFunction) {
+                    it.transformedName
+                } else {
+                    it.signature
+                }
+            }
             .also { log.v { "Matching functions:\n${it.joinToString("\n")}" } }
     }
 

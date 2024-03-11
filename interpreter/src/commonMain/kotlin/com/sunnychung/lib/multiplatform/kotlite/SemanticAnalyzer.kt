@@ -788,7 +788,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     receiverType = null,
                     arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
                     modifierFilter = if (function is TypeNode) SearchFunctionModifier.ConstructorOnly else modifierFilter!!,
-                ).distinctBy { it.signature }
+                )
                 if (resolutions.size > 1) {
                     throw SemanticException(position, "Ambiguous function call for `${functionName}`. ${resolutions.size} candidates match:\n${resolutions.joinToString("") { "- ${it.toDisplayableSignature()}\n" }}")
                 }
@@ -869,13 +869,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         modifierFilter = modifierFilter!!,
                     )
                 }
-                    .distinctBy {
-                        if (it.type == CallableType.ExtensionFunction) {
-                            it.transformedName
-                        } else {
-                            it.signature
-                        }
-                    }
                 if (resolutions.size > 1) {
                     throw SemanticException(position, "Ambiguous function call for `${function.member.name}`. ${resolutions.size} candidates match:\n${resolutions.joinToString("") { "- ${it.toDisplayableSignature()}\n" }}")
                 }
