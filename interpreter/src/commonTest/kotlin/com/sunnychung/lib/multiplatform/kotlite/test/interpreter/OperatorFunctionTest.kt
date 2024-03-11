@@ -237,4 +237,62 @@ class OperatorFunctionTest {
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("numSetCalls") as IntValue).value)
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("numValueCalls") as IntValue).value)
     }
+
+    @Test
+    fun plusMinus() {
+        val interpreter = interpreter("""
+            class C(val value: Int)
+            class B(val value: Int)
+            class A(val value: Int) {
+                operator fun plus(x: B): C {
+                    return C(value + x.value * 2)
+                }
+            }
+            operator fun C.minus(a: A): B {
+                return B(value * 3 - a.value)
+            }
+            val c: C = A(7) + B(4)
+            val cval = c.value
+            val b: B = c - A(11)
+            val bval = b.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("cval") as IntValue).value)
+        assertEquals(34, (symbolTable.findPropertyByDeclaredName("bval") as IntValue).value)
+    }
+
+    @Test
+    fun genericsTimesDivRem() {
+        val interpreter = interpreter("""
+            class C<T>(val value: Int)
+            class B<T>(val value: Int)
+            class A<T>(val value: Int) {
+                operator fun times(x: B<T>): C<T> {
+                    return C<T>(value + x.value * 2)
+                }
+            }
+            operator fun <T> C<T>.rem(a: A<T>): B<T> {
+                return B<T>(value * 3 - a.value)
+            }
+            operator fun <T> C<T>.div(b: B<T>): A<T> {
+                return A<T>(value - b.value * 7)
+            }
+            val c: C<Int> = A<Int>(7) * B<Int>(4)
+            val cval = c.value
+            val b = c % A<Int>(11)
+            val bval = b.value
+            val a = c / B<Int>(2)
+            val aval: Int = a.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("cval") as IntValue).value)
+        assertEquals(34, (symbolTable.findPropertyByDeclaredName("bval") as IntValue).value)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("aval") as IntValue).value)
+    }
 }

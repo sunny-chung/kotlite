@@ -54,6 +54,9 @@ data object NullNode : ASTNode {
 }
 
 data class BinaryOpNode(override val position: SourcePosition, val node1: ASTNode, val node2: ASTNode, val operator: String, @ModifyByAnalyzer var type: TypeNode? = null,) : ASTNode {
+    @ModifyByAnalyzer var hasFunctionCall: Boolean? = null
+    @ModifyByAnalyzer var call: FunctionCallNode? = null
+
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Binary Op ${operator}\"]"
         return "$self-->${node1.toMermaid()}\n$self-->${node2.toMermaid()}\n"

@@ -134,7 +134,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         ) }
         .toMap()
 
-    val supportedOperatorFunctionNames = setOf("get", "set", "hasNext", "next", "iterator")
+    val supportedOperatorFunctionNames = setOf("get", "set", "hasNext", "next", "iterator", "plus", "minus", "times", "div", "rem")
 
     fun ExtensionProperty.generateTransformedName() {
         this.transformedName = "EP//${this.receiver}/${this.declaredName}/${++functionDefIndex}"
@@ -348,8 +348,41 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     fun BinaryOpNode.visit(modifier: Modifier = Modifier()) {
+        if (hasFunctionCall != null) {
+            return
+        }
+
         node1.visit(modifier = modifier)
         node2.visit(modifier = modifier)
+        val functionName = when (operator) {
+            "+" -> "plus"
+            "-" -> "minus"
+            "*" -> "times"
+            "/" -> "div"
+            "%" -> "rem"
+            else -> null
+        }
+        val node1Type = node1.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
+        val node2Type = node2.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
+        if (functionName != null && currentScope.findMatchingCallables(
+                currentScope,
+                functionName,
+                node1Type,
+                listOf(FunctionCallArgumentInfo(name = null, type = node2Type)),
+                modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+            ).isNotEmpty()
+        ) {
+            call = FunctionCallNode(
+                function = NavigationNode(position, node1, ".", ClassMemberReferenceNode(position, functionName)),
+                arguments = listOf(FunctionCallArgumentNode(position = node2.position, index = 0, value = node2)),
+                declaredTypeArguments = emptyList(),
+                position = position,
+                modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+            ).also { it.visit(modifier = modifier) }
+            hasFunctionCall = true
+        } else {
+            hasFunctionCall = false
+        }
         type()
     }
 
@@ -2160,37 +2193,43 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is ValueParameterDeclarationNode -> TODO()
     }
 
-    fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode = type ?: when (operator) {
-        "+", "-", "*", "/", "%" -> {
-            val t1 = node1.type(modifier = modifier).toDataType()
-            val t2 = node2.type(modifier = modifier).toDataType()
-            if (t1 is StringType || t1 is NothingType || t2 is StringType || t2 is NothingType) {
-                typeRegistry["String"]!!
-            } else if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
-                || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
-            ) {
-                typeRegistry["Double"]!!
-            } else if ((t1 == LongType(isNullable = false) && t2.isNonNullIntegralType())
-                || (t2 == LongType(isNullable = false) && t2.isNonNullIntegralType())
-            ) {
-                typeRegistry["Long"]!!
-            } else if (t1 == IntType(isNullable = false) && t2 == IntType(isNullable = false)) {
-                typeRegistry["Int"]!!
-            } else if (operator == "+" && t1 is CharType && t2 is IntType) {
-                typeRegistry["Char"]!!
-            } else if (operator == "-" && t1 is CharType && t2 is CharType) {
-                typeRegistry["Int"]!!
-            } else {
-                throw SemanticException(position, "Types ${t1.nameWithNullable} and ${t2.nameWithNullable} cannot be applied with operator `$operator`")
+    fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode =
+        type
+            ?: call?.type(modifier = modifier)?.also { type = it }
+            ?: when (operator) {
+                "+", "-", "*", "/", "%" -> {
+                    val t1 = node1.type(modifier = modifier).toDataType()
+                    val t2 = node2.type(modifier = modifier).toDataType()
+                    if (t1 is StringType || t1 is NothingType || t2 is StringType || t2 is NothingType) {
+                        typeRegistry["String"]!!
+                    } else if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
+                        || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
+                    ) {
+                        typeRegistry["Double"]!!
+                    } else if ((t1 == LongType(isNullable = false) && t2.isNonNullIntegralType())
+                        || (t2 == LongType(isNullable = false) && t2.isNonNullIntegralType())
+                    ) {
+                        typeRegistry["Long"]!!
+                    } else if (t1 == IntType(isNullable = false) && t2 == IntType(isNullable = false)) {
+                        typeRegistry["Int"]!!
+                    } else if (operator == "+" && t1 is CharType && t2 is IntType) {
+                        typeRegistry["Char"]!!
+                    } else if (operator == "-" && t1 is CharType && t2 is CharType) {
+                        typeRegistry["Int"]!!
+                    } else {
+                        throw SemanticException(
+                            position,
+                            "Types ${t1.descriptiveName} and ${t2.descriptiveName} cannot be applied with operator `$operator`"
+                        )
+                    }
+                }
+
+                "<", "<=", ">", ">=", "==", "!=", "||", "&&" -> typeRegistry["Boolean"]!!
+
+                else -> throw UnsupportedOperationException()
+            }.also {
+                type = it
             }
-        }
-
-        "<", "<=", ">", ">=", "==", "!=", "||", "&&" -> typeRegistry["Boolean"]!!
-
-        else -> throw UnsupportedOperationException()
-    }.also {
-        type = it
-    }
 
     fun UnaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }
