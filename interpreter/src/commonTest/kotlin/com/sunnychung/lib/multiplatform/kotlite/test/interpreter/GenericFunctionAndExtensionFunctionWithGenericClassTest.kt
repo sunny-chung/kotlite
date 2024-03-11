@@ -366,4 +366,23 @@ class GenericFunctionAndExtensionFunctionWithGenericClassTest {
         assertEquals("abc,def,bcd,123,45,", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
         assertEquals("123,45,", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
     }
+
+    @Test
+    fun functionOverloadWithMoreSpecificValueParameter() {
+        val interpreter = interpreter("""
+            class A<T>
+            class B<T>
+            fun <T> A<T>.f(x: T) = 10
+            fun <T> A<T>.f(x: B<T>) = 12
+            val o = A<Int>
+            val a = o.f(1)
+            val b = o.f(B<Int>())
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(12, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

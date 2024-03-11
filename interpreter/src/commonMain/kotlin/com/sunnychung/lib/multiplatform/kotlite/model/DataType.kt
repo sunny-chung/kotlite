@@ -43,6 +43,10 @@ sealed interface DataType {
         return this.isAssignableFrom(other)
     }
 
+    fun isConvertibleTo(other:DataType): Boolean {
+        return other.isConvertibleFrom(this)
+    }
+
     fun copyOf(isNullable: Boolean): DataType
 
     fun toTypeNode() = TypeNode(SourcePosition.NONE, name, null, isNullable)
@@ -227,7 +231,8 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     // A.isSubTypeOf(B) = false
     // B.isSubTypeOf(A) = true
     override fun isSubTypeOf(other: DataType): Boolean {
-        if (other !is ObjectType || other == this) return false
+        if (other is AnyType && (other.isNullable || !isNullable)) return true
+        if ((other !is ObjectType && other !is TypeParameterType) || other == this) return false
         return other.isConvertibleFrom(this)
     }
 

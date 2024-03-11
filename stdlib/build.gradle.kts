@@ -172,6 +172,8 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryIterator",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableSetValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.wrap",
             ),
             typeAliases = mapOf(

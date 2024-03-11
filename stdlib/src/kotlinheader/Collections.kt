@@ -290,3 +290,40 @@ fun <K, V> Map<K, V>.toMutableMap(): MutableMap<K, V>
 fun <K, V> Map<K, V>.withDefault(defaultValue: (key: K) -> V): Map<K, V>
 fun <K, V> MutableMap<K, V>.withDefault(defaultValue: (key: K) -> V): MutableMap<K, V>
 
+////////////////////
+// Set
+
+val <T> Set<T>.size: Int
+    get()
+
+fun <T> Set<T>.contains(element: T): Boolean
+fun <T> Set<T>.containsAll(elements: Collection<T>): Boolean
+fun <T> Set<T>.isEmpty(): Boolean
+operator fun <T> Set<T>.iterator(): Iterator<T>
+/*infix*/ fun <T> Iterable<T>.intersect(
+    other: Iterable<T>
+): Set<T>
+/*operator*/ fun <T> Set<T>.minus(element: T): Set<T>
+/*operator*/ fun <T> Set<T>.minus(elements: Iterable<T>): Set<T>
+fun <T> Set<T>.minusElement(element: T): Set<T>
+fun <T> Set<T>?.orEmpty(): Set<T>
+/*operator*/ fun <T> Set<T>.plus(element: T): Set<T>
+/*operator*/ fun <T> Set<T>.plus(elements: Iterable<T>): Set<T>
+fun <T> Set<T>.plusElement(element: T): Set<T>
+/*infix*/ fun <T> Iterable<T>.subtract(other: Iterable<T>): Set<T>
+fun <T> Iterable<T>.toMutableSet(): MutableSet<T>
+fun <T> Iterable<T>.toSet(): Set<T>
+
+fun <T> MutableSet<T>.add(element: T): Boolean
+fun <T> MutableSet<T>.addAll(elements: Collection<T>): Boolean
+fun <T> MutableSet<T>.clear()
+fun <T> MutableSet<T>.remove(element: T): Boolean
+fun <T> MutableSet<T>.removeAll(elements: Collection<T>): Boolean
+fun <T> MutableSet<T>.retainAll(elements: Collection<T>): Boolean
+
+//fun <T> mutableSetOf(): MutableSet<T>
+fun <T> mutableSetOf(vararg elements: T): MutableSet<T>
+//fun <T> setOf(): Set<T>
+fun <T> setOf(vararg elements: T): Set<T>
+fun <T : Any> setOfNotNull(vararg elements: T?): Set<T>
+

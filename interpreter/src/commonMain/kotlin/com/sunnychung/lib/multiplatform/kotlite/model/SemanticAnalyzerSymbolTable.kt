@@ -314,7 +314,7 @@ class SemanticAnalyzerSymbolTable(
                         val otherValueParameterTypes = otherCallable.arguments.map { toDataType(it, otherCallable.typeParameters) }
                         var isOtherMoreSpecific = false
                         valueParameterTypes.indices.forEach {  i ->
-                            if (!otherValueParameterTypes[i].isAssignableTo(valueParameterTypes[i])) {
+                            if (!otherValueParameterTypes[i].isConvertibleTo(valueParameterTypes[i])) {
                                 return@any false
                             }
                             if (!isOtherMoreSpecific && otherValueParameterTypes[i].isSubTypeOf(valueParameterTypes[i])) {

@@ -8,6 +8,8 @@ import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapValue
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableSetValue
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetValue
 
 class CollectionsLibModule : AbstractCollectionsLibModule() {
     override val classes: List<ProvidedClassDefinition> = listOf(
@@ -21,5 +23,7 @@ class CollectionsLibModule : AbstractCollectionsLibModule() {
         MapValue.clazz,
         MutableMapValue.clazz,
         MapEntryValue.clazz,
+        SetValue.clazz,
+        MutableSetValue.clazz,
     )
 }

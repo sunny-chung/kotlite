@@ -15,6 +15,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isPrimitive
 
+internal val isDebug: Boolean = false
+
 internal class StdLibDelegationCodeGenerator(val name: String, val code: String, val outputPackage: String, val config: KotliteModuleConfig) {
     val parser = Parser(Lexer(name, code))
     val extensionProperties: List<PropertyDeclarationNode>
@@ -238,7 +240,11 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                         " }"
             }
             "Iterator" -> {
-                ".let { it.wrap(${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
+                debug { "Iterator wrap -> ${_type.descriptiveName()}" }
+                when (_type.arguments!!.get(0)!!.name) {
+                    "MapEntry" -> ".let { it.wrap(${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
+                    else -> ""
+                }
             }
             "Collection" -> {
                 ".toList()"
@@ -358,6 +364,12 @@ ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i"
         ${if (receiver!!.name.endsWith(".Companion")) receiver!!.name else "unwrappedReceiver"}.$name = unwrappedValue
     }""" } ?: "null"},
 )""".prependIndent(indent)
+    }
+}
+
+internal fun debug(message: () -> String) {
+    if (isDebug) {
+        println(message())
     }
 }
 
