@@ -25,6 +25,15 @@ abstract class KotliteCommonKotlinCodeGenerateTask : DefaultTask() {
     abstract val configs: MapProperty<String, KotliteModuleConfig>
 
     @TaskAction
+    fun run() {
+        try {
+            generate()
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+
     fun generate() {
         val outputDirObj = outputDir.asFile.get()
         outputDirObj.mkdirs()
