@@ -203,6 +203,7 @@ open class ClassDefinition(
         return memberFunctions
     }
 
+    @Deprecated("use findMemberFunctionsWithEnclosingTypeNameByDeclaredName")
     fun findMemberFunctionsWithIndexByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, Int>> =
         memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
             (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
@@ -222,8 +223,9 @@ open class ClassDefinition(
             } ?: emptyMap() )
 
     fun findMemberFunctionsByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, FunctionDeclarationNode> =
-        findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly).mapValues { it.value.first }
+        findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly).mapValues { it.value.first }
 
+    @Deprecated("use findMemberFunctionWithEnclosingTypeNameByTransformedName")
     fun findMemberFunctionWithIndexByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
         memberFunctions[transformedName]?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly) }
@@ -253,7 +255,7 @@ open class ClassDefinition(
             }
 
     fun findMemberFunctionByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): FunctionDeclarationNode? =
-        findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly)?.first
+        findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly)?.first
 
     fun findDeclarations(filter: (clazz: ClassDefinition, declaration: ASTNode) -> Boolean): List<ASTNode> {
         return declarations.filter { filter(this, it) } +

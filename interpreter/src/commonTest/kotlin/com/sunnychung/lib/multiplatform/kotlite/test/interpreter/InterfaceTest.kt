@@ -120,4 +120,35 @@ class InterfaceTest {
         assertEquals(24, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(36, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun implementMultipleInterfaces() {
+        val interpreter = interpreter("""
+            interface I {
+                fun f(x: Int): Int
+            }
+            interface J {
+                fun g(): Int
+            }
+            interface K : J {
+                fun h(): Int
+            }
+            class A : I, K {
+                override fun f(x: Int) = 2 * x
+                override fun g() = 20
+                override fun h() = 29
+            }
+            val o: K = A()
+            val a = (o as I).f(12)
+            val b = o.g()
+            val c = o.h()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(24, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
 }
