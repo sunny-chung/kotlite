@@ -349,7 +349,6 @@ class ExtensionFunctionTest {
     }
 
     @Test
-    @Ignore // TODO wait for ?: operator
     fun nullableExtensionReferenceToThis() {
         val interpreter = interpreter("""
             fun Int?.happyNumber(): Int = (this ?: 100) + 5
@@ -358,9 +357,25 @@ class ExtensionFunctionTest {
         """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
-        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(2, symbolTable.propertyValues.size)
         println(symbolTable.propertyValues)
         assertEquals(105, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
         assertEquals(7, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun superClassExtension() {
+        val interpreter = interpreter("""
+            open class Base
+            class A : Base()
+            class B : Base()
+            fun Base.f(other: Base): Int = 1000
+            val x = A().f(B())
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(1, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(1000, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
 }
