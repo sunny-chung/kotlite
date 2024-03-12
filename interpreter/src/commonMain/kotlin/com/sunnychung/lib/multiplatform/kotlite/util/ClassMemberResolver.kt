@@ -148,6 +148,13 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
         this.genericUpperBounds = genericUpperBounds.toList()
     }
 
+    fun forEachSuperClassesFromRoot(visit: (index: Int, clazz: ClassDefinition, typeResolutions: Map<String, TypeNode>, typeUpperBounds: Map<String, TypeNode>) -> Unit) {
+        genericResolutions.forEachIndexed { index, (clazz, typeResolutions) ->
+            val upperBounds = genericUpperBounds[index].second
+            visit(index, clazz, typeResolutions, upperBounds)
+        }
+    }
+
     fun findMemberPropertyCustomAccessorWithType(memberName: String): Pair<PropertyAccessorsNode, TypeNode>? {
         val (accessor, index) = clazz.findMemberPropertyCustomAccessorWithIndex(memberName) ?: return null
         val type = accessor.type.let { type ->

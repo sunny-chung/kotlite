@@ -20,7 +20,48 @@ class Cls(var a: Int = 60) {
 }
 ```
 
+== Variable scope / "transformedRefName"
+
+Using `"${declaredName}/${scopeLevel}"` as `transformedRefName` is not safe, because `scopeLevel` can clash when extension functions come in. So, a unique index is generated for `transformedRefName`.
+
+== The "this" keyword
+
+Two variables, `this` and `this/${className}`, are defined. The second one is to cater cases like this:
+
+[source, kotlin]
+....
+class B(var a: Int) {
+    fun inc(x: Int) {
+        a += x
+    }
+}
+class A(val b: B, var c: Int) {
+    fun addC(): Int {
+        return c++
+    }
+
+    fun B.f() {
+        inc(addC()) // <1>
+    }
+
+    fun a() {
+        b.f()
+    }
+}
+....
+
+<1> `this` of the function call `addC()` belongs to class `A`, while `this` of the function call `inc()` refers to class `B`.
 
 == The "super" keyword
 
 A hack is implemented in Interpreter to resolve the "super" keyword. The "super" variable resolves to the "this" instance. While evaluating `NavigationNode`, get the actual class name of "super", that was resolved properly in Semantic Analyzer, and lookup `parentInstance` of the "this" instance until reaching the actual class of "super". Both read and write operations have this hack implemented.
+
+== Abstract Classes
+
+As only abstract functions are supported, the only things need to be implemented are:
+
+- Parse 'abstract' modifier in Parser
+- Parser does not parse function body if 'abstract' modifier applies
+- Implement modifier checks in Semantic Analyzer
+- Disallow calling abstract functions directly via `super.abstractFunction()` expressions in Semantic Analyzer
+- Throw exception in Interceptor if a direct call is made to an abstract function, which supposes to be avoided by Semantic Analyzer

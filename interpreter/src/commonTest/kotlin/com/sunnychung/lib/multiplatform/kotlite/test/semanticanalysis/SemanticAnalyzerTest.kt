@@ -168,6 +168,20 @@ class SemanticAnalyzerTest {
     }
 
     @Test
+    fun functionWithDuplicateParameters1() {
+        assertSemanticFail("""
+            fun func(x: Int, x: String) { }
+        """.trimIndent())
+    }
+
+    @Test
+    fun functionWithDuplicateParameters2() {
+        assertSemanticFail("""
+            fun func(x: Int, y: Int, x: Int) { }
+        """.trimIndent())
+    }
+
+    @Test
     fun simpleFunctionFail1() {
         val analyzer = build("""
             val x: Int = 1 + 2
@@ -438,6 +452,36 @@ class SemanticAnalyzerTest {
         assertFailsWith<SemanticException> {
             analyzer.analyze()
         }
+    }
+
+    @Test
+    fun duplicatedPrimaryConstructorParameter() {
+        assertSemanticFail("""
+            class Cls(x: Int, x: Int)
+        """.trimIndent())
+    }
+
+    @Test
+    fun duplicatedPrimaryConstructorProperty() {
+        assertSemanticFail("""
+            class Cls(var x: Int, var x: Int)
+        """.trimIndent())
+    }
+
+    @Test
+    fun duplicatedPrimaryConstructorParameterOrProperty() {
+        assertSemanticFail("""
+            class Cls(x: Int, var x: Int)
+        """.trimIndent())
+    }
+
+    @Test
+    fun duplicatedPrimaryConstructorPropertyWithClassProperty() {
+        assertSemanticFail("""
+            class Cls(var x: Int) {
+                var x: String = ""
+            }
+        """.trimIndent())
     }
 
     @Test

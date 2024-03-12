@@ -57,6 +57,192 @@ class ClassInheritanceTest {
     }
 
     @Test
+    fun subclassAccessInheritedProperty() {
+        val interpreter = interpreter("""
+            open class A {
+                var a = 1
+            }
+            class B(var b: Int) : A() {
+                fun f(): Int {
+                    return a
+                }
+            }
+            
+            val x = B(123)
+            val a = x.f()
+            val b = x.b
+            x.a += 2
+            val c = x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun subclassAccessDeeplyInheritedProperty() {
+        val interpreter = interpreter("""
+            open class A {
+                var a = 1
+            }
+            open class A2 : A()
+            open class A3 : A2()
+            open class A4 : A3()
+            open class A5 : A4()
+            class B(var b: Int) : A5() {
+                fun f(): Int {
+                    return a
+                }
+            }
+            
+            val x = B(123)
+            val a = x.f()
+            val b = x.b
+            x.a += 2
+            val c = x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun subclassAccessInheritedPropertyInConstructor() {
+        val interpreter = interpreter("""
+            open class A(val c: Int) {
+                var a = 1
+            }
+            class B(var b: Int) : A(b + 10) {
+                fun f(): Int {
+                    return c
+                }
+            }
+            
+            val x = B(123)
+            val a = x.a
+            val b = x.b
+            x.a += 2
+            val c = x.a
+            val d = x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(133, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
+
+    @Test
+    fun subclassAccessDeeplyInheritedPropertyInConstructor() {
+        val interpreter = interpreter("""
+            open class A(val c: Int) {
+                var a = 1
+            }
+            open class A2(c: Int): A(c)
+            open class A3(c: Int): A2(c)
+            open class A4(c: Int): A3(c)
+            open class A5(c: Int): A4(c)
+            class B(var b: Int) : A5(b + 10) {
+                fun f(): Int {
+                    return c
+                }
+            }
+            
+            val x = B(123)
+            val a = x.a
+            val b = x.b
+            x.a += 2
+            val c = x.a
+            val d = x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(133, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
+
+    @Test
+    fun subclassAccessInheritedPropertyWhichThenRedeclared() {
+        val interpreter = interpreter("""
+            open class A {
+                var a = 1
+            }
+            class B(var b: Int) : A() {
+                fun f(): Int {
+                    fun g(): Int {
+                        return a
+                    }
+                    val a = 100
+                    return g()
+                }
+            }
+            
+            val x = B(123)
+            val a = x.f()
+            val b = x.b
+            x.a += 2
+            val c = x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
+    fun subclassAccessDeeplyInheritedPropertyWhichThenRedeclared() {
+        val interpreter = interpreter("""
+            open class A {
+                var a = 1
+            }
+            open class A2 : A()
+            open class A3 : A2()
+            open class A4 : A3()
+            open class A5 : A4()
+            class B(var b: Int) : A5() {
+                fun f(): Int {
+                    fun g(): Int {
+                        return a
+                    }
+                    val a = 100
+                    return g()
+                }
+            }
+            
+            val x = B(123)
+            val a = x.f()
+            val b = x.b
+            x.a += 2
+            val c = x.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
     fun passArgumentToSuperConstructor() {
         val interpreter = interpreter("""
             open class A(val c: Int) {

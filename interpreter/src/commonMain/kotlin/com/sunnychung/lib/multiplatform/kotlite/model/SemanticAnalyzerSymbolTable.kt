@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.log
@@ -100,7 +101,8 @@ class SemanticAnalyzerSymbolTable(
                 if (it.first.type !is FunctionType || it.first.type.isNullable) {
                     return@let
                 }
-                val transformedName = "$originalName/${this.scopeLevel}"
+//                val transformedName = "$originalName/${this.scopeLevel}"
+                val transformedName = it.second.transformedSymbolsByDeclaredName[IdentifierClassifier.Property to originalName]!!
                 val owner = findPropertyOwner(transformedName)?.ownerRefName
                 thisScopeCandidates += FindCallableResult(
                     transformedName = transformedName,

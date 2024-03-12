@@ -230,7 +230,17 @@ class CustomBuiltinExtensionPropertyTest {
                 getter = { interpreter, subject, typeArgs -> IntValue(2) }
             ))
         }
-        assertSemanticSuccess(code = "", environment = env)
+        val interpreter = interpreter("""
+            fun <T> list(vararg values: T): List<T> = values
+            val a = list(1, 2).prop
+            val b = list("abC").prop
+        """.trimIndent(), executionEnvironment = env)
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
 
     @Test

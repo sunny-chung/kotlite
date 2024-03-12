@@ -850,8 +850,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         symbolTable.assign("this", instance)
         symbolTable.declareProperty(callPosition, "this/${instance.clazz!!.fullQualifiedName}", TypeNode(callPosition, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
-        symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this", "this")
+//        symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this", "this")
         symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this/${instance.clazz!!.fullQualifiedName}", "this")
+
 //            instance.memberPropertyValues.forEach {
 //                symbolTable.putPropertyHolder(instance.clazz!!.memberPropertyNameToTransformedName[it.key]!!, it.value)
 //            }
@@ -951,7 +952,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             }
             symbolTable.declareProperty(position, "this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
-            symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
+//            symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
             symbolTable.registerTransformedSymbol(position, IdentifierClassifier.Property, "this/${subject.type().name}", "this")
 
             if (subject is ClassInstance) {

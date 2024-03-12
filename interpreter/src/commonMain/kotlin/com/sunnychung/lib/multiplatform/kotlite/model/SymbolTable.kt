@@ -12,12 +12,21 @@ open class SymbolTable(
     val scopeLevel: Int,
     val scopeName: String,
     val scopeType: ScopeType,
-    val parentScope: SymbolTable?,
+    var parentScope: SymbolTable?,
     val returnType: DataType? = null,
 ) {
     init {
         if (parentScope == this) {
-            throw RuntimeException("There is a cycle in symbol table hierarchy")
+            throw RuntimeException("There is an immediate cycle in symbol table hierarchy")
+        }
+
+        val visitedParents = mutableSetOf(this)
+        var parent = parentScope
+        while (parent != null) {
+            if (parent in visitedParents) {
+                throw RuntimeException("There is a cycle in symbol table hierarchy")
+            }
+            parent = parent.parentScope
         }
     }
 
@@ -26,6 +35,7 @@ open class SymbolTable(
     internal val propertyOwners = mutableMapOf<String, PropertyOwnerInfo>() // only use in SemanticAnalyzer
     internal val functionOwners = mutableMapOf<String, String>() // only use in SemanticAnalyzer
     internal val transformedSymbols = mutableMapOf<Pair<IdentifierClassifier, String>, String>() // only use in SemanticAnalyzer. transformed name -> original name
+    internal val transformedSymbolsByDeclaredName = mutableMapOf<Pair<IdentifierClassifier, String>, String>() // only use in SemanticAnalyzer. original name -> transformed name
 
     protected val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
     protected val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
@@ -481,20 +491,36 @@ open class SymbolTable(
         throw RuntimeException("Function $declaredName for receiver ${receiver.descriptiveName()} not found")
     }
 
+    private fun isReverseTransformNeeded(identifierClassifier: IdentifierClassifier): Boolean =
+        when (identifierClassifier) {
+            IdentifierClassifier.Property, IdentifierClassifier.Class, IdentifierClassifier.TypeAlias -> true
+            IdentifierClassifier.Function, IdentifierClassifier.TypeResolution -> false
+        }
+
     internal fun registerTransformedSymbol(position: SourcePosition, identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String) {
         val key = identifierClassifier to transformedName
-        if (transformedSymbols.containsKey(key)) {
+        if (transformedSymbols.containsKey(key) || (isReverseTransformNeeded(identifierClassifier) && transformedSymbolsByDeclaredName.containsKey(identifierClassifier to originalName))) {
             throw DuplicateIdentifierException(position, transformedName, identifierClassifier)
         }
         transformedSymbols[key] = originalName
+        if (isReverseTransformNeeded(identifierClassifier)) {
+            transformedSymbolsByDeclaredName[identifierClassifier to originalName] = transformedName
+        }
     }
 
-    internal fun unregisterTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String): Boolean {
+    internal fun unregisterTransformedSymbol(identifierClassifier: IdentifierClassifier, transformedName: String, originalName: String): Boolean {
         val key = identifierClassifier to transformedName
         return if (transformedSymbols.containsKey(key)) {
             transformedSymbols.remove(key)
+            if (isReverseTransformNeeded(identifierClassifier)) {
+                transformedSymbolsByDeclaredName.remove(identifierClassifier to originalName).also {
+                    if (it == null) {
+                        throw RuntimeException("$identifierClassifier orig $originalName not found")
+                    }
+                }
+            }
             true
-        } else if (parentScope?.unregisterTransformedSymbol(identifierClassifier, transformedName) == true) {
+        } else if (parentScope?.unregisterTransformedSymbol(identifierClassifier, transformedName, originalName) == true) {
             true
         } else {
             throw RuntimeException("$identifierClassifier $transformedName not found")
@@ -572,6 +598,27 @@ open class SymbolTable(
         }
         other.classDeclarations.forEach {
             declareClass(position, it.value)
+        }
+        other.propertyOwners.forEach {
+            declarePropertyOwner(it.key, it.value.ownerRefName, it.value.extensionPropertyRef)
+        }
+        other.transformedSymbols.forEach {
+            registerTransformedSymbol(SourcePosition.NONE, it.key.first, it.key.second, it.value)
+        }
+    }
+
+    fun printSymbolTableStack() {
+        log.d {
+            buildString {
+                var table: SymbolTable? = this@SymbolTable
+                while (table != null) {
+                    if (isNotEmpty()) {
+                        append(" --> ")
+                    }
+                    append("[l=${table.scopeLevel}, name=${table.scopeName}, type=${table.scopeType}]")
+                    table = table.parentScope
+                }
+            }
         }
     }
 

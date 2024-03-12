@@ -107,6 +107,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     val symbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 1, scopeName = ":global", scopeType = ScopeType.Script, parentScope = builtinSymbolTable)
     var currentScope = builtinSymbolTable
     var functionDefIndex = 0
+    var variableDefIndex = 0
     val symbolRecorders = mutableListOf<SymbolReferenceSet>()
 
     // a cache of common types for optimization. not a must to use them
@@ -323,6 +324,23 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             scope = scope.parentScope!!
         }
         return scope.scopeLevel
+    }
+
+    fun checkPropertyReadAccessAndGetScopeLevelAndTransformedName(accessNode: ASTNode, name: String): Pair<Int, String> {
+        if (!currentScope.hasProperty(name)) {
+            throw SemanticException(accessNode.position, "Property `$name` is not declared")
+        }
+        var scope: SymbolTable = currentScope
+        while (!scope.hasProperty(name, isThisScopeOnly = true)) {
+            scope = scope.parentScope!!
+        }
+        return scope.scopeLevel to
+                (scope.transformedSymbolsByDeclaredName[IdentifierClassifier.Property to name]
+                    ?: throw SemanticException(
+                        accessNode.position,
+                        "Transformed symbol of property `$name` cannot be found"
+                    )
+                )
     }
 
     /**
@@ -654,7 +672,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
             currentScope.assign(name, SemanticDummyRuntimeValue(currentScope.getPropertyType(name).first.type))
         }
-        transformedRefName = "$name/${scopeLevel}"
+//        transformedRefName = "$name/${scopeLevel}"
+        transformedRefName = "$name/${++variableDefIndex}"
         currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, transformedRefName!!, name)
 
         evaluateAndRegisterReturnType(this)
@@ -666,9 +685,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 return
             }
         }
-        val l = checkPropertyReadAccess(this, variableName)
+        val (l, transformedName) = checkPropertyReadAccessAndGetScopeLevelAndTransformedName(this, variableName)
         if (variableName != "this" && variableName != "super" && transformedRefName == null) {
-            transformedRefName = "$variableName/$l"
+            transformedRefName = transformedName
             currentScope.findPropertyOwner(transformedRefName!!)?.let {
                 ownerRef = it
             }
@@ -694,6 +713,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             returnType = returnType,
             parentScope = currentScope
         )
+    }
+
+    fun pushScope(scope: SemanticAnalyzerSymbolTable) {
+        scope.parentScope = currentScope
+        currentScope = scope
     }
 
     fun popScope() {
@@ -811,14 +835,22 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         type = it.value.type.toTypeNode(),
                         isMutable = it.value.isMutable
                     )
+                    val transformedName = clazz.findMemberPropertyTransformedName(it.key)
+                        ?: throw SemanticException(position, "Cannot find transformed property of `${it.key}`")
+                    currentScope.registerTransformedSymbol(
+                        position = position,
+                        identifierClassifier = IdentifierClassifier.Property,
+                        transformedName = transformedName,
+                        originalName = it.key,
+                    )
                     currentScope.declarePropertyOwner(
-                        name = "${it.key}/${currentScope.scopeLevel}",
-                        owner = "this/${receiver.descriptiveName()}"
+                        name = transformedName, // "${it.key}/${currentScope.scopeLevel}",
+                        owner = "this/${receiver.descriptiveName()}",
                     )
                 }
                 clazz.getAllMemberFunctions().forEach {
                     currentScope.declareFunction(position = position, name = it.key, node = it.value)
-                    currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this/${receiver.descriptiveName()}")
+                    currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this" /*"this/${receiver.descriptiveName()}"*/)
                 }
             }
             currentScope.findExtensionPropertyByReceiver(typeNode.resolveGenericParameterTypeToUpperBound(clazz.typeParameters)).forEach {
@@ -828,8 +860,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     type = it.second.typeNode!!,
                     isMutable = it.second.setter != null
                 )
+                currentScope.registerTransformedSymbol(
+                    position = position,
+                    identifierClassifier = IdentifierClassifier.Property,
+                    transformedName = it.second.transformedName!!,
+                    originalName = it.second.declaredName,
+                )
                 currentScope.declarePropertyOwner(
-                    name = "${it.second.declaredName}/${currentScope.scopeLevel}",
+                    name = it.second.transformedName!!, //"${it.second.declaredName}/${currentScope.scopeLevel}",
                     owner = "this/${receiver.descriptiveName()}",
                     extensionPropertyRef = it.first,
                 )
@@ -1332,10 +1370,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     fun FunctionValueParameterNode.generateTransformedName() {
-        transformedRefName = "$name/${currentScope.scopeLevel}"
+        transformedRefName = "$name/${++variableDefIndex}" //"$name/${currentScope.scopeLevel}"
     }
 
-    fun FunctionValueParameterNode.visit(modifier: Modifier = Modifier(), functionDeclarationNode: FunctionDeclarationNode?, isDeclareProperty: Boolean = true) {
+    fun FunctionValueParameterNode.visit(modifier: Modifier = Modifier(), functionDeclarationNode: FunctionDeclarationNode?, isDeclareProperty: Boolean = true, overrideTransformedName: String? = null) {
         if (defaultValue is LambdaLiteralNode && type is FunctionTypeNode) {
             defaultValue.parameterTypesUpperBound = (type as FunctionTypeNode).parameterTypes
         }
@@ -1360,7 +1398,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 name,
                 SemanticDummyRuntimeValue(currentScope.typeNodeToPropertyType(type, false)!!.type)
             )
-            generateTransformedName()
+            if (overrideTransformedName == null) {
+                generateTransformedName()
+            } else {
+                transformedRefName = overrideTransformedName
+            }
             currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, transformedRefName!!, name)
         }
     }
@@ -1751,19 +1793,30 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
         pushScope(name, ScopeType.Class)
         run {
+            var numExtraSuperScopes = 0
+
             typeParameters.forEach {
                 currentScope.declareTypeAlias(it.position, it.name, it.typeUpperBound)
             }
             primaryConstructor?.visit(modifier = modifier)
             superClassInvocation?.visit(modifier = modifier, isSuperClassInvocation = true)
+
+            val currentClassScope = currentScope
+
             if (superClassInvocation != null) {
-                temporarilySwitchToScopeAndRun(superClassScope) {
-                    val type = superClassInvocation.type()
-                    val typeArguments = superClass!!.typeParameters.mapIndexed { index, tp ->
-                        tp.name to type.arguments!![index]
-                    }.toMap()
-                    superClass.currentScope?.let { currentScope.mergeDeclarationsFrom(position, it, typeArguments) }
+                popScope()
+
+                val type = superClassInvocation.type()
+                ClassMemberResolver(superClassScope, superClass!!, type.arguments ?: emptyList()).forEachSuperClassesFromRoot { index, clazz, typeResolutions, typeUpperBounds ->
+                    pushScope(clazz.fullQualifiedName, ScopeType.Class)
+                    ++numExtraSuperScopes
+                    clazz.currentScope?.let { currentScope.mergeDeclarationsFrom(position, it, typeResolutions) }
+                    log.d { "scope [$index]. ${clazz.fullQualifiedName}" }
+                    currentScope.printSymbolTableStack()
                 }
+
+                // "push" `currentClassScope` to the top
+                pushScope(currentClassScope)
             }
 
             if (isInterface) {
@@ -1788,13 +1841,19 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 ?.filter { !it.isProperty }
             primaryConstructor?.parameters?.forEach {
                 currentScope.undeclareProperty(it.parameter.name)
-                currentScope.unregisterTransformedSymbol(IdentifierClassifier.Property, it.parameter.transformedRefName!!)
+                currentScope.unregisterTransformedSymbol(IdentifierClassifier.Property, it.parameter.transformedRefName!!, it.parameter.name)
             }
             primaryConstructor?.parameters
                 ?.filter { it.isProperty }
                 ?.forEach {
                     val p = it.parameter
                     currentScope.declareProperty(position = p.position, name = p.name, type = p.type, isMutable = it.isMutable)
+                    currentScope.registerTransformedSymbol(
+                        position = p.position,
+                        identifierClassifier = IdentifierClassifier.Property,
+                        transformedName = p.transformedRefName!!,
+                        originalName = p.name
+                    )
                     currentScope.assign(p.name, SemanticDummyRuntimeValue(currentScope.getPropertyType(p.name).first.type))
                 }
 
@@ -1856,7 +1915,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()
             val pseudoTypeArguments = typeParameters.map { TypeNode(it.position, it.name, null, false) }.emptyToNull()
             currentScope.declareProperty(position, "this", TypeNode(SourcePosition.NONE, name, pseudoTypeArguments, false), false)
-            currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
+//            currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
             currentScope.declareProperty(position, "this/${fullQualifiedClassName}", TypeNode(SourcePosition.NONE, name, pseudoTypeArguments, false), false)
             currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this/${fullQualifiedClassName}", "this")
 
@@ -1874,7 +1933,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     pushScope("init-property", ScopeType.ClassInitializer)
                     nonPropertyArguments?.forEach {
                         val parameterForClassBody = it.parameter.copy()
-                        parameterForClassBody.visit(modifier = modifier, null /* TODO support generic class */)
+                        parameterForClassBody.visit(modifier = modifier, null /* TODO support generic class */, overrideTransformedName = it.parameter.transformedRefName)
                         it.transformedRefNameInBody = parameterForClassBody.transformedRefName
                     }
                     pushScope("init-property-inner", ScopeType.ClassInitializer)
@@ -1930,6 +1989,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             classDefinition.enumValues = enumEntries.associate {
                 it.name to ClassInstance(symbolTable, classDefinition.fullQualifiedName, classDefinition, emptyList())
             }
+
+            (1..numExtraSuperScopes).forEach { popScope() }
         }
         popScope()
         popScope()
@@ -2201,6 +2262,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         )
 
         symbolTable.declareProperty(subject.position, "#subject", subjectType.toTypeNode(), false)
+        symbolTable.registerTransformedSymbol(subject.position, IdentifierClassifier.Property, "#subject", "#subject")
         symbolTable.assign("#subject", SemanticDummyRuntimeValue(subjectType))
 
         val call = FunctionCallNode(
