@@ -79,6 +79,16 @@ class OperatorTypeTest {
     }
 
     @Test
+    fun plusFunctionWithoutOperatorModifier() {
+        assertSemanticFail("""
+            class A
+            class B
+            fun A.plus(x: B): B = B()
+            var a = A() + B()
+        """.trimIndent())
+    }
+
+    @Test
     fun augmentedAssignmentWrongPreAssignmentOperatorType() {
         assertSemanticFail("""
             class A

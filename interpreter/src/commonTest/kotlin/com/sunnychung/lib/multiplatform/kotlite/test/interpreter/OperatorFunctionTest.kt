@@ -4,6 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -360,5 +361,32 @@ class OperatorFunctionTest {
         assertEquals(3, symbolTable.propertyValues.size)
         assertEquals(32, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(52, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test // TODO support not marking the `operator` modifier in subclasses
+    fun inheritDivAssignOperator() {
+        val interpreter = interpreter("""
+            open class ValueContainer(var value: Int) {
+                open operator fun divAssign(other: Int) {
+                    value -= other
+                }
+            }
+            class DoubledIntContainer(value: Int) : ValueContainer(value) {
+                override operator fun divAssign(other: Int) {
+                    value -= other * 2
+                }
+            }
+            val x = DoubledIntContainer(29)
+            x /= 4
+            val a: Int = x.value
+            x /= 3
+            val b: Int = x.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
 }
