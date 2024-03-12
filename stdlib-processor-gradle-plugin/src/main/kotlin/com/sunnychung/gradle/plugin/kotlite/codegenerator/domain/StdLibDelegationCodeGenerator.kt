@@ -188,7 +188,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             } else if (this.isPrimitive()) {
                 "${this.name}Type(isNullable = ${this.isNullable})"
             } else {
-                "ObjectType(${this.name}Value.clazz, listOf<DataType>(${this.arguments?.joinToString(", ") { it.toDataTypeCode() }}), superTypes = emptyList())"
+                "ObjectType(${this.name}Value.clazz, listOf<DataType>(${this.arguments?.joinToString(", ") { it.toDataTypeCode() } ?: ""}), superTypes = emptyList())"
             }
         }
 
@@ -223,6 +223,8 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             "List", "Iterable" -> {
                 when (type.arguments?.get(0)?.name) {
                     "Pair" -> "?.map { PairValue(it, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
+                    "String" -> "?.map { StringValue(it) }"
+                    "KDateTimeFormat" -> "?.map { KDateTimeFormatValue(it$symbolTableArg) }"
                     else -> ""
                 }
             }

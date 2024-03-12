@@ -81,7 +81,7 @@ kotlin {
             dependencies {
                 implementation("co.touchlab:kermit:1.0.0")
                 implementation(project(":kotlite-interpreter"))
-                implementation("io.github.sunny-chung:kdatetime-multiplatform:0.5.0")
+                implementation("io.github.sunny-chung:kdatetime-multiplatform:0.6.3")
             }
             kotlin.srcDir("build/generated/common/")
         }
@@ -140,6 +140,7 @@ kotliteStdLibHeaderProcessor {
         ),
         "KDateTime" to KotliteModuleConfig(
             imports = listOf(
+                "com.sunnychung.lib.multiplatform.kotlite.model.ListValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KInstantValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZonedInstantValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZoneOffsetValue",
@@ -147,6 +148,10 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZonedDateTimeValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KDateValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KDateTimeFormatValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KDateTimeFormattableInterface",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KPointOfTimeValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KFixedTimeUnitValue",
+                "com.sunnychung.lib.multiplatform.kdatetime.KFixedTimeUnit",
                 "com.sunnychung.lib.multiplatform.kdatetime.KInstant",
                 "com.sunnychung.lib.multiplatform.kdatetime.KZonedInstant",
                 "com.sunnychung.lib.multiplatform.kdatetime.KZoneOffset",
@@ -154,6 +159,8 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kdatetime.KZonedDateTime",
                 "com.sunnychung.lib.multiplatform.kdatetime.KDate",
                 "com.sunnychung.lib.multiplatform.kdatetime.KDateTimeFormat",
+                "com.sunnychung.lib.multiplatform.kdatetime.KDateTimeFormattable",
+                "com.sunnychung.lib.multiplatform.kdatetime.KPointOfTime",
                 "com.sunnychung.lib.multiplatform.kdatetime.toKZonedDateTime",
                 "com.sunnychung.lib.multiplatform.kdatetime.extension.milliseconds",
                 "com.sunnychung.lib.multiplatform.kdatetime.extension.seconds",

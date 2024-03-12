@@ -1,21 +1,21 @@
 package com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime
 
-import com.sunnychung.lib.multiplatform.kdatetime.KDuration
+import com.sunnychung.lib.multiplatform.kdatetime.KPointOfTime
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
-class KDurationValue(value: KDuration, symbolTable: SymbolTable) : DelegatedValue<KDuration>(value, clazz, symbolTable = symbolTable) {
+class KPointOfTimeValue(value: KPointOfTime, symbolTable: SymbolTable)
+    : DelegatedValue<KPointOfTime>(value = value, clazz = clazz, symbolTable = symbolTable)
+{
     companion object {
         val clazz = ProvidedClassDefinition(
-            fullQualifiedName = "KDuration",
+            fullQualifiedName = "KPointOfTime",
             typeParameters = emptyList(),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
-            constructInstance = { interpreter, callArguments, callPosition ->
-                throw UnsupportedOperationException()
-            },
+            constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("KDateTimeFormattable"),
             superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
             position = SourcePosition("KDateTime", 1, 1),

@@ -18,6 +18,10 @@ class KInstantValue(value: KInstant, symbolTable: SymbolTable) : DelegatedValue<
             constructInstance = { interpreter, callArguments, callPosition ->
                 KInstantValue(KInstant((callArguments[0] as LongValue).value), interpreter.symbolTable())
             },
+            superInterfaceTypeNames = listOf("KDateTimeFormattable"),
+            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
+            superClassInvocation = "KPointOfTime()",
+            superClass = KPointOfTimeValue.clazz,
             position = SourcePosition("KDateTime", 1, 1),
         )
     }

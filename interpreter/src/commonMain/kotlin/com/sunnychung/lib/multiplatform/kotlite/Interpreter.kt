@@ -935,18 +935,22 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
         try {
             val symbolTable = callStack.currentSymbolTable()
+            val declaredThisClassNames = mutableSetOf<String>()
             if (subject.type() is ObjectType) {
                 var clazz: ClassDefinition? = (subject.type() as ObjectType).clazz
                 while (clazz != null) {
+                    declaredThisClassNames += clazz.name
                     symbolTable.declareProperty(position, "this/${clazz.name}", subject.type().toTypeNode(), false)
                     symbolTable.assign("this/${clazz.name}", subject)
                     clazz = clazz.superClass
                 }
             } else {
+                declaredThisClassNames += subject.type().name
                 symbolTable.declareProperty(position, "this/${subject.type().name}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${subject.type().name}", subject)
             }
-            if (function.receiver != null && function.receiver!!.descriptiveName() != subject.type().name) {
+            if (function.receiver != null && !declaredThisClassNames.contains(function.receiver!!.descriptiveName())) {
+                declaredThisClassNames += function.receiver!!.descriptiveName()
                 symbolTable.declareProperty(position, "this/${function.receiver!!.descriptiveName()}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${function.receiver!!.descriptiveName()}", subject)
             }

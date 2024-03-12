@@ -24,6 +24,10 @@ class KZonedInstantValue(value: KZonedInstant, symbolTable: SymbolTable) : Deleg
                     zoneOffset = (callArguments[1] as KZoneOffsetValue).value,
                 ), interpreter.symbolTable())
             },
+            superInterfaceTypeNames = listOf("KDateTimeFormattable"),
+            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
+            superClassInvocation = "KPointOfTime()",
+            superClass = KPointOfTimeValue.clazz,
             position = SourcePosition("KDateTime", 1, 1),
         )
     }

@@ -57,11 +57,43 @@ class KDateTimeTest {
             install(KDateTimeLibModule())
         }
         val interpreter = interpreter("""
-            val d = 95.seconds()
+            val d = 1.minutes() + 15.seconds() + 20000.milliseconds()
             val s = d.format("m'm' s's'")
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
         val symbolTable = interpreter.symbolTable()
         assertEquals("1m 35s", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
+    }
+
+    @Test // TODO uncomment
+    fun plusMinusOperators() {
+        val env = ExecutionEnvironment().apply {
+            install(KDateTimeLibModule())
+        }
+        val interpreter = interpreter("""
+            val dateTime = KZonedDateTime(
+                year = 2024,
+                month = 1,
+                day = 1,
+                hour = 1,
+                minute = 8,
+                second = 40,
+                zoneOffset = KZoneOffset.parseFrom("+08:00")
+            )
+            val yesterday: KZonedDateTime = dateTime - 1.days()
+            val theDayAfterTomorrow = dateTime + 2.days()
+//            val duration: KDuration = theDayAfterTomorrow - yesterday
+            val a = yesterday.format("yy MM-dd H:mm:ss aa (z)")
+//            val b = duration.toSeconds()
+            
+            val t1: KZonedInstant = KInstant(1710250706001).at(KZoneOffset(-7, 0))
+            val t2: KInstant = KInstant(1710250716000)
+            val c = (t1 - t2).toMilliseconds()
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals("23 12-31 1:08:40 am (+08:00)", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+//        assertEquals(86400 * 3, (symbolTable.findPropertyByDeclaredName("b") as LongValue).value)
+        assertEquals(-9999, (symbolTable.findPropertyByDeclaredName("c") as LongValue).value)
     }
 }
