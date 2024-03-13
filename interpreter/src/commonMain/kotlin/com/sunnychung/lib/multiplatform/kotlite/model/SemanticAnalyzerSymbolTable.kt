@@ -188,6 +188,14 @@ class SemanticAnalyzerSymbolTable(
                         }
                     }
 
+                    SearchFunctionModifier.Type.InfixFunctionOnly -> {
+                        if (callable.definition is FunctionDeclarationNode) {
+                            callable.definition.modifiers.contains(FunctionModifier.infix)
+                        } else {
+                            false
+                        }
+                    }
+
                     else -> true
                 }
             }
@@ -477,12 +485,14 @@ fun FunctionDeclarationNode.toSignature(symbolTable: SemanticAnalyzerSymbolTable
 data class SearchFunctionModifier(val typeFilter: Type? = null, val returnType: DataType? = null) {
     enum class Type {
         OperatorFunctionOnly,
+        InfixFunctionOnly,
         ConstructorOnly,
         NoRestriction,
     }
 
     companion object {
         val OperatorFunctionOnly = SearchFunctionModifier(typeFilter = Type.OperatorFunctionOnly)
+        val InfixFunctionOnly = SearchFunctionModifier(typeFilter = Type.InfixFunctionOnly)
         val ConstructorOnly = SearchFunctionModifier(typeFilter = Type.ConstructorOnly)
         val NoRestriction = SearchFunctionModifier()
     }

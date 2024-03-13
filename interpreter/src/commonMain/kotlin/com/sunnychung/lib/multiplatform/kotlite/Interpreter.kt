@@ -1325,6 +1325,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
     }
 
     fun InfixFunctionCallNode.eval(): RuntimeValue {
+        call?.eval()?.let { return it }
+
         val n1 = node1.eval() as RuntimeValue
         return when (functionName) {
             "to" -> {

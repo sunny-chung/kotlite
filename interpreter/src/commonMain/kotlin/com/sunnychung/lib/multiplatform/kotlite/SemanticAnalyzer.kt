@@ -758,6 +758,20 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 throw SemanticException(position, "`$name` is not a supported operator function name. Supported names are: ${supportedOperatorFunctionNames.joinToString(", ")}")
             }
         }
+        if (FunctionModifier.infix in modifiers) {
+            if (isVararg) {
+                throw SemanticException(position, "Infix function cannot accept variable number of arguments")
+            }
+            if (valueParameters.size != 1) {
+                throw SemanticException(position, "Infix function must have a single value parameter")
+            }
+            if (!isClassMemberFunction && receiver == null) {
+                throw SemanticException(position, "Infix function must be member functions or extension functions")
+            }
+            if (valueParameters.first().defaultValue != null) {
+                throw SemanticException(position, "Infix function cannot contain a value parameter with default value")
+            }
+        }
 
         pushScope(
             scopeName = name,
@@ -2093,11 +2107,32 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     fun InfixFunctionCallNode.visit(modifier: Modifier = Modifier()) {
-        if (functionName !in setOf("to", "is", "!is")) {
-            throw SemanticException(position, "Infix function `$functionName` is not supported")
-        }
         this.node1.visit(modifier = modifier)
         this.node2.visit(modifier = modifier)
+
+        if (functionName !in setOf("to", "is", "!is")) {
+            val type1 = node1.type().toDataType()
+            val type2 = node2.type().toDataType()
+
+            if (currentScope.findMatchingCallables(
+                    currentScope,
+                    functionName,
+                    type1,
+                    listOf(FunctionCallArgumentInfo(name = null, type = type2)),
+                    modifierFilter = SearchFunctionModifier.InfixFunctionOnly,
+                ).isNotEmpty()
+            ) {
+                call = FunctionCallNode(
+                    function = NavigationNode(position, node1, ".", ClassMemberReferenceNode(position, functionName)),
+                    arguments = listOf(FunctionCallArgumentNode(position = node2.position, index = 0, value = node2)),
+                    declaredTypeArguments = emptyList(),
+                    position = position,
+                    modifierFilter = SearchFunctionModifier.InfixFunctionOnly,
+                ).also { it.visit(modifier = modifier) }
+            } else {
+                throw SemanticException(position, "Infix function `$functionName` for type ${type1.descriptiveName} not found.")
+            }
+        }
 
         type()
     }
@@ -2561,10 +2596,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
     fun InfixFunctionCallNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }
+        call?.let { it.type(modifier = modifier) }?.let {
+            type = it
+            return it
+        }
         return when (functionName) {
             "to" -> TypeNode(SourcePosition.NONE, "Pair", arguments = listOf(node1.type(modifier), node2.type(modifier)), isNullable = false)
             "is", "!is" -> typeRegistry["Boolean"]!!
-            else -> throw UnsupportedOperationException("Infix function `$functionName` is not supported")
+            else -> throw UnsupportedOperationException("Infix function `$functionName` not found")
         }.also { type = it }
     }
 

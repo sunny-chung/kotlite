@@ -68,7 +68,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 val ACCEPTED_MODIFIERS = setOf(
-    "open", "override", "operator", "vararg", "enum", "abstract"
+    "open", "override", "operator", "vararg", "enum", "abstract", "infix"
 )
 
 /**
@@ -1184,7 +1184,7 @@ class Parser(protected val lexer: Lexer) {
      */
     fun infixFunctionCall(): ASTNode {
         var n = additiveExpression()
-        while (currentToken.type == TokenType.Identifier && currentToken.value !in setOf("else", "is", "!is", "val", "var", "fun", "class", "for", "while", "do")) {
+        while (currentToken.type == TokenType.Identifier && currentToken.value !in setOf("else", "is", "!is", "in", "!in", "val", "var", "fun", "class", "for", "while", "do")) {
             val t = eat(TokenType.Identifier)
             repeatedNL()
             val n2 = additiveExpression()
@@ -1923,6 +1923,7 @@ class Parser(protected val lexer: Lexer) {
             "open" -> FunctionModifier.open
             "override" -> FunctionModifier.override
             "abstract" -> FunctionModifier.abstract
+            "infix" -> FunctionModifier.infix
             else -> throw ParseException("Modifier `$it` cannot be applied to function")
         }
     }.toSet()
