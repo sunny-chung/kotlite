@@ -158,6 +158,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
     init {
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
+            it.attachToSemanticAnalyzer(this)
             builtinSymbolTable.declareClass(SourcePosition.BUILTIN, it)
         }
 
@@ -1664,9 +1665,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 orderedInitializersAndPropertyDeclarations = emptyList(),
                 declarations = emptyList(),
                 rawMemberProperties = emptyList(),
-                memberFunctions = emptyMap(),
+                memberFunctions = emptyList(),
                 primaryConstructor = null,
-            )
+            ).also { it.attachToSemanticAnalyzer(this@SemanticAnalyzer) }
         )
 
         // Declare companion object
@@ -1693,30 +1694,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                             executable = { interpreter, receiver, args, typeArgs ->
                                 throw NotImplementedError()
                             }
-                        )).also {
-                            it.transformedRefName = it.toSignature(currentScope)
-                            executionEnvironment.registerGeneratedMapping(
-                                type = ExecutionEnvironment.SymbolType.Function,
-                                receiverType = it.receiver?.descriptiveName(),
-                                name = it.name,
-                                transformedName = it.transformedRefName!!,
-                            )
-
-                            it.valueParameters.forEach { p ->
-                                p.generateTransformedName()
-                                executionEnvironment.registerGeneratedMapping(
-                                    type = ExecutionEnvironment.SymbolType.ValueParameter,
-                                    receiverType = it.receiver?.descriptiveName(),
-                                    parentName = it.name,
-                                    name = p.name,
-                                    transformedName = p.transformedRefName!!,
-                                )
-                            }
-                        })
+                        )))
                     }
-                }.associateBy { it.toSignature(currentScope) },
+                },
                 primaryConstructor = null,
-            )
+            ).also { it.attachToSemanticAnalyzer(this@SemanticAnalyzer) }
         )
 
         if (ClassModifier.enum in modifiers) {
@@ -1898,7 +1880,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     } ?: emptyList() /* intentionally exclude non-constructor property declarations, in order to allow inferring types */,
                 memberFunctions = declarations
                     .filterIsInstance<FunctionDeclarationNode>()
-                    .associateBy {
+                    .onEach {
                         it.toSignature(currentScope).also { signature ->
                             log.v { "Class `$name` member function `${it.name}` signature = `$signature`" }
                             val superClassFunction = superClassFunctions?.get(signature)
@@ -1923,7 +1905,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 superClass = superClass,
                 superInterfaceTypes = interfaceInvocations,
                 superInterfaces = superInterfaces,
-            )
+            ).also { it.attachToSemanticAnalyzer(this@SemanticAnalyzer) }
             declarationScope.declareClass(position, classDefinition)
 
             // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()

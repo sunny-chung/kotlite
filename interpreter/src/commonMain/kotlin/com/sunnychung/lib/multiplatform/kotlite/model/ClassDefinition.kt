@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 
@@ -31,7 +32,7 @@ open class ClassDefinition(
     val declarations: List<ASTNode>,
 
     rawMemberProperties: List<PropertyDeclarationNode>,
-    private val memberFunctions: Map<String, FunctionDeclarationNode>,
+    private val memberFunctions: List<FunctionDeclarationNode>,
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superInterfaceTypes: List<TypeNode> = emptyList(),
@@ -41,6 +42,16 @@ open class ClassDefinition(
 ) {
 
     var enumValues: Map<String, ClassInstance> = emptyMap()
+
+    var isInInterpreter = false
+    lateinit var memberFunctionsForInterpreter: Map<String, FunctionDeclarationNode>
+    lateinit var memberFunctionsForSA: Map<String, FunctionDeclarationNode>
+    val memberFunctionsMap: Map<String, FunctionDeclarationNode>
+        get() = if (isInInterpreter) {
+            memberFunctionsForInterpreter
+        } else {
+            memberFunctionsForSA
+        }
 
     init {
         if (isInterface) {
@@ -99,6 +110,59 @@ open class ClassDefinition(
 
     init {
         rawMemberProperties.forEach { addProperty(currentScope, it) }
+    }
+
+    fun attachToSemanticAnalyzer(sa: SemanticAnalyzer) {
+        memberFunctionsForSA = memberFunctions.onEach {
+            with (sa) {
+                it.transformedRefName = it.toSignature(currentScope)
+                sa.executionEnvironment.registerGeneratedMapping(
+                    type = ExecutionEnvironment.SymbolType.Function,
+                    receiverType = it.receiver?.descriptiveName(),
+                    name = it.name,
+                    transformedName = it.transformedRefName!!,
+                )
+
+                it.valueParameters.forEach { p ->
+                    if (p.transformedRefName == null) {
+                        p.generateTransformedName()
+                        executionEnvironment.registerGeneratedMapping(
+                            type = ExecutionEnvironment.SymbolType.ValueParameter,
+                            receiverType = it.receiver?.descriptiveName(),
+                            parentName = it.name,
+                            name = p.name,
+                            transformedName = p.transformedRefName!!,
+                        )
+                    }
+                }
+            }
+        }.associateBy { it.toSignature(sa.currentScope) }
+    }
+
+    fun attachToInterpreter(interpreter: Interpreter) {
+        isInInterpreter = true
+
+        memberFunctionsForInterpreter = memberFunctions.onEach {
+            with(interpreter) {
+                it.valueParameters.forEach { p ->
+                    if (p.transformedRefName == null) {
+                        p.transformedRefName = executionEnvironment.findGeneratedMapping(
+                            type = ExecutionEnvironment.SymbolType.ValueParameter,
+                            receiverType = it.receiver?.descriptiveName(),
+                            parentName = it.name,
+                            name = p.name,
+                        ).transformedName
+                    }
+                }
+                if (it.transformedRefName == null) {
+                    it.transformedRefName = executionEnvironment.findGeneratedMapping(
+                        type = ExecutionEnvironment.SymbolType.Function,
+                        receiverType = it.receiver?.descriptiveName(),
+                        name = it.name,
+                    ).transformedName
+                }
+            }
+        }.associateBy { it.transformedRefName!! }
     }
 
     fun isInstanceCreationByUserAllowed() = isInstanceCreationAllowed && ClassModifier.abstract !in modifiers
@@ -184,7 +248,7 @@ open class ClassDefinition(
      * Key: Function signature
      */
     fun getAllMemberFunctions(): Map<String, FunctionDeclarationNode> {
-        return memberFunctions.let { functionsInThisClass ->
+        return memberFunctionsMap.let { functionsInThisClass ->
             var result = functionsInThisClass
             if (superClass != null) {
                 result = result mergeIfNotExists superClass.getAllMemberFunctions()
@@ -200,16 +264,16 @@ open class ClassDefinition(
      * Key: Function signature
      */
     fun getMemberFunctionsDeclaredInThisClass(): Map<String, FunctionDeclarationNode> {
-        return memberFunctions
+        return memberFunctionsMap
     }
 
     @Deprecated("use findMemberFunctionsWithEnclosingTypeNameByDeclaredName")
     fun findMemberFunctionsWithIndexByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, Int>> =
-        memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
+        memberFunctionsMap.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
             (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
 
     fun findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, String>> =
-        memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to fullQualifiedName } mergeIfNotExists
+        memberFunctionsMap.filter { it.value.name == declaredName }.mapValues { it.value to fullQualifiedName } mergeIfNotExists
             (Unit.takeIf { !inThisClassOnly }?.let {
                 val result = mutableMapOf<String, Pair<FunctionDeclarationNode, String>>()
                 superClass?.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly)
@@ -227,28 +291,28 @@ open class ClassDefinition(
 
     @Deprecated("use findMemberFunctionWithEnclosingTypeNameByTransformedName")
     fun findMemberFunctionWithIndexByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
-        memberFunctions[transformedName]?.let { it to index } ?:
+        memberFunctionsMap[transformedName]?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly) }
 
     /**
-     * For semantic analyzer use only. In SA, `memberFunctions` is not indexed by transformedRefName.
+     * For semantic analyzer use only. In SA, `memberFunctionsMap` is not indexed by transformedRefName.
      */
     fun findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
-        memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to index } ?:
+        memberFunctionsMap.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName, inThisClassOnly) }
 
     fun findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
-        memberFunctions[transformedName]?.let { it to fullQualifiedName } ?:
+        memberFunctionsMap[transformedName]?.let { it to fullQualifiedName } ?:
             Unit.takeIf { !inThisClassOnly }?.let {
                 superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly)
                     ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly) }
             }
 
     /**
-     * For semantic analyzer use only. In SA, `memberFunctions` is not indexed by transformedRefName.
+     * For semantic analyzer use only. In SA, `memberFunctionsMap` is not indexed by transformedRefName.
      */
     fun findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
-        memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to fullQualifiedName } ?:
+        memberFunctionsMap.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to fullQualifiedName } ?:
             Unit.takeIf { !inThisClassOnly }?.let {
                 superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly)
                     ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly) }

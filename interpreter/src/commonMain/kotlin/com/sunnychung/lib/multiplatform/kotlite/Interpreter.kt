@@ -108,6 +108,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 
     init {
         executionEnvironment.getBuiltinClasses(globalScope).forEach {
+            it.attachToInterpreter(this)
             callStack.provideBuiltinClass(it)
         }
         executionEnvironment.getBuiltinFunctions(globalScope).forEach {
@@ -1111,8 +1112,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                         declarations.filterIsInstance<PropertyDeclarationNode>()),
                 memberFunctions = declarations
                     .filterIsInstance<FunctionDeclarationNode>()
-                    .filter { it.receiver == null }
-                    .associateBy { it.transformedRefName!! },
+                    .filter { it.receiver == null },
+//                    .associateBy { it.transformedRefName!! },
                 orderedInitializersAndPropertyDeclarations = declarations
                     .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
                 declarations = declarations,
@@ -1127,7 +1128,10 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                     }
                     clazz
                 },
-            ).also { clazz = it })
+            ).also {
+                clazz = it
+                it.attachToInterpreter(this@Interpreter)
+            })
             // register extension functions in global scope
             declarations
                 .filterIsInstance<FunctionDeclarationNode>()
@@ -1172,20 +1176,11 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                             receiverType = "$fullQualifiedName.Companion",
                             name = "valueOf",
                         ).transformedName,
-                    ).also {
-                        it.valueParameters.forEach { p ->
-                            p.transformedRefName = executionEnvironment.findGeneratedMapping(
-                                type = ExecutionEnvironment.SymbolType.ValueParameter,
-                                receiverType = it.receiver!!.descriptiveName(),
-                                parentName = it.name,
-                                name = p.name,
-                            ).transformedName
-                        }
-                    })
+                    ))
                 }
-            }.associateBy { it.transformedRefName!! },
+            },
             primaryConstructor = null
-        ))
+        ).also { it.attachToInterpreter(this@Interpreter) })
 
         // creating enum values
         if (ClassModifier.enum in modifiers) {

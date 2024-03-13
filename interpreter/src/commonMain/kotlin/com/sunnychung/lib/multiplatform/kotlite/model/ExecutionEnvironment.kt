@@ -94,7 +94,7 @@ class ExecutionEnvironment(
                     orderedInitializersAndPropertyDeclarations = emptyList(),
                     declarations = emptyList(),
                     rawMemberProperties = emptyList(),
-                    memberFunctions = emptyMap(),
+                    memberFunctions = emptyList(),
                     primaryConstructor = null,
                 ),
                 ClassDefinition(
@@ -106,7 +106,7 @@ class ExecutionEnvironment(
                     orderedInitializersAndPropertyDeclarations = emptyList(),
                     declarations = emptyList(),
                     rawMemberProperties = emptyList(),
-                    memberFunctions = emptyMap(),
+                    memberFunctions = emptyList(),
                     primaryConstructor = null,
                 ),
                 ClassDefinition(
@@ -118,7 +118,7 @@ class ExecutionEnvironment(
                     orderedInitializersAndPropertyDeclarations = emptyList(),
                     declarations = emptyList(),
                     rawMemberProperties = emptyList(),
-                    memberFunctions = emptyMap(),
+                    memberFunctions = emptyList(),
                     primaryConstructor = null,
                 ),
             )

@@ -18,6 +18,7 @@ class ProvidedClassDefinition(
     superClass: ClassDefinition? = null,
     superInterfaceTypeNames: List<String> = emptyList(),
     superInterfaces: List<ClassDefinition> = emptyList(),
+    memberFunctions: List<CustomFunctionDefinition> = emptyList(),
 ) : ClassDefinition(
     currentScope = null,
     name = fullQualifiedName.substringAfterLast('.'),
@@ -29,7 +30,7 @@ class ProvidedClassDefinition(
     orderedInitializersAndPropertyDeclarations = emptyList(),
     declarations = emptyList(),
     rawMemberProperties = emptyList(),
-    memberFunctions = emptyMap(),
+    memberFunctions = memberFunctions.map { CustomFunctionDeclarationNode(it) },
     primaryConstructor = ClassPrimaryConstructorNode(
         position = position,
         parameters = primaryConstructorParameters.map {
