@@ -165,4 +165,13 @@ class ParserTest {
             """.trimIndent()).script()
         }
     }
+
+    @Test
+    fun unsupportedModifier() {
+        assertFailsWith<ExpectTokenMismatchException> {
+            parser("""
+                abc fun f()
+            """.trimIndent()).script()
+        }
+    }
 }

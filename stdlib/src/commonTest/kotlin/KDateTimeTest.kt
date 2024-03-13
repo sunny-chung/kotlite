@@ -1,4 +1,5 @@
 import com.sunnychung.lib.multiplatform.kdatetime.KInstant
+import com.sunnychung.lib.multiplatform.kdatetime.extension.hours
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
@@ -66,7 +67,7 @@ class KDateTimeTest {
     }
 
     @Test // TODO uncomment
-    fun plusMinusOperators() {
+    fun plusMinusOperatorsAndInfix() {
         val env = ExecutionEnvironment().apply {
             install(KDateTimeLibModule())
         }
@@ -86,14 +87,16 @@ class KDateTimeTest {
             val a = yesterday.format("yy MM-dd H:mm:ss aa (z)")
 //            val b = duration.toSeconds()
             
-            val t1: KZonedInstant = KInstant(1710250706001).at(KZoneOffset(-7, 0))
+            val t1: KZonedInstant = KInstant(1710250706001) at KZoneOffset(-7, 0)
             val t2: KInstant = KInstant(1710250716000)
             val c = (t1 - t2).toMilliseconds()
+            val d: Long = t1.zoneOffset.toMilliseconds()
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
         val symbolTable = interpreter.symbolTable()
         assertEquals("23 12-31 1:08:40 am (+08:00)", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
 //        assertEquals(86400 * 3, (symbolTable.findPropertyByDeclaredName("b") as LongValue).value)
         assertEquals(-9999, (symbolTable.findPropertyByDeclaredName("c") as LongValue).value)
+        assertEquals(-7.hours().toMilliseconds(), (symbolTable.findPropertyByDeclaredName("d") as LongValue).value)
     }
 }

@@ -154,4 +154,25 @@ class InfixFunctionTest {
         assertEquals(73, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(29, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun genericInfixExtensionFunction() {
+        val interpreter = interpreter("""
+            open class Box<T>(val value: Int)
+            open class A<T>(value: Int) : Box<T>(value)
+            open class B<X>(value: Int) : A<X>(value)
+            open class C<T>(value: Int) : B<T>(value)
+            class D<T>(value: Int) : C<T>(value)
+            infix fun <T> Box<T>.add(other: Box<T>): Box<T> {
+                return Box<T>(value + other.value)
+            }
+            val a: Box<Int> = C<Int>(7) add B<Int>(13) add D<Int>(-1) add A<Int>(10)
+            val b = a.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }

@@ -1,6 +1,6 @@
 operator fun KInstant.plus(duration: KDuration): KInstant
 operator fun KInstant.minus(duration: KDuration): KInstant
-/* infix */ fun KInstant.at(zoneOffset: KZoneOffset): KZonedInstant
+infix fun KInstant.at(zoneOffset: KZoneOffset): KZonedInstant
 fun KInstant.atZoneOffset(zoneOffset: KZoneOffset): KZonedInstant
 fun KInstant.atLocalZoneOffset(): KZonedInstant
 fun KInstant.Companion.now(): KInstant

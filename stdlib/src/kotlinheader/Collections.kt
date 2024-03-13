@@ -174,6 +174,9 @@ fun <T, R> Iterable<T>.windowed(
     partialWindows: Boolean = false,
     transform: (List<T>) -> R
 ): List<R>
+infix fun <T, R> Iterable<T>.zip(
+    other: Iterable<R>
+): List<Pair<T, R>>
 fun <T, R, V> Iterable<T>.zip(
     other: Iterable<R>,
     transform: (a: T, b: R) -> V
@@ -301,7 +304,7 @@ fun <T> Set<T>.contains(element: T): Boolean
 fun <T> Set<T>.containsAll(elements: Collection<T>): Boolean
 fun <T> Set<T>.isEmpty(): Boolean
 operator fun <T> Set<T>.iterator(): Iterator<T>
-/*infix*/ fun <T> Iterable<T>.intersect(
+infix fun <T> Iterable<T>.intersect(
     other: Iterable<T>
 ): Set<T>
 operator fun <T> Set<T>.minus(element: T): Set<T>
@@ -311,9 +314,10 @@ fun <T> Set<T>?.orEmpty(): Set<T>
 operator fun <T> Set<T>.plus(element: T): Set<T>
 operator fun <T> Set<T>.plus(elements: Iterable<T>): Set<T>
 fun <T> Set<T>.plusElement(element: T): Set<T>
-/*infix*/ fun <T> Iterable<T>.subtract(other: Iterable<T>): Set<T>
+infix fun <T> Iterable<T>.subtract(other: Iterable<T>): Set<T>
 fun <T> Iterable<T>.toMutableSet(): MutableSet<T>
 fun <T> Iterable<T>.toSet(): Set<T>
+infix fun <T> Iterable<T>.union(other: Iterable<T>): Set<T>
 
 fun <T> MutableSet<T>.add(element: T): Boolean
 fun <T> MutableSet<T>.addAll(elements: Collection<T>): Boolean

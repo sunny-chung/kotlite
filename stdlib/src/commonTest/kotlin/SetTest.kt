@@ -160,4 +160,33 @@ class SetTest {
         assertEquals(4, (symbolTable.findPropertyByDeclaredName("size") as IntValue).value)
         assertEquals(listOf(-6, 1, 9, 15), console.split("\n").filter { it.isNotEmpty() }.map { it.toInt() }.sorted())
     }
+
+    @Test
+    fun infixFunctionsUnionIntersect() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val set1 = listOf(1, 2, 2, 3, 2)
+            val set2 = listOf(2, 3, 9, 8)
+            var set = set1 union set2 union mutableSetOf(15, 7)
+            val a = set.size
+            set = set intersect listOf(1, 3, 3, 6, 7, 10)
+            val b = set.size
+            for (e in set) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(7, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(listOf(1, 3, 7), console.split("\n").filter { it.isNotEmpty() }.map { it.toInt() }.sorted())
+    }
 }
