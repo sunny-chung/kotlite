@@ -376,7 +376,7 @@ class OperatorFunctionTest {
                     value -= other * 2
                 }
             }
-            val x = DoubledIntContainer(29)
+            val x: ValueContainer = DoubledIntContainer(29)
             x /= 4
             val a: Int = x.value
             x /= 3
