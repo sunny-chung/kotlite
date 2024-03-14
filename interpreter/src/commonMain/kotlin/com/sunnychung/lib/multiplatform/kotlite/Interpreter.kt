@@ -107,15 +107,20 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
     internal val globalScope = callStack.currentSymbolTable()
 
     init {
+        val classes = mutableListOf<ClassDefinition>()
         executionEnvironment.getBuiltinClasses(globalScope).forEach {
-            it.attachToInterpreter(this)
+            it.attachToInterpreter(this) // make "ObjectType" resolvable
             callStack.provideBuiltinClass(it)
+            classes += it
         }
         executionEnvironment.getBuiltinFunctions(globalScope).forEach {
             callStack.provideBuiltinFunction(it)
         }
         executionEnvironment.getExtensionProperties(globalScope).forEach {
             callStack.provideBuiltinExtensionProperty(it)
+        }
+        classes.forEach { // do this again after registering functions again to make the post-resolution logic works
+            it.attachToInterpreter(this)
         }
     }
 

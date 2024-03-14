@@ -5,6 +5,9 @@ import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 
+/**
+ * Make a copy of this class before use.
+ */
 class ProvidedClassDefinition(
     val position: SourcePosition,
     fullQualifiedName: String,
@@ -14,11 +17,11 @@ class ProvidedClassDefinition(
     private val primaryConstructorParameters: List<CustomFunctionParameter>,
     private val constructInstance: (interpreter: Interpreter, callArguments: Array<RuntimeValue>, callPosition: SourcePosition) -> ClassInstance,
     modifiers: Set<ClassModifier> = emptySet(),
-    superClassInvocation: String? = null,
-    superClass: ClassDefinition? = null,
-    superInterfaceTypeNames: List<String> = emptyList(),
-    superInterfaces: List<ClassDefinition> = emptyList(),
-    memberFunctions: List<CustomFunctionDefinition> = emptyList(),
+    private val superClassInvocationString: String? = null,
+//    superClass: ClassDefinition? = null,
+    private val superInterfaceTypeNames: List<String> = emptyList(),
+//    superInterfaces: List<ClassDefinition> = emptyList(),
+    private val functions: List<CustomFunctionDefinition> = emptyList(),
 ) : ClassDefinition(
     currentScope = null,
     name = fullQualifiedName.substringAfterLast('.'),
@@ -30,7 +33,7 @@ class ProvidedClassDefinition(
     orderedInitializersAndPropertyDeclarations = emptyList(),
     declarations = emptyList(),
     rawMemberProperties = emptyList(),
-    memberFunctions = memberFunctions.map { CustomFunctionDeclarationNode(it) },
+    memberFunctions = functions.map { CustomFunctionDeclarationNode(it) },
     primaryConstructor = ClassPrimaryConstructorNode(
         position = position,
         parameters = primaryConstructorParameters.map {
@@ -53,15 +56,13 @@ class ProvidedClassDefinition(
             )
         }
     ),
-    superClassInvocation = superClassInvocation?.let {
+    superClassInvocation = superClassInvocationString?.let {
         Parser(Lexer(position.filename, it)).delegationSpecifiers().single() as? FunctionCallNode
             ?: throw SemanticException(position, "Missing value parameters in super class invocation")
     },
-    superClass = superClass,
     superInterfaceTypes = superInterfaceTypeNames.map {
         Parser(Lexer(position.filename, it)).typeReference()
     },
-    superInterfaces = superInterfaces,
 ) {
     override fun construct(
         interpreter: Interpreter,
@@ -75,6 +76,20 @@ class ProvidedClassDefinition(
             }
         }
     }
+
+    fun copyClassDefinition() = ProvidedClassDefinition(
+        fullQualifiedName = fullQualifiedName,
+        typeParameters = typeParameters,
+        isInterface = isInterface,
+        isInstanceCreationAllowed = isInstanceCreationAllowed,
+        primaryConstructorParameters = primaryConstructorParameters,
+        constructInstance = constructInstance,
+        position = position,
+        modifiers = modifiers,
+        superClassInvocationString = superClassInvocationString,
+        superInterfaceTypeNames = superInterfaceTypeNames,
+        functions = functions,
+    )
 
     fun copyNullableClassDefinition() = ProvidedClassDefinition(
         fullQualifiedName = "$fullQualifiedName?",

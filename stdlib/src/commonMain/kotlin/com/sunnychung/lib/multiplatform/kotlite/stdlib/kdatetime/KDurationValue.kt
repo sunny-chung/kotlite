@@ -17,7 +17,7 @@ class KDurationValue(value: KDuration, symbolTable: SymbolTable) : DelegatedValu
                 throw UnsupportedOperationException()
             },
             superInterfaceTypeNames = listOf("KDateTimeFormattable"),
-            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
+//            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
             position = SourcePosition("KDateTime", 1, 1),
         )
     }

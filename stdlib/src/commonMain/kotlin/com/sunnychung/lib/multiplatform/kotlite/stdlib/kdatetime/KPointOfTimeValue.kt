@@ -17,7 +17,7 @@ class KPointOfTimeValue(value: KPointOfTime, symbolTable: SymbolTable)
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("KDateTimeFormattable"),
-            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
+//            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
             position = SourcePosition("KDateTime", 1, 1),
         )
     }

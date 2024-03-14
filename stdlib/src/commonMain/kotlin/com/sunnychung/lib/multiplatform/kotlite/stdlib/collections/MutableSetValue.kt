@@ -19,9 +19,9 @@ class MutableSetValue(value: MutableSet<RuntimeValue>, typeArgument: DataType, s
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("MutableCollection<T>"),
-            superInterfaces = listOf(CollectionInterface.mutableCollectionClazz),
-            superClassInvocation = "Set<T>()",
-            superClass = SetValue.clazz,
+//            superInterfaces = listOf(CollectionInterface.mutableCollectionClazz),
+            superClassInvocationString = "Set<T>()",
+//            superClass = SetValue.clazz,
             position = SourcePosition("Collections", 1, 1),
         )
     }

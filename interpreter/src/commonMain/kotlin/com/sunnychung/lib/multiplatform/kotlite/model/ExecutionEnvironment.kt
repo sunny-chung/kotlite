@@ -126,7 +126,7 @@ class ExecutionEnvironment(
                 providedClasses.filter { classRegistrationFilter(it.fullQualifiedName) }
                     .flatMap {
                         listOf(
-                            it,
+                            it.copyClassDefinition(),
                             it.copyNullableClassDefinition(),
                             it.copyCompanionClassDefinition(),
                         )

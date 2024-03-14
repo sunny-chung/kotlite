@@ -5,6 +5,9 @@ import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 
+/**
+ * This class is stateful.
+ */
 open class ClassDefinition(
     /**
      * For storing parsed declarations
@@ -37,23 +40,23 @@ open class ClassDefinition(
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superInterfaceTypes: List<TypeNode> = emptyList(),
     val superClassInvocation: FunctionCallNode? = null,
-    val superClass: ClassDefinition? = null,
-    val superInterfaces: List<ClassDefinition> = emptyList(),
+    var superClass: ClassDefinition? = null,
+    var superInterfaces: List<ClassDefinition> = emptyList(),
 ) {
 
     var enumValues: Map<String, ClassInstance> = emptyMap()
 
     var isInInterpreter = false
-    lateinit var memberFunctionsForInterpreter: Map<String, FunctionDeclarationNode>
-    lateinit var memberFunctionsForSA: Map<String, FunctionDeclarationNode>
+    var memberFunctionsForInterpreter: Map<String, FunctionDeclarationNode>? = null
+    var memberFunctionsForSA: Map<String, FunctionDeclarationNode>? = null
     val memberFunctionsMap: Map<String, FunctionDeclarationNode>
         get() = if (isInInterpreter) {
-            memberFunctionsForInterpreter
+            memberFunctionsForInterpreter ?: throw RuntimeException("memberFunctionsForInterpreter not initialized for type $fullQualifiedName")
         } else {
-            memberFunctionsForSA
+            memberFunctionsForSA ?: throw RuntimeException("memberFunctionsForSA not initialized for type $fullQualifiedName")
         }
 
-    init {
+    fun validateSuperClassesAndInterfaces() {
         if (isInterface) {
             if (superClass != null || superClassInvocation != null) {
                 throw SemanticException(SourcePosition.NONE, "Interface cannot extend from a class")
@@ -65,8 +68,8 @@ open class ClassDefinition(
         } else if (superClass == null && superClassInvocation != null) {
             throw SemanticException(SourcePosition.NONE, "superClass must be provided if there is a super class invocation")
         } else if (superClass != null && superClassInvocation != null) {
-            if (superClass.fullQualifiedName != (superClassInvocation.function as TypeNode).name) {
-                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass.fullQualifiedName} VS ${(superClassInvocation.function as TypeNode).name}")
+            if (superClass!!.fullQualifiedName != (superClassInvocation.function as TypeNode).name) {
+                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass!!.fullQualifiedName} VS ${(superClassInvocation.function as TypeNode).name}")
             }
         }
 
@@ -80,8 +83,8 @@ open class ClassDefinition(
                 ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaces on the super interface type ${type.name}")
         }
 
-        if (superClass != null && superClass.isInterface) {
-            throw SemanticException(SourcePosition.NONE, "superClass ${superClass.name} is not a class but an interface")
+        if (superClass != null && superClass!!.isInterface) {
+            throw SemanticException(SourcePosition.NONE, "superClass ${superClass!!.name} is not a class but an interface")
         }
 
         superInterfaces.forEach { def ->
@@ -103,7 +106,7 @@ open class ClassDefinition(
 
     private fun findIndex(): Int {
         if (superClass == null) return 0
-        return superClass.findIndex() + 1
+        return superClass!!.findIndex() + 1
     }
 
     val index = findIndex()
@@ -113,6 +116,13 @@ open class ClassDefinition(
     }
 
     fun attachToSemanticAnalyzer(sa: SemanticAnalyzer) {
+        superClassInvocation?.function?.let { it as? TypeNode }?.name
+            ?.also { superClass = sa.currentScope.findClass(it)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find class $it") }
+
+        superInterfaces = superInterfaceTypes.map { sa.currentScope.findClass(it.name)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find interface $it") }
+
+        validateSuperClassesAndInterfaces()
+
         memberFunctionsForSA = memberFunctions.onEach {
             with (sa) {
                 it.transformedRefName = it.toSignature(currentScope)
@@ -141,6 +151,11 @@ open class ClassDefinition(
 
     fun attachToInterpreter(interpreter: Interpreter) {
         isInInterpreter = true
+
+        superClassInvocation?.function?.let { it as? TypeNode }?.name
+            ?.also { superClass = interpreter.symbolTable().findClass(it)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find class $it") }
+
+        superInterfaces = superInterfaceTypes.map { interpreter.symbolTable().findClass(it.name)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find interface $it") }
 
         memberFunctionsForInterpreter = memberFunctions.onEach {
             with(interpreter) {
@@ -251,7 +266,7 @@ open class ClassDefinition(
         return memberFunctionsMap.let { functionsInThisClass ->
             var result = functionsInThisClass
             if (superClass != null) {
-                result = result mergeIfNotExists superClass.getAllMemberFunctions()
+                result = result mergeIfNotExists superClass!!.getAllMemberFunctions()
             }
             superInterfaces.forEach {
                 result = result mergeIfNotExists it.getAllMemberFunctions()

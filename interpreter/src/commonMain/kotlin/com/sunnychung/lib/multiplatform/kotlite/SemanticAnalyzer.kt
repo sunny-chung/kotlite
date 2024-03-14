@@ -157,9 +157,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     init {
+        val classes = mutableListOf<ClassDefinition>()
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
-            it.attachToSemanticAnalyzer(this)
+            it.attachToSemanticAnalyzer(this) // make "ObjectType" resolvable
             builtinSymbolTable.declareClass(SourcePosition.BUILTIN, it)
+            classes += it
         }
 
         executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
@@ -169,6 +171,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         val libFunctions = executionEnvironment.getBuiltinFunctions(builtinSymbolTable)
         libFunctions.forEach {
             it.visit()
+        }
+        classes.forEach { // do this again after registering functions to make the post-resolution logic works
+            it.attachToSemanticAnalyzer(this)
         }
 
         currentScope = symbolTable
@@ -829,8 +834,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 val superClassTypeResolutions = ClassMemberResolver(currentScope, clazz, typeNode.arguments).genericResolutionsByTypeName[clazz.fullQualifiedName]!!
                 val superClassType = TypeNode(
                     SourcePosition.NONE,
-                    clazz.superClass.name,
-                    clazz.superClass.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
+                    clazz.superClass!!.name,
+                    clazz.superClass!!.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
                     isNullable = false,
                 )
                 currentScope.declareProperty(position = position, name = "super", type = superClassType, isMutable = false)

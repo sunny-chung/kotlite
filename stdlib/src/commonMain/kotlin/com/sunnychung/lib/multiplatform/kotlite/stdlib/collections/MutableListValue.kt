@@ -20,9 +20,9 @@ class MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("MutableCollection<T>"),
-            superInterfaces = listOf(CollectionInterface.mutableCollectionClazz),
-            superClassInvocation = "List<T>()",
-            superClass = ListValue.clazz,
+//            superInterfaces = listOf(CollectionInterface.mutableCollectionClazz),
+            superClassInvocationString = "List<T>()",
+//            superClass = ListValue.clazz,
             position = SourcePosition("Collections", 1, 1),
         )
     }
