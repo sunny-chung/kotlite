@@ -71,6 +71,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveTypeName
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveValue
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
@@ -80,7 +82,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
-import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
@@ -113,12 +114,14 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             callStack.provideBuiltinClass(it)
             classes += it
         }
+        callStack.builtinScope().init()
         executionEnvironment.getBuiltinFunctions(globalScope).forEach {
             callStack.provideBuiltinFunction(it)
         }
         executionEnvironment.getExtensionProperties(globalScope).forEach {
             callStack.provideBuiltinExtensionProperty(it)
         }
+        globalScope.init()
         classes.forEach { // do this again after registering functions again to make the post-resolution logic works
             it.attachToInterpreter(this)
         }
@@ -419,7 +422,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             }
             val newResult = when (operator) {
                 "+=" -> {
-                    if (subject.declaredType() is StringType) {
+                    if (subject.declaredType() isPrimitiveTypeOf PrimitiveTypeName.String) {
                         StringValue(existing.convertToString() + result.convertToString())
                     }  else {
                         (existing as NumberValue<*>) + result as NumberValue<*>
@@ -540,6 +543,12 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                         }
                         (subject as? ClassInstance)
                             ?.let { function.resolveSuperKeyword(it) as? ClassInstance }
+                            ?.clazz
+                            ?.findMemberFunctionByTransformedName(functionRefName!!)
+                            ?.let { function ->
+                                return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
+                            }
+                        (subject as? PrimitiveValue)
                             ?.clazz
                             ?.findMemberFunctionByTransformedName(functionRefName!!)
                             ?.let { function ->
@@ -1591,6 +1600,13 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
     fun CharNode.eval() = CharValue(value)
     fun NullNode.eval() = NullValue
     fun ValueNode.eval() = value
+
+    fun StringValue(value: String) = StringValue(value, symbolTable())
+    fun IntValue(value: Int) = IntValue(value, symbolTable())
+    fun LongValue(value: Long) = LongValue(value, symbolTable())
+    fun DoubleValue(value: Double) = DoubleValue(value, symbolTable())
+    fun BooleanValue(value: Boolean) = BooleanValue(value, symbolTable())
+    fun CharValue(value: Char) = CharValue(value, symbolTable())
 
     fun ASTNode.declaredType(): DataType = when (this) {
         is NavigationNode -> this.declaredType()

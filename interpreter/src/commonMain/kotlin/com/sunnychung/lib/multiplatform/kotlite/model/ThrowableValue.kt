@@ -44,7 +44,7 @@ open class ThrowableValue(
                 receiver = "Throwable",
                 type = "String?",
                 getter = { interpreter, receiver, typeArgs ->
-                    (receiver as ThrowableValue).message?.let { StringValue(it) } ?: NullValue
+                    (receiver as ThrowableValue).message?.let { StringValue(it, interpreter.symbolTable()) } ?: NullValue
                 },
             ),
             ExtensionProperty(
@@ -63,7 +63,7 @@ open class ThrowableValue(
                 type = "String",
                 getter = { interpreter, receiver, typeArgs ->
                     val value = receiver as ThrowableValue
-                    StringValue(value.externalExceptionClassName ?: value.fullClassName)
+                    StringValue(value.externalExceptionClassName ?: value.fullClassName, interpreter.symbolTable())
                 },
             ),
         )
@@ -76,7 +76,7 @@ open class ThrowableValue(
                 returnType = "String",
                 parameterTypes = emptyList(),
                 executable = { interpreter, receiver, args, typeArgs ->
-                    (receiver as ThrowableValue).stacktrace.joinToString("\n").let { StringValue(it) }
+                    (receiver as ThrowableValue).stacktrace.joinToString("\n").let { StringValue(it, interpreter.symbolTable()) }
                 },
             ),
         )

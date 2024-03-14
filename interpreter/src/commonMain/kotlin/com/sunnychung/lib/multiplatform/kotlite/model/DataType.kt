@@ -43,43 +43,23 @@ sealed interface DataType {
         return this.isAssignableFrom(other)
     }
 
-    fun isConvertibleTo(other:DataType): Boolean {
+    fun isConvertibleTo(other: DataType): Boolean {
         return other.isConvertibleFrom(this)
     }
 
     fun copyOf(isNullable: Boolean): DataType
 
     fun toTypeNode() = TypeNode(SourcePosition.NONE, name, null, isNullable)
+
+    fun `is`(type: PrimitiveTypeName, isNullable: Boolean): Boolean {
+        return this is PrimitiveType && this.isNullable == isNullable && this.name == type.name
+    }
+
+    infix fun isPrimitiveTypeOf(type: PrimitiveTypeName): Boolean {
+        return this is PrimitiveType && this.name == type.name
+    }
 }
 
-data class IntType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "Int"
-    override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
-}
-data class LongType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "Long"
-    override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
-}
-data class DoubleType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "Double"
-    override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
-}
-data class BooleanType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "Boolean"
-    override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
-}
-data class StringType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "String"
-    override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
-}
-data class CharType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "Char"
-    override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
-}
-data class ByteType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "Byte"
-    override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
-}
 data class UnitType(override val isNullable: Boolean = false) : DataType {
     override val name: String = "Unit"
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
@@ -120,17 +100,30 @@ data object StarType : DataType {
 /**
  * @param superTypes It should contain a flattened and non-repetitive list of all super classes and interfaces
  */
-data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>, override val isNullable: Boolean = false, val superTypes: List<ObjectType>) : DataType {
+open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>, override val isNullable: Boolean = false, val superTypes: List<ObjectType>) : DataType {
     init {
         if (superTypes.distinctBy { it.name }.size != superTypes.size) {
             throw RuntimeException("superTypes of type ${clazz.fullQualifiedName} have repeated types")
         }
     }
 
-    override val name: String = clazz.fullQualifiedName
+    override val name: String = clazz.fullQualifiedName.removeSuffix("?")
     override val descriptiveName: String = "${name}${
         arguments.emptyToNull()?.let { "<${it.joinToString(", ") { it.descriptiveName }}>" } ?: ""
     }${if (isNullable) "?" else ""}"
+
+    val superTypeNames = superTypes.map { it.descriptiveName }.toSet()
+
+    fun copy(
+        clazz: ClassDefinition = this.clazz,
+        arguments: List<DataType> = this.arguments,
+        isNullable: Boolean = this.isNullable,
+        superTypes: List<ObjectType> = this.superTypes,
+    ): ObjectType {
+        return ObjectType(clazz = clazz, arguments = arguments, isNullable = isNullable, superTypes = superTypes)
+    }
+
+
 
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
 
@@ -169,10 +162,10 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 //        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
 //            otherType = otherType.superType!!
 //        }
-        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) {
-            otherType = otherType.findSuperType(clazz.fullQualifiedName) ?: return false
+        if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) {
+            otherType = otherType.findSuperType(clazz.fullQualifiedName.removeSuffix("?")) ?: return false
         }
-        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) return false
+        if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) return false
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
         return arguments.withIndex().all {
             it.value == StarType || it.value == otherType.arguments[it.index]
@@ -216,10 +209,10 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 //        while (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName && otherType.superType != null) {
 //            otherType = otherType.superType!!
 //        }
-        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) {
-            otherType = otherType.findSuperType(clazz.fullQualifiedName) ?: return false
+        if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) {
+            otherType = otherType.findSuperType(clazz.fullQualifiedName.removeSuffix("?")) ?: return false
         }
-        if (otherType.clazz.fullQualifiedName != clazz.fullQualifiedName) return false
+        if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) return false
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
         return arguments.withIndex().all {
             it.value.isConvertibleFrom(otherType.arguments[it.index])
@@ -254,6 +247,26 @@ data class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
             )
         })
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ObjectType) return false
+
+        if (clazz != other.clazz) return false
+        if (arguments != other.arguments) return false
+        if (isNullable != other.isNullable) return false
+        if (name != other.name) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = clazz.hashCode()
+        result = 31 * result + arguments.hashCode()
+        result = 31 * result + isNullable.hashCode()
+        result = 31 * result + name.hashCode()
+        return result
+    }
 }
 
 /**
@@ -263,6 +276,24 @@ data object UnresolvedType : DataType {
     override val name: String = "Unresolved"
     override val isNullable: Boolean = false
     override fun copyOf(isNullable: Boolean) = this
+}
+
+data class RepeatedType(val realTypeDescriptiveName: String) : DataType {
+    override val name: String = "<Repeated<$realTypeDescriptiveName>>"
+    override val isNullable: Boolean = false
+    override fun copyOf(isNullable: Boolean) = this
+
+    override fun isConvertibleFrom(other: DataType): Boolean {
+        if (other is RepeatedType) {
+            return realTypeDescriptiveName == other.realTypeDescriptiveName
+        }
+        return other.descriptiveName == realTypeDescriptiveName ||
+                (other is ObjectType && name in other.superTypeNames)
+    }
+
+    override fun toTypeNode(): TypeNode {
+        return TypeNode(SourcePosition.NONE, name, listOf(TypeNode(SourcePosition.NONE, realTypeDescriptiveName, null, false)), isNullable)
+    }
 }
 
 data class TypeParameterType(
@@ -345,30 +376,27 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
     }
 }
 
-fun TypeNode.toPrimitiveDataType() = when(this.name) {
-    "Int" -> IntType(isNullable = isNullable)
-    "Long" -> LongType(isNullable = isNullable)
-    "Double" -> DoubleType(isNullable = isNullable)
-    "Boolean" -> BooleanType(isNullable = isNullable)
-    "String" -> StringType(isNullable = isNullable)
-    "Char" -> CharType(isNullable = isNullable)
-    "Byte" -> ByteType(isNullable = isNullable)
+fun TypeNode.toPrimitiveDataType(symbolTable: SymbolTable) = when(this.name) {
+    "Int" -> if (isNullable) symbolTable.NullableIntType else symbolTable.IntType
+    "Long" -> if (isNullable) symbolTable.NullableLongType else symbolTable.LongType
+    "Double" -> if (isNullable) symbolTable.NullableDoubleType else symbolTable.DoubleType
+    "Boolean" -> if (isNullable) symbolTable.NullableBooleanType else symbolTable.BooleanType
+    "String" -> if (isNullable) symbolTable.NullableStringType else symbolTable.StringType
+    "Char" -> if (isNullable) symbolTable.NullableCharType else symbolTable.CharType
+    "Byte" -> if (isNullable) symbolTable.NullableByteType else symbolTable.ByteType
     "Unit" -> UnitType(isNullable = isNullable)
     "Any" -> AnyType(isNullable = isNullable)
     "Nothing" -> NothingType(isNullable = isNullable)
     else -> null //ObjectType(clazz = clazz!!, isNullable = isNullable)
 }
 
-fun DataType.isNonNullNumberType() = when (this) {
-    is DoubleType -> !isNullable
-    is IntType -> !isNullable
-    is LongType -> !isNullable
+fun DataType.isNonNullNumberType() = when ((this as? PrimitiveType)?.typeName) {
+    PrimitiveTypeName.Double, PrimitiveTypeName.Int, PrimitiveTypeName.Long -> !isNullable
     else -> false
 }
 
-fun DataType.isNonNullIntegralType() = when (this) {
-    is IntType -> !isNullable
-    is LongType -> !isNullable
+fun DataType.isNonNullIntegralType() = when ((this as? PrimitiveType)?.typeName) {
+    PrimitiveTypeName.Int, PrimitiveTypeName.Long -> !isNullable
     else -> false
 }
 
@@ -387,6 +415,9 @@ fun DataType.toTypeNode(): TypeNode = when (this) {
         isNullable
     )
 }
+
+fun TypeNode.isPrimitiveWithValue() =
+    name in setOf("Int", "Double", "Long", "Boolean", "String", "Char")
 
 fun TypeNode.isPrimitive() =
     name in setOf("Int", "Double", "Long", "Boolean", "String", "Char", "Unit", "Nothing", "Any")

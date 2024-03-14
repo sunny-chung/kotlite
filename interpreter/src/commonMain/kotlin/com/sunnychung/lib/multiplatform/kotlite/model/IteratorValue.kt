@@ -27,7 +27,7 @@ class IteratorValue(value: Iterator<RuntimeValue>, typeArgument: DataType, symbo
                 modifiers = setOf(FunctionModifier.operator),
                 executable = { interpreter, receiver, args, typeArgs ->
                     receiver as IteratorValue
-                    BooleanValue(receiver.value.hasNext())
+                    BooleanValue(receiver.value.hasNext(), interpreter.symbolTable())
                 },
                 position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
             ),

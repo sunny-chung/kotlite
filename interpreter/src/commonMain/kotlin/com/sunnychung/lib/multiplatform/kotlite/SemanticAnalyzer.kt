@@ -19,7 +19,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableType
 import com.sunnychung.lib.multiplatform.kotlite.model.CatchNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
-import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
@@ -35,7 +34,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
-import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
@@ -54,16 +52,15 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
-import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LabelNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
-import com.sunnychung.lib.multiplatform.kotlite.model.LongType
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveTypeName
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyModifier
@@ -78,7 +75,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
-import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolReferenceSet
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
@@ -150,6 +146,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "timesAssign",
         "divAssign",
         "remAssign",
+        "compareTo",
     )
 
     fun ExtensionProperty.generateTransformedName() {
@@ -163,6 +160,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             builtinSymbolTable.declareClass(SourcePosition.BUILTIN, it)
             classes += it
         }
+        builtinSymbolTable.init()
 
         executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
             it.generateTransformedName()
@@ -175,6 +173,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         classes.forEach { // do this again after registering functions to make the post-resolution logic works
             it.attachToSemanticAnalyzer(this)
         }
+
+        symbolTable.init()
 
         currentScope = symbolTable
     }
@@ -586,7 +586,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 return
             }
 
-            if (operator == "+=" && subjectType is StringType) {
+            if (operator == "+=" && subjectType isPrimitiveTypeOf PrimitiveTypeName.String) {
                 return // string can concat anything
             }
             if (!subjectType.isNonNullNumberType()) {
@@ -595,10 +595,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             if (!valueType.isNonNullNumberType()) {
                 throw TypeMismatchException(position, "non-null number type", valueType.nameWithNullable)
             }
-            if (subjectType is DoubleType) {
+            if (subjectType isPrimitiveTypeOf PrimitiveTypeName.Double) {
                 return // ok
             }
-            if (subjectType is LongType && valueType.isNonNullIntegralType()) {
+            if (subjectType isPrimitiveTypeOf PrimitiveTypeName.Long && valueType.isNonNullIntegralType()) {
                 return // ok
             }
         }
@@ -2405,21 +2405,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 "+", "-", "*", "/", "%" -> {
                     val t1 = node1.type(modifier = modifier).toDataType()
                     val t2 = node2.type(modifier = modifier).toDataType()
-                    if (t1 is StringType || t1 is NothingType || t2 is StringType || t2 is NothingType) {
+                    if (t1 isPrimitiveTypeOf PrimitiveTypeName.String || t1 is NothingType || t2 isPrimitiveTypeOf PrimitiveTypeName.String || t2 is NothingType) {
                         typeRegistry["String"]!!
-                    } else if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
-                        || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
+                    } else if ((t1.`is`(PrimitiveTypeName.Double, isNullable = false) && t2.isNonNullNumberType())
+                        || (t2.`is`(PrimitiveTypeName.Double, isNullable = false) && t2.isNonNullNumberType())
                     ) {
                         typeRegistry["Double"]!!
-                    } else if ((t1 == LongType(isNullable = false) && t2.isNonNullIntegralType())
-                        || (t2 == LongType(isNullable = false) && t2.isNonNullIntegralType())
+                    } else if ((t1.`is`(PrimitiveTypeName.Long, isNullable = false) && t2.isNonNullIntegralType())
+                        || (t2.`is`(PrimitiveTypeName.Long, isNullable = false) && t2.isNonNullIntegralType())
                     ) {
                         typeRegistry["Long"]!!
-                    } else if (t1 == IntType(isNullable = false) && t2 == IntType(isNullable = false)) {
+                    } else if (t1.`is`(PrimitiveTypeName.Int, isNullable = false) && t2.`is`(PrimitiveTypeName.Int, isNullable = false)) {
                         typeRegistry["Int"]!!
-                    } else if (operator == "+" && t1 is CharType && t2 is IntType) {
+                    } else if (operator == "+" && t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Int) {
                         typeRegistry["Char"]!!
-                    } else if (operator == "-" && t1 is CharType && t2 is CharType) {
+                    } else if (operator == "-" && t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Char) {
                         typeRegistry["Int"]!!
                     } else {
                         throw SemanticException(
@@ -2601,7 +2601,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         return if (type1.name == "Nothing") {
             type2
         } else {
-            superTypeOf(type1, type2)
+            superTypeOf(type1.copy(isNullable = false), type2)
         }.also { type = it }
     }
 

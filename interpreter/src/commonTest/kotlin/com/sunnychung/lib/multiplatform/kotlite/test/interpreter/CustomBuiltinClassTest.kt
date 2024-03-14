@@ -2,14 +2,11 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
-import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
-import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValueHolder
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
-import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
@@ -76,7 +73,10 @@ class CustomBuiltinClassTest {
                     declaredName = "a",
                     type = "String",
                     getter = { interpreter, receiver, typeArgs ->
-                        StringValue((receiver as ConstructableClassValue).value)
+                        StringValue(
+                            (receiver as ConstructableClassValue).value,
+                            interpreter.symbolTable(),
+                        )
                     },
                     setter = { interpreter, receiver, value, typeArgs ->
                         (receiver as ConstructableClassValue).value = (value as StringValue).value

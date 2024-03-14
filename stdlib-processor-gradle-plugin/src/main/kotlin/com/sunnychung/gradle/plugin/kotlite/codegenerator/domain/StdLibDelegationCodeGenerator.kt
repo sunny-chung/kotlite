@@ -14,6 +14,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isPrimitive
+import com.sunnychung.lib.multiplatform.kotlite.model.isPrimitiveWithValue
 
 internal val isDebug: Boolean = false
 
@@ -41,33 +42,29 @@ internal class StdLibDelegationCodeGenerator(val name: String, val code: String,
 package $outputPackage
 
 import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
-import com.sunnychung.lib.multiplatform.kotlite.model.BooleanType
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
-import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DelegatedValue
-import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
-import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IteratorValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
-import com.sunnychung.lib.multiplatform.kotlite.model.LongType
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveType
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveTypeName
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
-import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
@@ -185,6 +182,8 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         fun TypeNode.toDataTypeCode(): String {
             return if (typeParameters.containsKey(this.name)) {
                 "typeArgs[\"${this.name}\"]!!.copyOf(isNullable = ${this.isNullable})"
+            } else if (this.isPrimitiveWithValue()) {
+                "interpreter.symbolTable().${if (this.isNullable) "Nullable" else ""}${this.name}Type"
             } else if (this.isPrimitive()) {
                 "${this.name}Type(isNullable = ${this.isNullable})"
             } else {
@@ -201,7 +200,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                 }
             }
         } + " /* _t = ${_type.descriptiveName()}; t.name = ${type.name}; t = ${type.descriptiveName()} */"
-        val symbolTableArg = if (!type.isPrimitive()) {
+        val symbolTableArg = if (type.isPrimitiveWithValue() || !type.isPrimitive()) {
             ", symbolTable = interpreter.symbolTable()"
         } else ""
         val translatedTypeName = when (type.name) {
@@ -221,11 +220,17 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                 }
             }
             "List", "Iterable" -> {
-                when (type.arguments?.get(0)?.name) {
+                when (val subtypeName = type.arguments?.get(0)?.name) {
                     "Pair" -> "?.map { PairValue(it, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
-                    "String" -> "?.map { StringValue(it) }"
-                    "KDateTimeFormat" -> "?.map { KDateTimeFormatValue(it$symbolTableArg) }"
-                    else -> ""
+//                    "String" -> "?.map { StringValue(it$symbolTableArg) }"
+//                    "KDateTimeFormat" -> "?.map { KDateTimeFormatValue(it$symbolTableArg) }"
+//                    else -> ""
+                    "Any" -> ""
+                    else -> if (!typeParameters.containsKey(subtypeName)) {
+                        "?.map { ${subtypeName}Value(it$symbolTableArg) }"
+                    } else {
+                        ""
+                    }
                 }
             }
             "Pair" -> {

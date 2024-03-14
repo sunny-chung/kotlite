@@ -1,17 +1,11 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
-import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
-import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
-import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
-import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
-import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
-import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticSuccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -24,7 +18,7 @@ class CustomBuiltinExtensionPropertyTest {
                 receiver = "String",
                 type = "Int",
                 getter = { interpreter, subject, typeArgs ->
-                    IntValue((subject as StringValue).value.length * 10)
+                    IntValue((subject as StringValue).value.length * 10, interpreter.symbolTable())
                 }
             ))
         }
@@ -75,7 +69,7 @@ class CustomBuiltinExtensionPropertyTest {
                 receiver = "String",
                 type = "Int",
                 getter = { interpreter, subject, typeArgs ->
-                    IntValue(hostScopeVariable)
+                    IntValue(hostScopeVariable, interpreter.symbolTable())
                 },
                 setter = { interpreter, subject, value, typeArgs ->
                     hostScopeVariable += (value as IntValue).value
@@ -106,7 +100,7 @@ class CustomBuiltinExtensionPropertyTest {
                 receiver = "String",
                 type = "Int",
                 getter = { interpreter, subject, typeArgs ->
-                    IntValue((subject as StringValue).value.length * 10)
+                    IntValue((subject as StringValue).value.length * 10, interpreter.symbolTable())
                 }
             ))
         }
@@ -141,13 +135,13 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "prop",
                 receiver = "String",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "String",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -160,13 +154,13 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "prop",
                 receiver = "List<Any>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "List<Any>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -180,14 +174,14 @@ class CustomBuiltinExtensionPropertyTest {
                 typeParameters = listOf(TypeParameter("T", "Any")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 typeParameters = listOf(TypeParameter("T", "Any")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -200,14 +194,14 @@ class CustomBuiltinExtensionPropertyTest {
                 declaredName = "prop",
                 receiver = "List<Any?>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 typeParameters = listOf(TypeParameter("T", "Any?")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
         }
         assertSemanticFail(code = "", environment = env)
@@ -221,13 +215,13 @@ class CustomBuiltinExtensionPropertyTest {
                 typeParameters = listOf(TypeParameter("T", "Any?")),
                 receiver = "List<T>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(1) }
+                getter = { interpreter, subject, typeArgs -> IntValue(1, interpreter.symbolTable()) }
             ))
             registerExtensionProperty(ExtensionProperty(
                 declaredName = "prop",
                 receiver = "List<Int>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(2) }
+                getter = { interpreter, subject, typeArgs -> IntValue(2, interpreter.symbolTable()) }
             ))
         }
         val interpreter = interpreter("""
@@ -251,7 +245,7 @@ class CustomBuiltinExtensionPropertyTest {
                 typeParameters = listOf(TypeParameter("K", "Any?"), TypeParameter("V", "Any?")),
                 receiver = "Pair<K, V>",
                 type = "Int",
-                getter = { interpreter, subject, typeArgs -> IntValue(10) }
+                getter = { interpreter, subject, typeArgs -> IntValue(10, interpreter.symbolTable()) }
             ))
         }
         val interpreter = interpreter("""
