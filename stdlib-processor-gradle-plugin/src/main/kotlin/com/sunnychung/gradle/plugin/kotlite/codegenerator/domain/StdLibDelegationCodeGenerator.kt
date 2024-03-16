@@ -41,9 +41,9 @@ internal class StdLibDelegationCodeGenerator(val name: String, val code: String,
 
 package $outputPackage
 
-import com.sunnychung.lib.multiplatform.kotlite.conversion.makeComparable
 import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ComparableRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.CharValue
@@ -185,6 +185,9 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         fun TypeNode.toDataTypeCode(): String {
             return if (typeParameters.containsKey(this.name)) {
                 "typeArgs[\"${this.name}\"]!!.copyOf(isNullable = ${this.isNullable})"
+            } else if (this.name == "Comparable") {
+                val arg = this.arguments!!.first()
+                arg.toDataTypeCode()
             } else if (this.isPrimitiveWithValue()) {
                 "interpreter.symbolTable().${if (this.isNullable) "Nullable" else ""}${this.name}Type"
             } else if (this.isPrimitive()) {
@@ -229,7 +232,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
 //                    "KDateTimeFormat" -> "?.map { KDateTimeFormatValue(it$symbolTableArg) }"
 //                    else -> ""
                     "Any" -> ""
-                    else -> if (!typeParameters.containsKey(subtypeName)) {
+                    else -> if (!typeParameters.containsKey(subtypeName) && subtypeName !in setOf("Comparable")) {
                         "?.map { ${subtypeName}Value(it$symbolTableArg) }"
                     } else {
                         ""
@@ -261,7 +264,11 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             }
             else -> ""
         }
-        return if (type.name != "Unit") "$variableName$preMap?.let { $wrappedValue } ?: NullValue" else "UnitValue"
+        return when (type.name) {
+            "Unit" -> "UnitValue"
+            "Comparable" -> "$variableName ?: NullValue"
+            else -> "$variableName$preMap?.let { $wrappedValue } ?: NullValue"
+        }
     }
 
     // Interpreter runtime value -> kotlin value
@@ -274,15 +281,23 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             "Unit"
         } else if (type.name == "Any") {
             "$variableName as RuntimeValue"
+        } else if (type.name == "Comparable") {
+            "$variableName as ComparableRuntimeValue<Comparable<Any>>"
         } else {
             if (type.isPrimitive()) {
                 "($variableName as$question ${type.name}Value)$question.value"
             } else {
                 val postMap = when (type.name) {
-                    "Comparable" -> "?.let { makeComparable(it as Comparable<Any>) }"
+//                    "Comparable" -> "$question.let { makeComparable(it as Comparable<Any>) }"
                     else -> " as ${type.name}${
                         type.arguments?.let {
-                            "<${it.joinToString(", ") { "RuntimeValue" }}>"
+                            "<${it.joinToString(", ") {
+                                if (it.name == "Comparable") {
+                                    "ComparableRuntimeValue<Comparable<Any>>"
+                                } else {
+                                    "RuntimeValue"
+                                }
+                            }}>"
                         } ?: ""
                     }$question"
                 }

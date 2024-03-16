@@ -300,4 +300,72 @@ class ListTest {
         assertEquals(4, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
     }
+
+    @Test
+    fun maxMaxByMinMinByOrNull() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val value: Int)
+            val l = listOf(V("A", 7), V("B", 29), V("C", 6), V("D", 14), V("E", 27))
+            val l2 = l.map { it.value }
+            val a = l2.max()
+            val b = l2.min()
+            val c = l.maxBy { it.value }.name
+            val d = l.minByOrNull { it.value }?.name
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals("B", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals("C", (symbolTable.findPropertyByDeclaredName("d") as StringValue).value)
+    }
+
+    @Test
+    fun sorted() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val list1 = listOf(1, 7, 4, -2, 9)
+            val list = list1.sorted()
+            for (e in list) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("-2\n1\n4\n7\n9\n", console.toString())
+    }
+
+    @Test
+    fun sort() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val list = mutableListOf(1, 7, 4)
+            list += -2
+            list += 9
+            list.sort()
+            for (e in list) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("-2\n1\n4\n7\n9\n", console.toString())
+    }
 }
