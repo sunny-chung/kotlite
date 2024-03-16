@@ -140,7 +140,6 @@ kotliteStdLibHeaderProcessor {
         ),
         "KDateTime" to KotliteModuleConfig(
             imports = listOf(
-                "com.sunnychung.lib.multiplatform.kotlite.model.ListValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KInstantValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZonedInstantValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZoneOffsetValue",
@@ -172,8 +171,6 @@ kotliteStdLibHeaderProcessor {
         ),
         "Collections" to KotliteModuleConfig(
             imports = listOf(
-                "com.sunnychung.lib.multiplatform.kotlite.model.IterableValue",
-                "com.sunnychung.lib.multiplatform.kotlite.model.ListValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapValue",

@@ -18,6 +18,11 @@ fun <T> MutableCollection<T>.addAll(elements: Iterable<T>): Boolean
 fun <T> Iterable<T>.all(predicate: (T) -> Boolean): Boolean
 fun <T> Iterable<T>.any(predicate: (T) -> Boolean): Boolean
 fun <T> List<T>.asReversed(): List<T>
+fun <T : Comparable<T>> List<T?>.binarySearch(
+    element: T?,
+    fromIndex: Int = 0,
+    toIndex: Int = size,
+): Int
 fun <T> List<T>.binarySearch(
     fromIndex: Int = 0,
     toIndex: Int = size,

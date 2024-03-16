@@ -170,8 +170,8 @@ open class SymbolTable(
             throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeAlias)
         }
         val typeUpperBound = typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-        typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound)!!
-        typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true))!!
+        typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound, visitedTypes = mutableSetOf(name))!!
+        typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true), visitedTypes = mutableSetOf("$name?"))!!
     }
 
     fun declareTypeAliasResolution(position: SourcePosition, name: String, type: TypeNode, referenceSymbolTable: SymbolTable = this) {
@@ -212,6 +212,10 @@ open class SymbolTable(
             return StarType // TODO: additional validations of use of type *?
         }
 
+        if (type.arguments == null && type.descriptiveName() in visitedTypes) {
+            return RepeatedType(type.descriptiveName())
+        }
+
         val alias = findTypeAlias("${type.name}${if (type.isNullable) "?" else ""}")
         if (alias != null) {
             return findTypeAliasResolution("${type.name}${if (type.isNullable) "?" else ""}")
@@ -235,7 +239,7 @@ open class SymbolTable(
         type.arguments?.forEachIndexed { index, it ->
             // TODO refactor this repeated logic
             val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-            if (!assertToDataType(upperBound).isAssignableFrom(assertToDataType(it))) {
+            if (!assertToDataType(upperBound, visitedTypes.toMutableSet()).isAssignableFrom(assertToDataType(it, visitedTypes.toMutableSet()))) {
                 throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
             }
         }
@@ -271,7 +275,7 @@ open class SymbolTable(
 //        }
 //        return superType
 
-        val visitedTypes = mutableSetOf<String>()
+//        val visitedTypes = mutableSetOf<String>()
 
         fun resolve(type: ClassDefinition): ObjectType {
             val resolution = genericResolver.genericResolutionsByTypeName[type.name]!!
@@ -282,11 +286,7 @@ open class SymbolTable(
                 clazz = type,
                 arguments = type.typeParameters.map { tp ->
                     val argument = resolution[tp.name]!!
-                    if (argument.descriptiveName() in visitedTypes) {
-                        RepeatedType(argument.descriptiveName())
-                    } else {
-                        assertToDataType(argument)
-                    }
+                    assertToDataType(argument, visitedTypes)
                 },
                 isNullable = isNullable,
                 superTypes = (listOfNotNull(type.superClass) + type.superInterfaces)

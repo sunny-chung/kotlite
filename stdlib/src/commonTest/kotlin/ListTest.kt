@@ -275,4 +275,29 @@ class ListTest {
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals("7\n9\n2\n1\n5\n", console.toString())
     }
+
+    @Test
+    fun binarySearchElement() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val l = mutableListOf(1, 4, 6, 7, 11)
+            l += 16
+            val a = l.binarySearch(1)
+            val b = l.binarySearch(4)
+            val c = l.binarySearch(6)
+            val d = l.binarySearch(7)
+            val e = l.binarySearch(11)
+            val f = l.binarySearch(16)
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(0, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+    }
 }

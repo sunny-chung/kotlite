@@ -41,6 +41,7 @@ internal class StdLibDelegationCodeGenerator(val name: String, val code: String,
 
 package $outputPackage
 
+import com.sunnychung.lib.multiplatform.kotlite.conversion.makeComparable
 import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
@@ -54,8 +55,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IteratorValue
+import com.sunnychung.lib.multiplatform.kotlite.model.KotlinValueHolder
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
+import com.sunnychung.lib.multiplatform.kotlite.model.ListValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
@@ -275,11 +278,16 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             if (type.isPrimitive()) {
                 "($variableName as$question ${type.name}Value)$question.value"
             } else {
-                "($variableName as$question DelegatedValue<*>)$question.value as ${type.name}${
-                    type.arguments?.let {
-                        "<${it.joinToString(", ") { "RuntimeValue" }}>"
-                    } ?: ""
-                }$question"
+                val postMap = when (type.name) {
+                    "Comparable" -> "?.let { makeComparable(it as Comparable<Any>) }"
+                    else -> " as ${type.name}${
+                        type.arguments?.let {
+                            "<${it.joinToString(", ") { "RuntimeValue" }}>"
+                        } ?: ""
+                    }$question"
+                }
+
+                "($variableName as$question KotlinValueHolder<*>)$question.value$postMap"
             }
         }
     }
@@ -290,7 +298,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         } else if (type.name in setOf("List", "Iterable")) {
             // do not transform MutableList, otherwise no side effect can be performed
             val postUnwrap = if (type.name == "MutableList") ".toMutableList()" else ""
-            "($variableName as DelegatedValue<${type.name}<*>>).value.map { ${unwrapOne("it", type.arguments!!.first())} }$postUnwrap"
+            "($variableName as KotlinValueHolder<${type.name}<*>>).value.map { ${unwrapOne("it", type.arguments!!.first())} }$postUnwrap"
         } else {
             unwrapOne(variableName, type)
         }

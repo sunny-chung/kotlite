@@ -65,6 +65,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyOwnerInfo
+import com.sunnychung.lib.multiplatform.kotlite.model.RepeatedType
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
@@ -1232,7 +1233,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         t = t.findSuperType(tpUpperBounds[resolvedArgumentTypeName]!!.name)
                     }
                     (tpUpperBounds[resolvedArgumentTypeName] as? ObjectType)?.arguments?.forEachIndexed { i, it ->
-                        if (tpUpperBounds.containsKey(it.name)) {
+                        if (tpUpperBounds.containsKey(it.name) && (t as ObjectType).arguments[i] !is RepeatedType) {
                             val resolvedArgumentType = (t as ObjectType).arguments[i].toTypeNode()
                             tpResolutions[it.name] = superTypeOf(tpResolutions[it.name] ?: resolvedArgumentType, resolvedArgumentType)
                         }

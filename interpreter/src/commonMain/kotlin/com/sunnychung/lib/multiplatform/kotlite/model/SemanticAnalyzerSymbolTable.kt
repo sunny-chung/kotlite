@@ -35,7 +35,7 @@ class SemanticAnalyzerSymbolTable(
         // e.g. `<T, L : List<T>>`
         tempTypeAlias += alias
         typeAliasAndUpperBounds.forEach {
-            alias[it.first] = assertToDataType(it.second)
+            alias[it.first] = assertToDataType(it.second, visitedTypes = mutableSetOf(it.first))
         }
     }
 
@@ -261,9 +261,12 @@ class SemanticAnalyzerSymbolTable(
     }
 
     fun assertToDataTypeWithTypeParameters(type: TypeNode, typeParameters: List<TypeParameterNode>): DataType {
-        declareTempTypeAlias(typeParameters.map {
-            it.name to it.typeUpperBoundOrAny()
-        })
+        declareTempTypeAlias(typeParameters.flatMap {
+            listOf(
+                it.name to it.typeUpperBoundOrAny(),
+                "${it.name}?" to it.typeUpperBoundOrAny().copy(isNullable = true),
+            )
+        }.distinctBy { it.first })
         try {
             return assertToDataType(type)
         } finally {

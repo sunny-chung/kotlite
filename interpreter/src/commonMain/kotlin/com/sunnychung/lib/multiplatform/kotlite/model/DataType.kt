@@ -129,6 +129,7 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NothingType && isNullable) return true
+        if (other is RepeatedType) return true // FIXME
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
 //        var otherClazz = other.clazz
@@ -284,11 +285,12 @@ data class RepeatedType(val realTypeDescriptiveName: String) : DataType {
     override fun copyOf(isNullable: Boolean) = this
 
     override fun isConvertibleFrom(other: DataType): Boolean {
-        if (other is RepeatedType) {
-            return realTypeDescriptiveName == other.realTypeDescriptiveName
-        }
-        return other.descriptiveName == realTypeDescriptiveName ||
-                (other is ObjectType && name in other.superTypeNames)
+        return true // FIXME no idea how to check it
+//        if (other is RepeatedType) {
+//            return realTypeDescriptiveName == other.realTypeDescriptiveName
+//        }
+//        return other.descriptiveName == realTypeDescriptiveName ||
+//                (other is ObjectType && name in other.superTypeNames)
     }
 
     override fun toTypeNode(): TypeNode {

@@ -552,7 +552,7 @@ class FunctionTypeNode(override val position: SourcePosition, val receiverType: 
     : TypeNode(position, "Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
 
     override fun descriptiveName(): String {
-        var s = "(${parameterTypes!!.joinToString(", ") { it.descriptiveName() }}) -> ${returnType!!.descriptiveName()}"
+        var s = "(${parameterTypes?.joinToString(", ") { it.descriptiveName() } ?: "?"}) -> ${returnType?.descriptiveName() ?: "?"}"
         if (isNullable) s = "($s)?"
         return s
     }
