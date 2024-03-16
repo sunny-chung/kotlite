@@ -65,3 +65,26 @@ As only abstract functions are supported, the only things need to be implemented
 - Implement modifier checks in Semantic Analyzer
 - Disallow calling abstract functions directly via `super.abstractFunction()` expressions in Semantic Analyzer
 - Throw exception in Interceptor if a direct call is made to an abstract function, which supposes to be avoided by Semantic Analyzer
+
+== Dealing with `<T : Comparable<T>>`
+
+Note there is a recursion in this definition. This creates an infinite loop to `isAssignableFrom()` and `superTypeOf()`.
+
+For `isAssignableFrom()`, a special data type `RepeatedType` and a data structure `SymbolTableTypeVisitCache` are introduced. Type `RepeatedType` holds a field `actualType`. Whenever a type is about to be visited, it is added to `SymbolTableTypeVisitCache` (pre-visit). When a type finishes visiting, the result is recorded to `SymbolTableTypeVisitCache` (post-visit). If a type is visited before post-visit, then `RepeatedType` would be returned and registered into `SymbolTableTypeVisitCache`. In post-visit, the result is propagated to the field `actualType` of all the registered `RepeatedType` instances.
+
+In some cases where an ad-hoc call of `assertToDataType` is needed, `SymbolTableTypeVisitCache` is copied to prevent polluting the cache.
+
+It is also tricky to resolve a function definition like this:
+....
+fun <T : Comparable<T>> List<T?>.binarySearch(
+    element: T?,
+    fromIndex: Int = 0,
+    toIndex: Int = size,
+): Int
+....
+
+When a type parameter is present, they are all added to `SymbolTableTypeVisitCache` before start visiting, otherwise the type parameter cannot be resolved.
+
+While resolving function declarations, the field `actualType` of `RepeatedType` is never filled. In this case, it would be treated as an "Any" type with nullability same as that in the declaration.
+
+For `superTypeOf()`, Kotlite follows the same handling with Kotlin 1.9. That is, for Int and String, where Int : Comparable<Int> and String : Comparable<String>, their super type is Comparable<*>. So, if a repeated type is encountered, a star type is returned.

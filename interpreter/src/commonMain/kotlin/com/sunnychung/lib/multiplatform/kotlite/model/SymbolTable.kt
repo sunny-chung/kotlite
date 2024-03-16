@@ -76,15 +76,6 @@ open class SymbolTable(
         private set
 
     protected fun initPrimitiveTypes() {
-        fun getObjectType(typeName: String, isNullable: Boolean): ObjectType {
-            return rootScope.resolveObjectType(
-                clazz = rootScope.findClass(typeName, isThisScopeOnly = true)?.first
-                    ?: throw RuntimeException("Cannot find class $typeName"),
-                typeArguments = null,
-                isNullable = isNullable,
-            )
-        }
-
         fun getPrimitiveClass(typeName: PrimitiveTypeName, isNullable: Boolean): ClassDefinition {
             return rootScope.findClass("${typeName.name}${if (isNullable) "?" else ""}", isThisScopeOnly = true)?.first
                 ?: throw RuntimeException("Cannot find class ${typeName.name}")
@@ -170,8 +161,8 @@ open class SymbolTable(
             throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeAlias)
         }
         val typeUpperBound = typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-        typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound, visitedTypes = mutableSetOf(name))!!
-        typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true), visitedTypes = mutableSetOf("$name?"))!!
+        typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound, visitCache = SymbolTableTypeVisitCache(name))!!
+        typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true), visitCache = SymbolTableTypeVisitCache("$name?"))!!
     }
 
     fun declareTypeAliasResolution(position: SourcePosition, name: String, type: TypeNode, referenceSymbolTable: SymbolTable = this) {
@@ -200,20 +191,27 @@ open class SymbolTable(
         return typeAliasResolution[name] ?: parentScope?.findTypeAliasResolution(name)
     }
 
-    fun assertToDataType(type: TypeNode, visitedTypes: MutableSet<String> = mutableSetOf()): DataType {
-        if (type.name.startsWith("<Repeated<")) {
-            return RepeatedType((type.arguments ?: throw RuntimeException("Missing argument for repeated type")).first().name)
-        }
-        return typeNodeToDataType(type, visitedTypes) ?: throw RuntimeException("Cannot resolve type ${type.descriptiveName()}")
+    fun assertToDataType(type: TypeNode, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): DataType {
+        val isCacheCreator = visitCache.isEmpty
+
+        return typeNodeToDataType(type, visitCache)
+            ?.also {
+                if (isCacheCreator) {
+                    visitCache.throwErrorIfThereIsUnprocessedRepeatedType()
+                }
+            }
+            ?: throw RuntimeException("Cannot resolve type ${type.descriptiveName()}")
     }
 
-    fun typeNodeToDataType(type: TypeNode, visitedTypes: MutableSet<String> = mutableSetOf()): DataType? {
+    fun typeNodeToDataType(type: TypeNode, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): DataType? {
         if (type.name == "*") {
             return StarType // TODO: additional validations of use of type *?
         }
 
-        if (type.arguments == null && type.descriptiveName() in visitedTypes) {
-            return RepeatedType(type.descriptiveName())
+        if (visitCache.isVisited(type)) {
+            return RepeatedType(type.descriptiveName(), type.isNullable).also {
+                visitCache.postVisit(type, it)
+            }
         }
 
         val alias = findTypeAlias("${type.name}${if (type.isNullable) "?" else ""}")
@@ -239,12 +237,12 @@ open class SymbolTable(
         type.arguments?.forEachIndexed { index, it ->
             // TODO refactor this repeated logic
             val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-            if (!assertToDataType(upperBound, visitedTypes.toMutableSet()).isAssignableFrom(assertToDataType(it, visitedTypes.toMutableSet()))) {
+            if (!assertToDataType(upperBound, visitCache.copy()).isAssignableFrom(assertToDataType(it, visitCache.copy()))) {
                 throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
             }
         }
 
-        val type = resolveObjectType(clazz, type.arguments, type.isNullable, visitedTypes = visitedTypes)
+        val type = resolveObjectType(clazz, type.arguments, type.isNullable, visitCache = visitCache)
         if (type!!.clazz != clazz) {
             throw RuntimeException("genericResolver.genericResolutions is wrong")
         }
@@ -257,7 +255,7 @@ open class SymbolTable(
 //        )
     }
 
-    fun resolveObjectType(clazz: ClassDefinition, typeArguments: List<TypeNode>?, isNullable: Boolean, upToIndex: Int = -1, visitedTypes: MutableSet<String> = mutableSetOf()): ObjectType {
+    fun resolveObjectType(clazz: ClassDefinition, typeArguments: List<TypeNode>?, isNullable: Boolean, upToIndex: Int = -1, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): ObjectType {
         val genericResolver = ClassMemberResolver(this, clazz, typeArguments ?: emptyList())
 //        var superType: ObjectType? = null
 //        genericResolver.genericResolutions.forEachIndexed { index, resolutions ->
@@ -279,19 +277,19 @@ open class SymbolTable(
 
         fun resolve(type: ClassDefinition): ObjectType {
             val resolution = genericResolver.genericResolutionsByTypeName[type.name]!!
-            visitedTypes += type.name
-            log.v { "resolve visit ${type.name}" }
-            log.v { "resolve visited = ${visitedTypes}" }
+            visitCache.preVisit(type)
+//            log.v { "resolve visit ${type.name}" }
+//            log.v { "resolve visited = ${visitedTypes}" }
             return ObjectType(
                 clazz = type,
                 arguments = type.typeParameters.map { tp ->
                     val argument = resolution[tp.name]!!
-                    assertToDataType(argument, visitedTypes)
+                    assertToDataType(argument, visitCache)
                 },
                 isNullable = isNullable,
                 superTypes = (listOfNotNull(type.superClass) + type.superInterfaces)
                     .flatMap {
-                        if (it.name in visitedTypes) {
+                        if (visitCache.isVisited(it)) {
                             return@flatMap emptyList()
                         }
                         log.v { "resolve ${it.name} from ${type.name}" }
@@ -311,10 +309,18 @@ open class SymbolTable(
                         it.value.first()
                     }
                     .values.toList(),
-            )
+            ).also {
+                visitCache.postVisit(type, it)
+            }
         }
 
-        return resolve(clazz)
+        val isCacheCreator = visitCache.isEmpty
+
+        return resolve(clazz).also {
+            if (isCacheCreator) {
+                visitCache.throwErrorIfThereIsUnprocessedRepeatedType()
+            }
+        }
     }
 
     fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {

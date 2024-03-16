@@ -78,6 +78,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolReferenceSet
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTableTypeVisitCache
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
@@ -1233,7 +1234,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         t = t.findSuperType(tpUpperBounds[resolvedArgumentTypeName]!!.name)
                     }
                     (tpUpperBounds[resolvedArgumentTypeName] as? ObjectType)?.arguments?.forEachIndexed { i, it ->
-                        if (tpUpperBounds.containsKey(it.name) && (t as ObjectType).arguments[i] !is RepeatedType) {
+                        if (tpUpperBounds.containsKey(it.name)) {
                             val resolvedArgumentType = (t as ObjectType).arguments[i].toTypeNode()
                             tpResolutions[it.name] = superTypeOf(tpResolutions[it.name] ?: resolvedArgumentType, resolvedArgumentType)
                         }
@@ -2638,7 +2639,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             return types + type.superTypes
         }
 
-        fun superTypeOf(type1: TypeNode, type2: TypeNode): TypeNode {
+        fun superTypeOf(type1: TypeNode, type2: TypeNode, visitCache: SymbolTableTypeVisitCache): TypeNode {
             if (type1 == type2) return type1
             if (type1.name == type2.name && (type1.isNullable || type2.isNullable)) {
                 return type1.toNullable()
@@ -2657,6 +2658,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     type1
                 }
             }
+            if (visitCache.isVisited(type1) || visitCache.isVisited(type2)) {
+                return TypeNode(SourcePosition.NONE, "*", null, false)
+            }
+            visitCache.preVisit(type1)
+            visitCache.preVisit(type2)
 
             val typeTree1 = superTypeTree(currentScope.assertToDataType(type1))
             val typeTree2 = superTypeTree(currentScope.assertToDataType(type2))
@@ -2673,7 +2679,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                                     position = SourcePosition.NONE,
                                     name = superType1.name,
                                     arguments = superType1.arguments.mapIndexed { index, it ->
-                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode())
+                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode(), visitCache)
                                     }.emptyToNull(),
                                     isNullable = isNullable,
                                 )
@@ -2684,7 +2690,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                                 return FunctionTypeNode(
                                     position = SourcePosition.NONE,
                                     parameterTypes = superType1.arguments.mapIndexed { index, it ->
-                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode())
+                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode(), visitCache)
                                     },
                                     returnType = superTypeOf(superType1.returnType.toTypeNode(), superType2.returnType.toTypeNode()),
                                     isNullable = isNullable,
@@ -2702,9 +2708,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             return typeRegistry["Any${if (type1.isNullable || type2.isNullable) "?" else ""}"]!!
         }
 
+        val visitCache = SymbolTableTypeVisitCache()
         var type = types.first()
         types.drop(1)
-            .forEach { type = superTypeOf(type, it) }
+            .forEach { type = superTypeOf(type, it, visitCache) }
         return type
     }
 }

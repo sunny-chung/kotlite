@@ -35,7 +35,7 @@ class SemanticAnalyzerSymbolTable(
         // e.g. `<T, L : List<T>>`
         tempTypeAlias += alias
         typeAliasAndUpperBounds.forEach {
-            alias[it.first] = assertToDataType(it.second, visitedTypes = mutableSetOf(it.first))
+            alias[it.first] = assertToDataType(it.second, visitCache = SymbolTableTypeVisitCache(it.first))
         }
     }
 

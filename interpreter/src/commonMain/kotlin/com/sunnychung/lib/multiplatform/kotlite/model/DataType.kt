@@ -129,7 +129,7 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NothingType && isNullable) return true
-        if (other is RepeatedType) return true // FIXME
+        if (other is RepeatedType) return this.isAssignableFrom(other.actualType!!) // FIXME
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
 //        var otherClazz = other.clazz
@@ -182,6 +182,7 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     // B.isConvertibleFrom(A) = false
     override fun isConvertibleFrom(other: DataType): Boolean {
         if (other is NothingType && isNullable) return true
+        if (other is RepeatedType) return this.isConvertibleFrom(other.actualType!!) // FIXME
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
 //        var otherClazz = other.clazz
@@ -279,13 +280,29 @@ data object UnresolvedType : DataType {
     override fun copyOf(isNullable: Boolean) = this
 }
 
-data class RepeatedType(val realTypeDescriptiveName: String) : DataType {
-    override val name: String = "<Repeated<$realTypeDescriptiveName>>"
-    override val isNullable: Boolean = false
-    override fun copyOf(isNullable: Boolean) = this
+data class RepeatedType(val realTypeDescriptiveName: String, override val isNullable: Boolean, var actualType: DataType? = null) : DataType {
+    override val name: String = actualType?.name ?: "<Repeated<$realTypeDescriptiveName>>"
+    override fun copyOf(isNullable: Boolean) = copy(isNullable = isNullable)
+
+    override fun isAssignableFrom(other: DataType): Boolean {
+        if (actualType == null) {
+            return realTypeDescriptiveName == other.descriptiveName
+        }
+        val other = if (other is RepeatedType) other.actualTypeOrAny() else other
+        return actualType!!.isAssignableFrom(other)
+    }
+
+    fun actualTypeOrAny(): DataType = actualType ?: AnyType(isNullable = isNullable)
 
     override fun isConvertibleFrom(other: DataType): Boolean {
-        return true // FIXME no idea how to check it
+        if (actualType == null) return true
+        val other = if (other is RepeatedType) {
+            other.actualTypeOrAny()
+        } else {
+            other
+        }
+        return actualType!!.isConvertibleFrom(other)
+
 //        if (other is RepeatedType) {
 //            return realTypeDescriptiveName == other.realTypeDescriptiveName
 //        }
@@ -294,6 +311,7 @@ data class RepeatedType(val realTypeDescriptiveName: String) : DataType {
     }
 
     override fun toTypeNode(): TypeNode {
+        actualType?.toTypeNode()?.let { return it }
         return TypeNode(SourcePosition.NONE, name, listOf(TypeNode(SourcePosition.NONE, realTypeDescriptiveName, null, false)), isNullable)
     }
 }
@@ -310,7 +328,7 @@ data class TypeParameterType(
 
     override fun isConvertibleFrom(other: DataType): Boolean {
         if (isAssignableFrom(other)) return true
-        return upperBound.isAssignableFrom(other)
+        return upperBound.isConvertibleFrom(other)
     }
 
     override fun isAssignableFrom(other: DataType): Boolean {
