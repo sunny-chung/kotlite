@@ -197,6 +197,10 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
 //        )
 //    }
 
+    fun resolveTypes(function: FunctionDeclarationNode, encloseTypeName: String): FunctionAndTypes {
+        return Pair(function, encloseTypeName).resolveTypes()!!
+    }
+
     private fun Pair<FunctionDeclarationNode, String>?.resolveTypes(): FunctionAndTypes? {
         val (function, encloseTypeName) = this ?: return null
 
@@ -248,6 +252,13 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
 //                classTreeIndex = it.value.second,
                 enclosingTypeName = it.value.second,
             )
+        }
+    }
+
+    fun findMemberFunctionsAndExactTypesByDeclaredName(memberName: String, clazz: ClassDefinition = this.clazz): Map<String, FunctionAndTypes> {
+        val lookup: Map<String, Pair<FunctionDeclarationNode, String>> = clazz.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(memberName)
+        return lookup.mapValues {
+            it.value.resolveTypes()!!
         }
     }
 }

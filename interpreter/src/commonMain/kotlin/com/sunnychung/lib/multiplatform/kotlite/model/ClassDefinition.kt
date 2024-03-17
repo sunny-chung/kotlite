@@ -46,9 +46,9 @@ open class ClassDefinition(
 
     var enumValues: Map<String, ClassInstance> = emptyMap()
 
-    var isInInterpreter = false
-    var memberFunctionsForInterpreter: Map<String, FunctionDeclarationNode>? = null
-    var memberFunctionsForSA: Map<String, FunctionDeclarationNode>? = null
+    internal var isInInterpreter = false
+    internal var memberFunctionsForInterpreter: Map<String, FunctionDeclarationNode>? = null
+    internal var memberFunctionsForSA: Map<String, FunctionDeclarationNode>? = null
     val memberFunctionsMap: Map<String, FunctionDeclarationNode>
         get() = if (isInInterpreter) {
             memberFunctionsForInterpreter ?: throw RuntimeException("memberFunctionsForInterpreter not initialized for type $fullQualifiedName")

@@ -294,7 +294,7 @@ class ClassInheritanceCheckTest {
                 open fun f(x: T) {}
             }
             class B<T1, T2> : A<T2>() {
-                open fun f(x: T1) {}
+                open fun f(x: T2) {}
             }
         """.trimIndent())
     }

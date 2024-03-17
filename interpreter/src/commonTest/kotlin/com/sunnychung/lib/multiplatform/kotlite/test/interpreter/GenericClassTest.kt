@@ -658,6 +658,34 @@ class GenericClassTest {
     }
 
     @Test
+    fun overrideMemberFunction() {
+        val interpreter = interpreter("""
+            open class A<T>(var value: T) {
+                open fun getValue(): T = value
+                open fun setValue(v: T) {
+                    value = v
+                }
+            }
+            class B(value: Int) : A<Int>(value) {
+                override fun getValue(): Int = 3 * value
+                override fun setValue(v: Int) {
+                    value = 2 * v
+                }
+            }
+            val o = B(15)
+            val a = o.getValue()
+            o.setValue(47)
+            val b = o.getValue()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(3, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(45, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(282, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
     fun memberPropertiesOfTypeParametersInInitOfDeeplyInheritedClass() {
         val interpreter = interpreter("""
             open class MyPair<A, B>(first: A, second: B) {

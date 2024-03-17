@@ -88,3 +88,13 @@ When a type parameter is present, they are all added to `SymbolTableTypeVisitCac
 While resolving function declarations, the field `actualType` of `RepeatedType` is never filled. In this case, it would be treated as an "Any" type with nullability same as that in the declaration.
 
 For `superTypeOf()`, Kotlite follows the same handling with Kotlin 1.9. That is, for Int and String, where Int : Comparable<Int> and String : Comparable<String>, their super type is Comparable<*>. So, if a repeated type is encountered, a star type is returned.
+
+== Generic Classes
+
+=== Inheriting and Overriding Member Functions
+
+The functions override and being overridden have different signatures, unless the subclass uses upper bounds as type arguments, but they have same `transformedRefName` values for easier lookups. A concrete subclass has function signatures with exact types, while a generic superclass has function signatures with type upper bounds.
+
+When checking for `override` / `open` modifiers, `ClassMemberResolver` is used to lookup members of superclasses with exact types.
+
+When providing a custom function that overrides / implements superclasses / interfaces, concrete types / generic types specific to the enclosing class should be provided.
