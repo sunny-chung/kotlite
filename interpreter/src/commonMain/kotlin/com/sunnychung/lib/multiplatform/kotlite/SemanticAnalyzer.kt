@@ -159,8 +159,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     init {
         val classes = mutableListOf<ClassDefinition>()
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
-            it.attachToSemanticAnalyzer(this) // make "ObjectType" resolvable
             builtinSymbolTable.declareClass(SourcePosition.BUILTIN, it)
+            it.attachToSemanticAnalyzer(this, isReady = false) // make "ObjectType" resolvable
             classes += it
         }
         builtinSymbolTable.init()
@@ -174,7 +174,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             it.visit()
         }
         classes.forEach { // do this again after registering functions to make the post-resolution logic works
-            it.attachToSemanticAnalyzer(this)
+            it.attachToSemanticAnalyzer(this, isReady = true)
         }
 
         symbolTable.init()
@@ -834,7 +834,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
             val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException(position, "Class `${receiver.descriptiveName()}` not found")
             if (clazz.superClass != null) {
-                val superClassTypeResolutions = ClassMemberResolver(currentScope, clazz, typeNode.arguments).genericResolutionsByTypeName[clazz.fullQualifiedName]!!
+                val superClassTypeResolutions = ClassMemberResolver.create(currentScope, clazz, typeNode.arguments)!!
+                    .genericResolutionsByTypeName[clazz.fullQualifiedName]!!
                 val superClassType = TypeNode(
                     SourcePosition.NONE,
                     clazz.superClass!!.name,
@@ -1281,7 +1282,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         (function as NavigationNode).subject.type(ResolveTypeModifier(isSkipGenerics = isSkipGenerics))
 
                     var type = argumentType.toDataType() as? ObjectType
-                    val resolver = type?.let { ClassMemberResolver(currentScope, it.clazz, it.arguments.map { it.toTypeNode() }) }
+                    val resolver = type?.let { ClassMemberResolver.create(currentScope, it.clazz, it.arguments.map { it.toTypeNode() }) }
 //                    while (type != null && type.name != parameterType.name) {
 ////                        type = (type as? ObjectType)?.clazz?.superClass?.let {
 ////                            val typeResolutions = resolver!!.genericResolutions[it.index].second
@@ -1805,8 +1806,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 popScope()
 
                 val type = superClassInvocation.type()
-                val superClassMemberResolver = ClassMemberResolver(superClassScope, superClass!!, type.arguments ?: emptyList())
-                superClassMemberResolver.forEachSuperClassesFromRoot { index, clazz, typeResolutions, typeUpperBounds ->
+                val superClassMemberResolver = ClassMemberResolver.create(superClassScope, superClass!!, type.arguments ?: emptyList())
+                superClassMemberResolver?.forEachSuperClassesFromRoot { index, clazz, typeResolutions, typeUpperBounds ->
                     pushScope(clazz.fullQualifiedName, ScopeType.Class)
                     ++numExtraSuperScopes
                     clazz.currentScope?.let { currentScope.mergeDeclarationsFrom(position, it, typeResolutions) }
@@ -1890,30 +1891,14 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 superClass = superClass,
                 superInterfaceTypes = interfaceInvocations,
                 superInterfaces = superInterfaces,
-            ).also { it.attachToSemanticAnalyzer(this@SemanticAnalyzer) }
+            )
             declarationScope.declareClass(position, classDefinition)
+            classDefinition.attachToSemanticAnalyzer(this@SemanticAnalyzer)
 
             // define an empty class for ClassMemberResolver's use to resolve functions from superclasses and
             // interfaces, not to resolve members from current class
-            val emptyClassDefinition = ClassDefinition(
-                currentScope = currentScope,
-                name = name,
-                fullQualifiedName = fullQualifiedName,
-                isInterface = isInterface,
-                modifiers = modifiers,
-                typeParameters = typeParameters,
-                isInstanceCreationAllowed = !isInterface,
-                primaryConstructor = primaryConstructor,
-                rawMemberProperties = emptyList(),
-                memberFunctions = emptyList(),
-                orderedInitializersAndPropertyDeclarations = emptyList(),
-                declarations = emptyList(),
-                superClassInvocation = superClassInvocation,
-                superClass = superClass,
-                superInterfaceTypes = interfaceInvocations,
-                superInterfaces = superInterfaces,
-            ).also { it.memberFunctionsForSA = emptyMap() }
-            val classMemberResolver = ClassMemberResolver(currentScope, emptyClassDefinition, null)
+            val emptyClassDefinition = classDefinition.copyAsEmptyClass()
+            val classMemberResolver = ClassMemberResolver.create(currentScope, emptyClassDefinition, null)
 
             // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()
             val pseudoTypeArguments = typeParameters.map { TypeNode(it.position, it.name, null, false) }.emptyToNull()
@@ -1958,40 +1943,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
 //                    it.transformedRefName = "${it.name}/${++functionDefIndex}"
-                    it.transformedRefName = it.toSignature(currentScope)
+//                    if (it.transformedRefName == null) {
+//                        it.transformedRefName = it.toSignature(currentScope)
+//                    }
                     currentScope.declareFunctionOwner(it.name, it, "this/$fullQualifiedClassName")
                 }
 
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach { thisFunc ->
-                    // TODO these are duplicating with ClassSemanticAnalyzer. Refactor these
-                    val superClassFunctions = classMemberResolver.findMemberFunctionsAndExactTypesByDeclaredName(thisFunc.name)
-                    var hasOverridden = false
-                    val identicalSuperClassFunctions: Collection<FunctionAndTypes>
-                    if (superClassFunctions != null) {
-                        identicalSuperClassFunctions = superClassFunctions.filter {
-                            it.value.resolvedValueParameterTypes.withIndex().all {
-                                it.value.type == thisFunc.valueParameters[it.index].type
-                            }
-                        }.values
-                        identicalSuperClassFunctions.forEach { superFunc ->
-                            if (FunctionModifier.open !in superFunc.function.modifiers) {
-                                throw SemanticException(thisFunc.position, "A function cannot override another function not marked as `open`")
-                            }
-                            superFunc.function.transformedRefName?.let {
-                                thisFunc.transformedRefName = it // reuse parent's transformedRefName to have less trouble in implementation
-                            }
+                    // TODO these are duplicating with ClassSemanticAnalyzer and ClassDefinition. Refactor these
+                    val superClassFunctions = classMemberResolver?.findMemberFunctionsAndExactTypesByDeclaredName(thisFunc.name) ?: emptyMap()
+                    val identicalSuperClassFunctions: Collection<FunctionAndTypes> = superClassFunctions.filter {
+                        it.value.resolvedValueParameterTypes.withIndex().all {
+                            it.value.type == thisFunc.valueParameters[it.index].type
                         }
-                        hasOverridden = identicalSuperClassFunctions.isNotEmpty()
-                    } else {
-                        identicalSuperClassFunctions = emptyList()
-                    }
-                    if (hasOverridden && FunctionModifier.override !in thisFunc.modifiers) {
-                        throw SemanticException(thisFunc.position, "A function cannot override anything without the modifier `override`")
-                    }
-                    if (!hasOverridden && FunctionModifier.override in thisFunc.modifiers) {
-                        throw SemanticException(thisFunc.position, "Function `${thisFunc.name}` overrides nothing")
-                    }
+                    }.values
 
                     thisFunc.visit(modifier = modifier, isClassMemberFunction = true)
 
@@ -2512,15 +2478,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 //            return subjectArguments[typeParameterIndex]
         }
 
-        val resolver = ClassMemberResolver(currentScope, clazz, subjectType.arguments)
+        val resolver = ClassMemberResolver.create(currentScope, clazz, subjectType.arguments)
         if (lookupType == IdentifierClassifier.Property) {
             /**
              * As of Kotlin 1.9, resolution order is Companion Property > Enum Entry
              */
-            resolver.findMemberPropertyCustomAccessorWithType(memberName)?.let {
+            resolver?.findMemberPropertyCustomAccessorWithType(memberName)?.let {
                 return it.second.also { type = it }
             }
-            resolver.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
+            resolver?.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
                 return it.second.also { type = it }
             }
             if (clazz.fullQualifiedName.endsWith(".Companion") && !subjectType.isNullable) {
@@ -2543,7 +2509,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 return it.typeNode!!.resolveMemberType()
             }
         } else {
-            resolver.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
+            resolver?.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
                 return FunctionTypeNode(
                     position = it.function.position,
                     parameterTypes = emptyList(),

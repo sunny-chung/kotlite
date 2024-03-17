@@ -368,4 +368,54 @@ class ListTest {
         interpreter.eval()
         assertEquals("-2\n1\n4\n7\n9\n", console.toString())
     }
+
+    @Test
+    fun sortedByCustomClass() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int)
+            val list1 = listOf(V("A", 7), V("B", 29), V("C", 6), V("D", 14), V("E", 27))
+            val list = list1.sortedBy { it.num }
+            for (e in list) {
+                println(e.name)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("C\nA\nD\nE\nB\n", console.toString())
+    }
+
+    @Test
+    fun sortedListOfCustomClass() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int) : Comparable<V> {
+                override operator fun compareTo(other: V): Int {
+                    return num.compareTo(other.num)
+                }
+            }
+            val list1 = listOf(V("A", 7), V("B", 29), V("C", 6), V("D", 14), V("E", 27))
+            val list = list1.sorted()
+            for (e in list) {
+                println(e.name)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("C\nA\nD\nE\nB\n", console.toString())
+    }
 }

@@ -58,7 +58,7 @@ class LongValue(override val value: Long, symbolTable: SymbolTable) : NumberValu
     }
 }
 
-class StringValue(override val value: String, symbolTable: SymbolTable) : ComparableRuntimeValue<String>, PrimitiveValue(symbolTable) {
+class StringValue(override val value: String, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<String>, PrimitiveValue(symbolTable) {
 
     override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.StringType
     override fun convertToString() = value
@@ -76,7 +76,7 @@ class StringValue(override val value: String, symbolTable: SymbolTable) : Compar
     }
 }
 
-class CharValue(override val value: Char, symbolTable: SymbolTable) : ComparableRuntimeValue<Char>, PrimitiveValue(symbolTable) {
+class CharValue(override val value: Char, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<Char>, PrimitiveValue(symbolTable) {
 
     override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.CharType
     override fun convertToString() = value.toString()

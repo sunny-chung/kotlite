@@ -30,7 +30,10 @@ class ComparableInterface {
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-            functions = memberFunctions.map { it.copy(executable = { _, _, _, _ ->throw UnsupportedOperationException() }) },
+            functions = memberFunctions.map { it.copy(
+                modifiers = setOf(FunctionModifier.abstract, FunctionModifier.operator, FunctionModifier.open),
+                executable = { _, _, _, _ -> throw UnsupportedOperationException() }
+            ) },
             position = SourcePosition.BUILTIN,
         )
     }

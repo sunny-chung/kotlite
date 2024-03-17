@@ -327,7 +327,9 @@ class CallableTypeTest {
     @Test
     fun compatibleComparableCall() {
         assertSemanticSuccess("""
-            class A : Comparable<A>
+            class A : Comparable<A> {
+                override operator fun compareTo(o: A): Int = 1
+            }
             fun <T> makeList(vararg values: T): List<T> = values
             fun <T : Comparable<T>> List<T?>.f(element: T?) { }
             makeList(A(), A()).f(A())

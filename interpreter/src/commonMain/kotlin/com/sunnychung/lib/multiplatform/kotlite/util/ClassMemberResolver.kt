@@ -14,7 +14,20 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.typeUpperBoundOrAny
 
-class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefinition, private val typeArguments: List<TypeNode>?) {
+class ClassMemberResolver private constructor(symbolTable: SymbolTable, private val clazz: ClassDefinition, private val typeArguments: List<TypeNode>?) {
+    companion object {
+        /**
+         * If `createOnlyIfClassExists` == true, returns a resolver only if `clazz` can be found in `symbolTable`; null otherwise.
+         * If `createOnlyIfClassExists` == false, always returns a resolver.
+         */
+        fun create(symbolTable: SymbolTable, clazz: ClassDefinition, typeArguments: List<TypeNode>?, createOnlyIfClassExists: Boolean = false): ClassMemberResolver? {
+            if (createOnlyIfClassExists && symbolTable.findClass(clazz.fullQualifiedName) == null) {
+                return null
+            }
+            return ClassMemberResolver(symbolTable, clazz, typeArguments)
+        }
+    }
+
     // [n-1] = clazz; [n-2] = superclass of clazz; etc.
     @Deprecated("use genericResolutionsByTypeName") val genericResolutions: List<Pair<ClassDefinition, Map<String, TypeNode>>>
     @Deprecated("use genericUpperBoundsByTypeName") val genericUpperBounds: List<Pair<ClassDefinition, Map<String, TypeNode>>>

@@ -196,6 +196,34 @@ class GenericFunctionTest {
     }
 
     @Test
+//    @Ignore // FIXME interface clash
+    fun genericVararg2() {
+        val interpreter = interpreter("""
+            open class A : Comparable<A> {
+                override operator fun compareTo(o: A): Int = -1
+            }
+            class B : Comparable<A>, A()
+            
+            var a: Int = 0
+            fun <T> f(vararg args: T) {
+                ++a
+            }
+            f(A(), A())
+            f(A())
+            f(B())
+            f(B(), B())
+            f(A(), B())
+            f(B(), A())
+            f(A(), B(), B(), A(), B())
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(1, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(7, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
+
+    @Test
     fun nonAnyTypeUpperBound() {
         val interpreter = interpreter("""
             open class MyStringListBase<T> {

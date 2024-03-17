@@ -135,14 +135,15 @@ class SemanticAnalyzerSymbolTable(
 //                    scope = this
 //                )
 //            }.let { thisScopeCandidates += it }
-            ClassMemberResolver(this, receiverClass, null).findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName).map { lookup ->
+            ClassMemberResolver.create(this, receiverClass, null, createOnlyIfClassExists = true)?.findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName)?.mapNotNull { lookup ->
                 val it = lookup.value.function
                 // TODO this is slow, O(n^2). optimize this
-                ClassMemberResolver(
-                    this,
-                    receiverClass,
-                    (receiverType as ObjectType).arguments.map { it.toTypeNode() }
-                ).findMemberFunctionWithIndexByTransformedNameLinearSearch(it.transformedRefName!!).let { lookup2 ->
+                ClassMemberResolver.create(
+                    symbolTable = this,
+                    clazz = receiverClass,
+                    typeArguments = (receiverType as ObjectType).arguments.map { it.toTypeNode() },
+                    createOnlyIfClassExists = true
+                )?.findMemberFunctionWithIndexByTransformedNameLinearSearch(it.transformedRefName!!)?.let { lookup2 ->
                     FindCallableResult(
                         transformedName = it.transformedRefName!!,
                         originalName = it.name,
@@ -158,7 +159,7 @@ class SemanticAnalyzerSymbolTable(
                         scope = this
                     )
                 }
-            }.let { thisScopeCandidates += it }
+            }?.let { thisScopeCandidates += it }
 
             findExtensionFunctionsIncludingSuperClasses(receiverType!!, originalName, isThisScopeOnly = true).map {
                 FindCallableResult(

@@ -16,6 +16,7 @@ class ExecutionEnvironment(
     private val initiallyProvidedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
 
     private val generatedMapping: MutableMap<MappingKey, AnalyzedMapping> = mutableMapOf()
+    private val specialFunctionLookupCache: MutableMap<MappingKey, FunctionDeclarationNode> = mutableMapOf()
 
     init {
         registerInitClass(ComparableInterface.interfaze)
@@ -124,7 +125,20 @@ class ExecutionEnvironment(
                                         )
                                     ),
                                     isNullable = false,
-                                ) to ComparableInterface.memberFunctions.map { CustomFunctionDeclarationNode(it) }
+                                ) to ComparableInterface.memberFunctions.map {
+                                    CustomFunctionDeclarationNode(
+                                        it.copy(
+                                            modifiers = setOf(
+                                                FunctionModifier.operator,
+                                                FunctionModifier.open,
+                                                FunctionModifier.override,
+                                            ),
+                                            parameterTypes = listOf(
+                                                CustomFunctionParameter(name = "other", type = className)
+                                            ),
+                                        )
+                                    )
+                                }
                             )
                         }
 
@@ -189,6 +203,17 @@ class ExecutionEnvironment(
         val key = MappingKey(type = type, receiverType = receiverType, name = name, parentName = parentName)
         return generatedMapping[key]
             ?: throw RuntimeException("$type ${receiverType?.let { "$it." }}${parentName?.let { "$it." }}$name is not analyzed")
+    }
+
+    internal fun registerSpecialFunction(type: SymbolType, receiverType: String?, parentName: String? = null, name: String, function: FunctionDeclarationNode) {
+        val key = MappingKey(type = type, receiverType = receiverType, parentName = parentName, name = name)
+        specialFunctionLookupCache[key] = function
+    }
+
+    internal fun findSpecialFunction(type: SymbolType, receiverType: String?, parentName: String? = null, name: String): FunctionDeclarationNode {
+        val key = MappingKey(type = type, receiverType = receiverType, name = name, parentName = parentName)
+        return specialFunctionLookupCache[key]
+            ?: throw RuntimeException("Function cache of $type ${receiverType?.let { "$it." }}${parentName?.let { "$it." }}$name is not found")
     }
 
 

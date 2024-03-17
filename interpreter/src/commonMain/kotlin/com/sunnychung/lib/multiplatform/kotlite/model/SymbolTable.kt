@@ -256,7 +256,7 @@ open class SymbolTable(
     }
 
     fun resolveObjectType(clazz: ClassDefinition, typeArguments: List<TypeNode>?, isNullable: Boolean, upToIndex: Int = -1, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): ObjectType {
-        val genericResolver = ClassMemberResolver(this, clazz, typeArguments ?: emptyList())
+        val genericResolver = ClassMemberResolver.create(this, clazz, typeArguments ?: emptyList())!!
 //        var superType: ObjectType? = null
 //        genericResolver.genericResolutions.forEachIndexed { index, resolutions ->
 //            if (upToIndex >= 0 && index > upToIndex) return superType

@@ -1,6 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-sealed interface NumberValue<T> : ComparableRuntimeValue<T>, RuntimeValue/*, Comparable<NumberValue<*>>*/ where T : Number, T : Comparable<T> {
+sealed interface NumberValue<T> : ComparableRuntimeValueHolder<T>, RuntimeValue/*, Comparable<NumberValue<*>>*/ where T : Number, T : Comparable<T> {
 //    val value: T
 
     private fun longOp(num1: NumberValue<*>, num2: NumberValue<*>, operation: (Long, Long) -> Long): LongValue? {

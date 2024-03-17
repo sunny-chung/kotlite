@@ -16,7 +16,7 @@ class ClassSemanticAnalyzer(val symbolTable: SemanticAnalyzerSymbolTable, val po
     private val visitedTypes = mutableSetOf<String>()
     private val implementedFunctions = mutableSetOf<FunctionDeclarationNode>()
 
-    private val classMemberResolver = ClassMemberResolver(symbolTable, classDefinition, null)
+    private val classMemberResolver = ClassMemberResolver.create(symbolTable, classDefinition, null)!!
 
     /**
      * This function assumes all member FunctionDeclarationNode#visit() and

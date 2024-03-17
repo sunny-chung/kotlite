@@ -648,7 +648,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             ?.let { function ->
                 val subjectType = subject?.type() as? ObjectType
                 subjectType?.let { subjectType ->
-                    ClassMemberResolver(symbolTable(), subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
+                    ClassMemberResolver.create(symbolTable(), subjectType.clazz, subjectType.arguments.map { it.toTypeNode() })
                 }
             }
         val resolvedFunction = (functionNode as? FunctionDeclarationNode)

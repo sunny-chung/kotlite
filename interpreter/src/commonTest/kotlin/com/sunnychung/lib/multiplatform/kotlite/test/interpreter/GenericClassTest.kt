@@ -81,6 +81,42 @@ class GenericClassTest {
     }
 
     @Test
+    fun pairReadWriteFunctions() {
+        val interpreter = interpreter("""
+            class MyPair<A, B>(var first: A, var second: B) {
+                fun concat(): String = "${'$'}first,${'$'}second"
+                fun getFirst(): A = first
+                fun setFirst(value: A) {
+                    first = value
+                }
+                fun getSecond(): B = second
+                fun setSecond(value: B) {
+                    second = value
+                }
+            }
+            val p1 = MyPair<Int, Double>(10, 2.345)
+            val a: Int = p1.getFirst()
+            val b: Double = p1.getSecond()
+            val c: String = p1.concat()
+            p1.setFirst(p1.getFirst() + 1)
+            p1.setSecond(p1.getSecond() + 5)
+            val d: Int = p1.getFirst()
+            val e: Double = p1.getSecond()
+            val f: String = p1.concat()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(7, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        compareNumber(2.345, symbolTable.findPropertyByDeclaredName("b") as DoubleValue)
+        assertEquals("10,2.345", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals(11, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        compareNumber(7.345, symbolTable.findPropertyByDeclaredName("e") as DoubleValue)
+        assertTrue((symbolTable.findPropertyByDeclaredName("f") as StringValue).value.startsWith("11,7.34"))
+    }
+
+    @Test
     fun nestedPair() {
         val interpreter = interpreter("""
             class MyPair<A, B>(val first: A, val second: B) {
@@ -706,9 +742,9 @@ class GenericClassTest {
                 }
             }
             open class MyPair2<A, B>(first: A, second: B) : MyPair<A, B>(first, second)
-            open class MyPair3<A, B>(first: A, second: B) : MyPair2<A, B>(first, second)
+            open class MyPair3<C, D>(first: C, second: D) : MyPair2<C, D>(first, second)
             open class MyPair4<A, B>(first: A, second: B) : MyPair3<A, B>(first, second)
-            class MyPair5<A, B>(first: A, second: B) : MyPair4<A, B>(first, second)
+            class MyPair5<E, F>(first: E, second: F) : MyPair4<E, F>(first, second)
             val p1 = MyPair5<Int, Double>(10, 2.345)
             val a: Int = p1.first!!
             val b: Double = p1.second!!
@@ -725,5 +761,59 @@ class GenericClassTest {
         assertEquals("10,2.345", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
         compareNumber(2.345, symbolTable.findPropertyByDeclaredName("e") as DoubleValue)
+    }
+
+    @Test
+    fun memberFunctionsOfDeeplyInheritedGenericClass() {
+        val interpreter = interpreter("""
+            open class MyPair<A, B>(first: A, second: B) {
+                var first: A? = null
+                var second: B? = null
+                
+                init {
+                    val a: A = first
+                    val b: B = second
+                    this.first = a
+                    this.second = b
+                }
+                
+                fun concat(): String = "${'$'}first,${'$'}second"
+                fun setFirst(value: A) {
+                    first = value
+                }
+                fun getFirst(): A = this.first!!
+                fun setSecond(value: B) {
+                    this.second = value
+                }
+                fun getSecond(): B {
+                    return second!!
+                }
+            }
+            open class MyPair2<A, B>(first: A, second: B) : MyPair<A, B>(first, second)
+            open class MyPair3<C, D>(first: C, second: D) : MyPair2<C, D>(first, second)
+            open class MyPair4<A, B>(first: A, second: B) : MyPair3<A, B>(first, second)
+            class MyPair5<E, F>(first: E, second: F) : MyPair4<E, F>(first, second)
+            val p1 = MyPair5<Int, Double>(10, 2.345)
+            val a: Int = p1.first!!
+            val b: Double = p1.second!!
+            val c: String = p1.concat()
+            val d: Int = p1.getFirst()
+            val e: Double = p1.getSecond()
+            p1.setFirst(p1.getFirst() + 6)
+            p1.setSecond(p1.getSecond() + 8)
+            val f: Int = p1.getFirst()
+            val g: Double = p1.getSecond()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(8, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        compareNumber(2.345, symbolTable.findPropertyByDeclaredName("b") as DoubleValue)
+        assertEquals("10,2.345", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        compareNumber(2.345, symbolTable.findPropertyByDeclaredName("e") as DoubleValue)
+        assertEquals(16, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        compareNumber(10.345, symbolTable.findPropertyByDeclaredName("g") as DoubleValue)
     }
 }

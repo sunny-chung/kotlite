@@ -17,7 +17,7 @@ open class ClassInstance(
      * It can be flattened in the future.
      */
     val parentInstance: ClassInstance? = null,
-) : RuntimeValue {
+) : RuntimeValue, ComparableRuntimeValue<Comparable<Any>> {
     internal var clazz: ClassDefinition? = null
     internal var hasInitialized: Boolean = false
     internal var typeArgumentByName: Map<String, DataType> = emptyMap()
@@ -155,6 +155,13 @@ open class ClassInstance(
     private fun DataType.resolveTypeParameter(): DataType {
         if (this !is TypeParameterType) return this
         return typeArgumentByName[name]?.copyOf(isNullable = isNullable) ?: TODO()
+    }
+
+    override fun compareTo(other: ComparableRuntimeValue<Comparable<Any>>): Int {
+        clazz?.compareToExec?.let { executable ->
+            return executable(this, other)
+        }
+        throw RuntimeException("Class ${clazz!!.fullQualifiedName} is not comparable")
     }
 
     override fun convertToString(): String = "${clazz!!.fullQualifiedName}()" // TODO

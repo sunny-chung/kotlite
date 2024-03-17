@@ -431,6 +431,36 @@ class ClassInheritanceCheckTest {
     }
 
     @Test
+    fun classMustImplementAbstractFunctions1() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            class B : A()
+        """.trimIndent())
+    }
+
+    @Test
+    fun classMustImplementAbstractFunctions2() {
+        assertSemanticFail("""
+            abstract class A {
+                abstract fun f(): Int
+            }
+            open class A2: A()
+            open class A3: A2()
+            open class A4: A3()
+            class B : A4()
+        """.trimIndent())
+    }
+
+    @Test
+    fun classMustImplementAbstractFunctions3() {
+        assertSemanticFail("""
+            class A : Comparable<A>
+        """.trimIndent())
+    }
+
+    @Test
     fun abstractFunctionOverridesImplementationChangeReturnType1() {
         assertSemanticFail("""
             abstract class A {
