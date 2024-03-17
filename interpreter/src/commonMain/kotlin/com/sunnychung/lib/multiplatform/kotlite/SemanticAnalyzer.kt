@@ -259,6 +259,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "*=" -> "timesAssign"
         "/=" -> "divAssign"
         "%=" -> "remAssign"
+        "<", ">", "<=", ">=" -> "compareTo"
         else -> null
     }
 
@@ -410,7 +411,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
         node1.visit(modifier = modifier)
         node2.visit(modifier = modifier)
-        val functionName = if (operator in setOf("+", "-", "*", "/", "%")) {
+        val functionName = if (operator in setOf("+", "-", "*", "/", "%", "<", ">", "<=", ">=")) {
             operatorToFunctionName(operator)
         } else null
         val node1Type = node1.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
@@ -765,6 +766,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
             if (name !in supportedOperatorFunctionNames) {
                 throw SemanticException(position, "`$name` is not a supported operator function name. Supported names are: ${supportedOperatorFunctionNames.joinToString(", ")}")
+            }
+            when (name) {
+                "compareTo" -> {
+                    if (valueParameters.size != 1) {
+                        throw SemanticException(position, "Operator function `$name` must have exactly one value parameter")
+                    }
+                    if (returnType != typeRegistry["Int"]) {
+                        throw SemanticException(position, "Operator function `$name` must return Int")
+                    }
+                }
             }
         }
         if (FunctionModifier.infix in modifiers) {
@@ -2392,11 +2403,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is ValueParameterDeclarationNode -> TODO()
     }
 
-    fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode =
-        type
-            ?: call?.type(modifier = modifier)?.also { type = it }
+    fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        return type
             ?: when (operator) {
                 "+", "-", "*", "/", "%" -> {
+                    call?.type(modifier = modifier)?.also {
+                        type = it
+                        return it
+                    }
+
                     val t1 = node1.type(modifier = modifier).toDataType()
                     val t2 = node2.type(modifier = modifier).toDataType()
                     if (t1 isPrimitiveTypeOf PrimitiveTypeName.String || t1 is NothingType || t2 isPrimitiveTypeOf PrimitiveTypeName.String || t2 is NothingType) {
@@ -2409,7 +2424,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         || (t2.`is`(PrimitiveTypeName.Long, isNullable = false) && t2.isNonNullIntegralType())
                     ) {
                         typeRegistry["Long"]!!
-                    } else if (t1.`is`(PrimitiveTypeName.Int, isNullable = false) && t2.`is`(PrimitiveTypeName.Int, isNullable = false)) {
+                    } else if (t1.`is`(PrimitiveTypeName.Int, isNullable = false)
+                        && t2.`is`(PrimitiveTypeName.Int, isNullable = false)
+                    ) {
                         typeRegistry["Int"]!!
                     } else if (operator == "+" && t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Int) {
                         typeRegistry["Char"]!!
@@ -2429,6 +2446,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }.also {
                 type = it
             }
+    }
 
     fun UnaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }

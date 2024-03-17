@@ -9,7 +9,9 @@ class ComparableInterface {
                 receiverType = null,
                 functionName = "compareTo",
                 returnType = "Int",
-                modifiers = setOf(FunctionModifier.operator, FunctionModifier.open),
+                // Intentionally drop "operator" modifier to lessen performance penalty
+                // Otherwise, it won't pass LoopTest.
+                modifiers = setOf(/*FunctionModifier.operator,*/ FunctionModifier.open),
                 parameterTypes = listOf(CustomFunctionParameter(name = "other", type = "T")),
                 executable = exe@ { interpreter, receiver, args, typeArgs ->
                     if (receiver is ComparableRuntimeValue<*> && args[0] is ComparableRuntimeValue<*>) {
@@ -31,7 +33,9 @@ class ComparableInterface {
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             functions = memberFunctions.map { it.copy(
-                modifiers = setOf(FunctionModifier.abstract, FunctionModifier.operator, FunctionModifier.open),
+                // Intentionally drop "operator" modifier to lessen performance penalty.
+                // Otherwise, it won't pass LoopTest.
+                modifiers = setOf(FunctionModifier.abstract, /*FunctionModifier.operator,*/ FunctionModifier.open),
                 executable = { _, _, _, _ -> throw UnsupportedOperationException() }
             ) },
             position = SourcePosition.BUILTIN,

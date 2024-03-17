@@ -196,7 +196,14 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 
     fun BinaryOpNode.eval(): RuntimeValue {
         if (hasFunctionCall == true) {
-            return call!!.eval()
+            val result = call!!.eval()
+            return when (operator) {
+                ">" -> BooleanValue((result as IntValue).value > 0)
+                ">=" -> BooleanValue((result as IntValue).value >= 0)
+                "<" -> BooleanValue((result as IntValue).value < 0)
+                "<=" -> BooleanValue((result as IntValue).value <= 0)
+                else -> result
+            }
         }
 
         return when (operator) { // TODO overflow

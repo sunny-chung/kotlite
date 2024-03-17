@@ -36,4 +36,33 @@ class ComparableTest {
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("g") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("h") as BooleanValue).value)
     }
+
+    @Test
+    fun customComparisonOperator() {
+        val operators = listOf(
+            "<" to { a: Int, b: Int -> a < b},
+            "<=" to { a: Int, b: Int -> a <= b},
+            ">" to { a: Int, b: Int -> a > b},
+            ">=" to { a: Int, b: Int -> a >= b},
+        )
+        (1 .. 3).forEach { a ->
+            (1 .. 3).forEach { b ->
+                operators.forEach { op ->
+                    val interpreter = interpreter("""
+                        class Num(val value: Int) {
+                            operator fun compareTo(other: Num): Int = value.compareTo(other.value)
+                        }
+                        val x = Num($a)
+                        val y = Num($b)
+                        val a: Boolean = x ${op.first} y
+                    """.trimIndent())
+                    interpreter.eval()
+                    val symbolTable = interpreter.callStack.currentSymbolTable()
+                    println(symbolTable.propertyValues)
+                    assertEquals(3, symbolTable.propertyValues.size)
+                    assertEquals(op.second(a, b), (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+                }
+            }
+        }
+    }
 }

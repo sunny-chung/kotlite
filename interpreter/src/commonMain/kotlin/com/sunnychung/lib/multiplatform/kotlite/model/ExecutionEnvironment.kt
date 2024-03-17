@@ -129,7 +129,9 @@ class ExecutionEnvironment(
                                     CustomFunctionDeclarationNode(
                                         it.copy(
                                             modifiers = setOf(
-                                                FunctionModifier.operator,
+                                                // Intentionally drop "operator" modifier to lessen performance penalty.
+                                                // Otherwise, it won't pass LoopTest.
+                                                // FunctionModifier.operator,
                                                 FunctionModifier.open,
                                                 FunctionModifier.override,
                                             ),
