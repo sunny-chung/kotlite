@@ -904,22 +904,42 @@ class Parser(protected val lexer: Lexer) {
      */
     fun whenCondition(): WhenConditionNode {
         // TODO: rangeTest
-        if (currentToken.`is`(TokenType.Identifier, "is")) {
+        if (
+            currentToken.`is`(TokenType.Identifier, "is")
+            || (currentToken.`is`(TokenType.Operator, "!") && peekNextToken().`is`(TokenType.Identifier, "is"))
+        ) {
+            val isNegate = if (currentToken.`is`(TokenType.Operator, "!")) {
+                eat(TokenType.Operator, "!")
+                true
+            } else {
+                false
+            }
             val t = eat(TokenType.Identifier, "is")
             repeatedNL()
             val type = type()
             return WhenConditionNode(
                 position = t.position,
                 testType = WhenConditionNode.TestType.TypeTest,
+                isNegateResult = isNegate,
                 expression = type,
             )
-        } else if (currentToken.`is`(TokenType.Identifier, "in")) {
+        } else if (
+            currentToken.`is`(TokenType.Identifier, "in")
+            || (currentToken.`is`(TokenType.Operator, "!") && peekNextToken().`is`(TokenType.Identifier, "in"))
+        ) {
+            val isNegate = if (currentToken.`is`(TokenType.Operator, "!")) {
+                eat(TokenType.Operator, "!")
+                true
+            } else {
+                false
+            }
             val t = eat(TokenType.Identifier, "in")
             repeatedNL()
             val expr = expression()
             return WhenConditionNode(
                 position = t.position,
                 testType = WhenConditionNode.TestType.RangeTest,
+                isNegateResult = isNegate,
                 expression = expr,
             )
         } else {
@@ -928,6 +948,7 @@ class Parser(protected val lexer: Lexer) {
             return WhenConditionNode(
                 position = t.position,
                 testType = WhenConditionNode.TestType.Regular,
+                isNegateResult = false,
                 expression = expr,
             )
         }

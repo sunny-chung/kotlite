@@ -712,6 +712,7 @@ data class WhenSubjectNode(
 data class WhenConditionNode(
     override val position: SourcePosition,
     val testType: TestType,
+    val isNegateResult: Boolean,
     val expression: ASTNode,
     @ModifyByAnalyzer var type: TypeNode? = null,
 ) : ASTNode {

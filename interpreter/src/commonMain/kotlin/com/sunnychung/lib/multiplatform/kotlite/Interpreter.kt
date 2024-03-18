@@ -1472,9 +1472,11 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                             WhenConditionNode.TestType.TypeTest -> {
                                 val type = symbolTable().assertToDataType(it.expression as TypeNode)
                                 type.isAssignableFrom(subjectValue.type())
+                                    .let { result -> if (it.isNegateResult) !result else result }
                             }
                             WhenConditionNode.TestType.RangeTest -> {
                                 (it.call!!.eval(replaceArguments = mapOf(0 to subjectValue)) as BooleanValue).value
+                                    .let { result -> if (it.isNegateResult) !result else result }
                             }
                             else -> {
                                 val evalExprResult = it.expression.eval()

@@ -100,12 +100,14 @@ class WhenTest {
             open class B : A()
             class C : A()
             class D : B()
+            class E
             class Other
             fun f(x: Any): Int = when (x) {
                 is C, is D -> 15
                 is B -> -3
                 is A -> 6
-                else -> -1
+                !is E -> -1
+                else -> 4
             }
             val a: Int = f(A())
             val b: Int = f(B())
@@ -113,17 +115,19 @@ class WhenTest {
             val d: Int = f(D())
             val e: Int = f(Other())
             val f: Int = f(6)
+            val g: Int = f(E())
         """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
-        assertEquals(6, symbolTable.propertyValues.size)
+        assertEquals(7, symbolTable.propertyValues.size)
         assertEquals(6, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(-3, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(15, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
         assertEquals(15, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
         assertEquals(-1, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
         assertEquals(-1, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
     }
 
     @Test
@@ -292,7 +296,8 @@ class WhenTest {
                     in makeList(2, 16) -> 23
                     in MyRange(14, 50) -> 24
                     66 -> 25
-                    else -> 26
+                    !in MyRange(70, 80) -> 26
+                    else -> 27
                 }
             }
             val a: Int = f(8)
@@ -303,11 +308,13 @@ class WhenTest {
             val f: Int = f(29)
             val g: Int = f(51)
             val h: Int = f(66)
+            val i: Int = f(88)
+            val j: Int = f(72)
         """.trimIndent())
         interpreter.eval()
         val symbolTable = interpreter.callStack.currentSymbolTable()
         println(symbolTable.propertyValues)
-        assertEquals(8, symbolTable.propertyValues.size)
+        assertEquals(10, symbolTable.propertyValues.size)
         assertEquals(21, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(21, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(22, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
@@ -316,5 +323,7 @@ class WhenTest {
         assertEquals(24, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
         assertEquals(26, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
         assertEquals(25, (symbolTable.findPropertyByDeclaredName("h") as IntValue).value)
+        assertEquals(26, (symbolTable.findPropertyByDeclaredName("i") as IntValue).value)
+        assertEquals(27, (symbolTable.findPropertyByDeclaredName("j") as IntValue).value)
     }
 }
