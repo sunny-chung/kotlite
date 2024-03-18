@@ -146,4 +146,24 @@ class OperatorTypeTest {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun containsShouldReturnBoolean1() {
+        assertSemanticFail("""
+            class A {
+                operator fun contains(a: Int): Int = 1
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun containsShouldReturnBoolean2() {
+        assertSemanticFail("""
+            class A {
+                operator fun contains(a: Int): Boolean? {
+                    return true
+                }
+            }
+        """.trimIndent())
+    }
 }

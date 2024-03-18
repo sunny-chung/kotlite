@@ -150,6 +150,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "divAssign",
         "remAssign",
         "compareTo",
+        "contains",
     )
 
     fun ExtensionProperty.generateTransformedName() {
@@ -774,6 +775,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     }
                     if (returnType != typeRegistry["Int"]) {
                         throw SemanticException(position, "Operator function `$name` must return Int")
+                    }
+                }
+                "contains" -> {
+                    if (returnType != typeRegistry["Boolean"]) {
+                        throw SemanticException(position, "Operator function `$name` must return Boolean")
                     }
                 }
             }
@@ -2102,27 +2108,53 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         this.node1.visit(modifier = modifier)
         this.node2.visit(modifier = modifier)
 
-        if (functionName !in setOf("to", "is", "!is")) {
-            val type1 = node1.type().toDataType()
-            val type2 = node2.type().toDataType()
+        when (functionName) {
+            in setOf("to", "is", "!is") -> {}
+            in setOf("in", "!in") -> {
+                val type1 = node1.type().toDataType()
+                val type2 = node2.type().toDataType()
 
-            if (currentScope.findMatchingCallables(
-                    currentScope,
-                    functionName,
-                    type1,
-                    listOf(FunctionCallArgumentInfo(name = null, type = type2)),
-                    modifierFilter = SearchFunctionModifier.InfixFunctionOnly,
-                ).isNotEmpty()
-            ) {
-                call = FunctionCallNode(
-                    function = NavigationNode(position, node1, ".", ClassMemberReferenceNode(position, functionName)),
-                    arguments = listOf(FunctionCallArgumentNode(position = node2.position, index = 0, value = node2)),
-                    declaredTypeArguments = emptyList(),
-                    position = position,
-                    modifierFilter = SearchFunctionModifier.InfixFunctionOnly,
-                ).also { it.visit(modifier = modifier) }
-            } else {
-                throw SemanticException(position, "Infix function `$functionName` for type ${type1.descriptiveName} not found.")
+                if (currentScope.findMatchingCallables(
+                        currentSymbolTable = currentScope,
+                        originalName = "contains",
+                        receiverType = type2,
+                        arguments = listOf(FunctionCallArgumentInfo(name = null, type = type1)),
+                        modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+                    ).isNotEmpty()
+                ) {
+                    call = FunctionCallNode(
+                        function = NavigationNode(position, node2, ".", ClassMemberReferenceNode(position, "contains")),
+                        arguments = listOf(FunctionCallArgumentNode(position = node1.position, index = 0, value = node1)),
+                        declaredTypeArguments = emptyList(),
+                        position = position,
+                        modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+                    ).also { it.visit(modifier = modifier) }
+                } else {
+                    throw SemanticException(position, "Operator function `contains` for type ${type2.descriptiveName} not found.")
+                }
+            }
+            else -> {
+                val type1 = node1.type().toDataType()
+                val type2 = node2.type().toDataType()
+
+                if (currentScope.findMatchingCallables(
+                        currentSymbolTable = currentScope,
+                        originalName = functionName,
+                        receiverType = type1,
+                        arguments = listOf(FunctionCallArgumentInfo(name = null, type = type2)),
+                        modifierFilter = SearchFunctionModifier.InfixFunctionOnly,
+                    ).isNotEmpty()
+                ) {
+                    call = FunctionCallNode(
+                        function = NavigationNode(position, node1, ".", ClassMemberReferenceNode(position, functionName)),
+                        arguments = listOf(FunctionCallArgumentNode(position = node2.position, index = 0, value = node2)),
+                        declaredTypeArguments = emptyList(),
+                        position = position,
+                        modifierFilter = SearchFunctionModifier.InfixFunctionOnly,
+                    ).also { it.visit(modifier = modifier) }
+                } else {
+                    throw SemanticException(position, "Infix function `$functionName` for type ${type1.descriptiveName} not found.")
+                }
             }
         }
 

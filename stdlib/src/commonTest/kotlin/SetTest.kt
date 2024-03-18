@@ -1,3 +1,4 @@
+import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
@@ -188,5 +189,25 @@ class SetTest {
         assertEquals(7, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(3, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(listOf(1, 3, 7), console.split("\n").filter { it.isNotEmpty() }.map { it.toInt() }.sorted())
+    }
+
+    @Test
+    fun inOperator() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val set = setOf("hi", "abc", "g", "jk", "def")
+            val a = "hi" in set
+            val b = "abcd" in set
+            val c = "k" !in set
+            val d = "def" !in set
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
     }
 }

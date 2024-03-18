@@ -36,7 +36,7 @@ fun <T, K : Comparable<K>> List<T>.binarySearchBy(
 ): Int
 //fun <T> Iterable<T>.chunked(size: Int): List<List<T>>
 fun <T, R> Iterable<T>.chunked(size: Int, transform: (List<T>) -> R): List<R>
-fun <T> Iterable<T>.contains(element: T): Boolean
+operator fun <T> Iterable<T>.contains(element: T): Boolean
 fun <T> List<T>.containsAll(elements: List<T>): Boolean
 fun <T> MutableCollection<T>.clear()
 fun <T> Iterable<T>.count(predicate: (T) -> Boolean): Int
@@ -231,7 +231,7 @@ val <K, V> MapEntry<K, V>.value: V
 fun <K, V> mapOf(vararg pairs: Pair<K, V>): Map<K, V>
 fun <K, V> mutableMapOf(vararg pairs: Pair<K, V>): MutableMap<K, V>
 
-fun <K, V> Map<K, V>.contains(key: K): Boolean
+operator fun <K, V> Map<K, V>.contains(key: K): Boolean
 fun <K> Map<K, *>.containsKey(key: K): Boolean
 fun <K, V> Map<K, V>.containsValue(value: V): Boolean
 
@@ -339,7 +339,7 @@ fun <K, V> MutableMap<K, V>.withDefault(defaultValue: (key: K) -> V): MutableMap
 val <T> Set<T>.size: Int
     get()
 
-fun <T> Set<T>.contains(element: T): Boolean
+operator fun <T> Set<T>.contains(element: T): Boolean
 fun <T> Set<T>.containsAll(elements: Collection<T>): Boolean
 fun <T> Set<T>.isEmpty(): Boolean
 operator fun <T> Set<T>.iterator(): Iterator<T>

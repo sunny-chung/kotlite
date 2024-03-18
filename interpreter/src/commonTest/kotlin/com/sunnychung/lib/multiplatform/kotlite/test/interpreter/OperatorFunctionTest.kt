@@ -389,4 +389,36 @@ class OperatorFunctionTest {
         assertEquals(21, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(15, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun inOperators() {
+        val interpreter = interpreter("""
+            class MyRange<T: Comparable<T>>(val low: T, val high: T) {
+                operator fun contains(a: T): Boolean {
+                    return low <= a && a <= high
+                }
+            }
+            val r = MyRange(3, 10)
+            val a = 6 in r
+            val b = 10 in r
+            val c = 2 in r
+            val d = 30 in r
+            val e = 6 !in r
+            val f = 10 !in r
+            val g = 2 !in r
+            val h = 30 !in r
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(9, symbolTable.propertyValues.size)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("g") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("h") as BooleanValue).value)
+    }
 }

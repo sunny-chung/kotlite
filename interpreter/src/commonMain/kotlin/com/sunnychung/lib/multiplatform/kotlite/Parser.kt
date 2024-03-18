@@ -1145,17 +1145,23 @@ class Parser(protected val lexer: Lexer) {
         while (
             (currentToken.type == TokenType.Identifier && currentToken.value in setOf("is"))
             || (currentToken.`is`(TokenType.Operator, "!") && peekNextToken().`is`(TokenType.Identifier, "is"))
+            || (currentToken.type == TokenType.Identifier && currentToken.value in setOf("in"))
+            || (currentToken.`is`(TokenType.Operator, "!") && peekNextToken().`is`(TokenType.Identifier, "in"))
         ) {
             val token = currentToken
-            val t = if (currentToken.type == TokenType.Identifier) {
+            val operatorName = if (currentToken.type == TokenType.Identifier) {
                 eat(TokenType.Identifier).value as String
             } else {
                 eat(TokenType.Operator, "!")
                 "!${eat(TokenType.Identifier).value}"
             }
             repeatedNL()
-            val n2 = type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
-            n = InfixFunctionCallNode(position = token.position, node1 = n, node2 = n2, functionName = t)
+            val n2 = if (operatorName.contains("is")) {
+                type(isParseDottedIdentifiers = true, isIncludeLastIdentifierAsTypeName = true)
+            } else {
+                elvisExpression()
+            }
+            n = InfixFunctionCallNode(position = token.position, node1 = n, node2 = n2, functionName = operatorName)
         }
         return n
     }

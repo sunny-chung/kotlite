@@ -1341,7 +1341,12 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
     }
 
     fun InfixFunctionCallNode.eval(): RuntimeValue {
-        call?.eval()?.let { return it }
+        call?.eval()?.let {
+            if (functionName == "!in") {
+                return BooleanValue((it as BooleanValue).value.not())
+            }
+            return it
+        }
 
         val n1 = node1.eval() as RuntimeValue
         return when (functionName) {

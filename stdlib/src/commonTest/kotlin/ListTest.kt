@@ -1,3 +1,4 @@
+import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
@@ -417,5 +418,25 @@ class ListTest {
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
         assertEquals("C\nA\nD\nE\nB\n", console.toString())
+    }
+
+    @Test
+    fun inOperator() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val list = listOf("hi", "abc", "g", "def", "jk", "def")
+            val a = "hi" in list
+            val b = "abcd" in list
+            val c = "k" !in list
+            val d = "def" !in list
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
     }
 }
