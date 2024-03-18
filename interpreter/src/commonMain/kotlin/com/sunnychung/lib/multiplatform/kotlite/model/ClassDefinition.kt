@@ -205,10 +205,10 @@ open class ClassDefinition(
             }
         }.associateBy { it.toSignature(sa.currentScope) }
 
-        if (isReady && superInterfaces.any { it.fullQualifiedName == "Comparable" }) {
-            val reference = superInterfaceTypes.first { it.name == "Comparable" }
+        if (isReady && !isInterface && classMemberResolver?.containsSuperType("Comparable") == true) {
+            val reference = classMemberResolver.genericResolutionsByTypeName["Comparable"]!!
             val symbolTable = sa.currentScope
-            val callables = sa.currentScope.findMatchingCallables(
+            var callables = sa.currentScope.findMatchingCallables(
                 currentSymbolTable = sa.currentScope,
                 originalName = "compareTo",
                 receiverType = symbolTable.assertToDataType(
@@ -221,9 +221,27 @@ open class ClassDefinition(
                         isNullable = false
                     )
                 ),
-                arguments = listOf(FunctionCallArgumentInfo(null, symbolTable.assertToDataType(reference.arguments!!.first()))),
-                modifierFilter = SearchFunctionModifier.NoRestriction,
+                arguments = listOf(FunctionCallArgumentInfo(null, symbolTable.assertToDataType(reference.values.first()))),
+                modifierFilter = SearchFunctionModifier.OperatorFunctionOnly, // prefer operator (extension) functions over normal member functions
             )
+            if (callables.isEmpty()) {
+                callables = sa.currentScope.findMatchingCallables(
+                    currentSymbolTable = sa.currentScope,
+                    originalName = "compareTo",
+                    receiverType = symbolTable.assertToDataType(
+                        TypeNode(
+                            position = SourcePosition.NONE,
+                            name = fullQualifiedName,
+                            arguments = typeParameters.map {
+                                TypeNode(SourcePosition.NONE, it.name, null, false)
+                            }.emptyToNull(),
+                            isNullable = false
+                        )
+                    ),
+                    arguments = listOf(FunctionCallArgumentInfo(null, symbolTable.assertToDataType(reference.values.first()))),
+                    modifierFilter = SearchFunctionModifier.NoRestriction,
+                )
+            }
             if (callables.isEmpty()) {
                 throw SemanticException(SourcePosition.NONE, "`compareTo` function not found")
             } else if (callables.size > 1) {
@@ -269,7 +287,9 @@ open class ClassDefinition(
             }
         }.associateBy { it.transformedRefName!! }
 
-        if (compareToFunctionNode == null && superInterfaces.any { it.fullQualifiedName == "Comparable" }) {
+        val classMemberResolver = ClassMemberResolver.create(interpreter.symbolTable(), copyAsEmptyClass(), null)
+
+        if (compareToFunctionNode == null && !isInterface && classMemberResolver?.containsSuperType("Comparable") == true) {
             compareToFunctionNode = interpreter.executionEnvironment.findSpecialFunction(
                 type = ExecutionEnvironment.SymbolType.Function,
                 receiverType = fullQualifiedName,

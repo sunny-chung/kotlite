@@ -8,7 +8,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyType
-import com.sunnychung.lib.multiplatform.kotlite.model.SemanticAnalyzerSymbolTable
+import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
@@ -43,6 +44,14 @@ class ClassMemberResolver private constructor(symbolTable: SymbolTable, private 
         val genericResolutionsByTypeName: MutableMap<String, Map<String, TypeNode>> = mutableMapOf()
         val genericUpperBoundsByTypeName: MutableMap<String, Map<String, TypeNode>> = mutableMapOf()
         val typeDefinitions: MutableMap<String, ClassDefinition> = mutableMapOf()
+
+        val symbolTable = SymbolTable(
+            scopeLevel = symbolTable.scopeLevel + 1,
+            scopeName = "ClassMemberResolver",
+            scopeType = ScopeType.ExtraWrap,
+            parentScope = symbolTable,
+            isInitOnCreate = false, // don't init. primitive types would fail to be resolved when initializing root symbol table
+        )
 
         fun checkAndPutResolution(typeDef: ClassDefinition, resolvedTypeArguments: Map<String, TypeNode>, destination: MutableMap<String, Map<String, TypeNode>>) {
             if (destination.containsKey(typeDef.name)) {
@@ -99,8 +108,10 @@ class ClassMemberResolver private constructor(symbolTable: SymbolTable, private 
             }
         }
 
-        if (typeArguments == null && symbolTable is SemanticAnalyzerSymbolTable) {
-            symbolTable.declareTempTypeAlias(clazz.typeParameters.map { it.name to it.typeUpperBoundOrAny() })
+        if (typeArguments == null) {
+            clazz.typeParameters.map { it.name to it.typeUpperBoundOrAny() }.forEach {
+                symbolTable.declareTypeAlias(SourcePosition.NONE, it.first, it.second)
+            }
         }
 
         val firstTypeArgumentMap = clazz.typeParameters.mapIndexed { index, tp ->
@@ -131,10 +142,6 @@ class ClassMemberResolver private constructor(symbolTable: SymbolTable, private 
             clazz = superClass
         }
         genericResolutions.reverse()
-
-        if (typeArguments == null && symbolTable is SemanticAnalyzerSymbolTable) {
-            symbolTable.popTempTypeAlias()
-        }
 
         this.genericResolutions = genericResolutions.toList()
         this.genericResolutionsByTypeName = genericResolutionsByTypeName.toMap()
@@ -273,6 +280,10 @@ class ClassMemberResolver private constructor(symbolTable: SymbolTable, private 
         return lookup.mapValues {
             it.value.resolveTypes()!!
         }
+    }
+
+    fun containsSuperType(typeName: String): Boolean {
+        return genericResolutionsByTypeName.containsKey(typeName)
     }
 }
 

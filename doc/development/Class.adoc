@@ -68,7 +68,7 @@ As only abstract functions are supported, the only things need to be implemented
 
 == Dealing with `<T : Comparable<T>>`
 
-Note there is a recursion in this definition. This creates an infinite loop to `isAssignableFrom()` and `superTypeOf()`.
+Note there is a recursion in this definition. This creates an infinite loop to `isAssignableFrom()`, `superTypeOf()`, `toTypeNode()`, `equals()`, `hashCode()`, etc..
 
 For `isAssignableFrom()`, a special data type `RepeatedType` and a data structure `SymbolTableTypeVisitCache` are introduced. Type `RepeatedType` holds a field `actualType`. Whenever a type is about to be visited, it is added to `SymbolTableTypeVisitCache` (pre-visit). When a type finishes visiting, the result is recorded to `SymbolTableTypeVisitCache` (post-visit). If a type is visited before post-visit, then `RepeatedType` would be returned and registered into `SymbolTableTypeVisitCache`. In post-visit, the result is propagated to the field `actualType` of all the registered `RepeatedType` instances.
 

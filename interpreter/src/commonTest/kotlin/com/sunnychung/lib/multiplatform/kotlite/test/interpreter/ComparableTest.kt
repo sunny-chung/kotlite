@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -64,5 +65,57 @@ class ComparableTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun inheritedComparison() {
+        val interpreter = interpreter("""
+            open class Num(val value: Int) {
+                operator fun compareTo(other: Num): Int = value.compareTo(other.value)
+            }
+            open class A(value: Int) : Num(value)
+            open class B(value: Int) : A(value)
+            class C(value: Int) : B(value)
+            val a: Boolean = C(-5) < C(-8)
+            val b: Boolean = C(-5) < C(7)
+            val c: Boolean = C(7) >= C(7)
+            val d: Boolean = C(16) > C(7)
+            val e: Boolean = C(16) <= C(13)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
+    }
+
+    @Test
+    fun inheritedGenericComparison() {
+        val interpreter = interpreter("""
+            open class Num<P : Comparable<P>>(val value: P) {
+                operator fun compareTo(other: Num<P>): Int = value.compareTo(other.value)
+            }
+            open class A<X : Comparable<X>>(value: X) : Num<X>(value)
+            open class B<X : Comparable<X>>(value: X) : A<X>(value)
+            class C<T : Comparable<T>>(value: T) : B<T>(value)
+            val a: Boolean = C(-5) < C(-8)
+            val b: Boolean = C(-5) < C(7)
+            val c: Boolean = C(7) >= C(7)
+            val d: Boolean = C(16) > C(7)
+            val e: Boolean = C(16) <= C(13)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
     }
 }

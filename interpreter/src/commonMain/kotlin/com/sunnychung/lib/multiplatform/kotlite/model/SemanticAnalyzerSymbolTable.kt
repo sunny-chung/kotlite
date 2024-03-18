@@ -35,7 +35,11 @@ class SemanticAnalyzerSymbolTable(
         // e.g. `<T, L : List<T>>`
         tempTypeAlias += alias
         typeAliasAndUpperBounds.forEach {
-            alias[it.first] = assertToDataType(it.second, visitCache = SymbolTableTypeVisitCache(it.first))
+            alias[it.first] = SymbolTableTypeVisitCache(it.first).let { cache ->
+                assertToDataType(it.second, visitCache = cache).also { result ->
+                    cache.postVisit(it.first, result)
+                }
+            }
         }
     }
 
@@ -137,6 +141,13 @@ class SemanticAnalyzerSymbolTable(
 //            }.let { thisScopeCandidates += it }
             ClassMemberResolver.create(this, receiverClass, null, createOnlyIfClassExists = true)?.findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName)?.mapNotNull { lookup ->
                 val it = lookup.value.function
+                val receiverType = when (receiverType) {
+                    is TypeParameterType -> receiverType.upperBound
+                    is ObjectType -> receiverType
+                    else -> null
+                }
+                if (receiverType !is ObjectType) return@mapNotNull null
+
                 // TODO this is slow, O(n^2). optimize this
                 ClassMemberResolver.create(
                     symbolTable = this,

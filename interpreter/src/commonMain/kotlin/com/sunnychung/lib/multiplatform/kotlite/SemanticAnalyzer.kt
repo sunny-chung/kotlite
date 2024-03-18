@@ -212,8 +212,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         } catch (e: SemanticException) {
             throw e
         } catch (e: RuntimeException) {
-            e.printStackTrace()
-            throw SemanticException(position, e.message ?: e.toString())
+//            e.printStackTrace()
+            throw SemanticException(position, e.message ?: e.toString(), e)
         }
     }
 
@@ -1063,10 +1063,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
                 val resolutions = lookupReceiverTypes.flatMap {
                     currentScope.findMatchingCallables(
-                        currentScope,
-                        function.member.name,
-                        it,
-                        arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
+                        currentSymbolTable = currentScope,
+                        originalName = function.member.name,
+                        receiverType = it,
+                        arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
                         modifierFilter = modifierFilter!!,
                     )
                 }

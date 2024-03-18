@@ -39,7 +39,7 @@ sealed interface DataType {
     // It is similar to `isAssignableFrom()`, except would return true for assignable type arguments
     // e.g. List<Any>.isAssignableFrom(List<Int>) = false, but
     // List<Any>.isConvertibleFrom(List<Int>) = true
-    fun isConvertibleFrom(other: DataType): Boolean {
+    fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean = true): Boolean {
         return this.isAssignableFrom(other)
     }
 
@@ -49,7 +49,7 @@ sealed interface DataType {
 
     fun copyOf(isNullable: Boolean): DataType
 
-    fun toTypeNode() = TypeNode(SourcePosition.NONE, name, null, isNullable)
+    fun toTypeNode(isResolveTypeArguments: Boolean = true) = TypeNode(SourcePosition.NONE, name, null, isNullable)
 
     fun `is`(type: PrimitiveTypeName, isNullable: Boolean): Boolean {
         return this is PrimitiveType && this.isNullable == isNullable && this.name == type.name
@@ -129,7 +129,8 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NothingType && isNullable) return true
-        if (other is RepeatedType) return this.isAssignableFrom(other.actualType!!) // FIXME
+        if (other is RepeatedType) return other.actualType == null || this.isAssignableFrom(other.actualType!!)
+        if (other is TypeParameterType) return this.isAssignableFrom(other.upperBound)
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
 //        var otherClazz = other.clazz
@@ -170,6 +171,8 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
         return arguments.withIndex().all {
             it.value == StarType || it.value == otherType.arguments[it.index]
+                || (otherType.arguments[it.index] is RepeatedType && it.value.isAssignableFrom(otherType.arguments[it.index]))
+                || (it.value is TypeParameterType && (it.value as TypeParameterType).upperBound.isAssignableFrom(otherType.arguments[it.index]))
         }
 //        return other is ObjectType &&
 //                other.clazz.fullQualifiedName == clazz.fullQualifiedName &&
@@ -180,9 +183,10 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     // e.g. open class A; class B : A()
     // A.isConvertibleFrom(B) = true
     // B.isConvertibleFrom(A) = false
-    override fun isConvertibleFrom(other: DataType): Boolean {
+    override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
         if (other is NothingType && isNullable) return true
-        if (other is RepeatedType) return this.isConvertibleFrom(other.actualType!!) // FIXME
+        if (other is RepeatedType) return this.isConvertibleFrom(other.actualType!!, isResolveTypeArguments = false) // this is the key
+        if (other is TypeParameterType) return this.isConvertibleFrom(other.upperBound)
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
 //        var otherClazz = other.clazz
@@ -216,6 +220,9 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
         }
         if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) return false
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
+        if (!isResolveTypeArguments) {
+            return true
+        }
         return arguments.withIndex().all {
             it.value.isConvertibleFrom(otherType.arguments[it.index])
         }
@@ -235,8 +242,21 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
         return superTypes.firstOrNull { it.name == typeName }
     }
 
-    override fun toTypeNode(): TypeNode {
-        return TypeNode(SourcePosition.NONE, name, arguments.map { it.toTypeNode() }.emptyToNull(), isNullable)
+    override fun toTypeNode(isResolveTypeArguments: Boolean): TypeNode {
+        return TypeNode(
+            position = SourcePosition.NONE,
+            name = name,
+            arguments = arguments.map {
+                if (isResolveTypeArguments) {
+                    it.toTypeNode()
+                } else if (it is RepeatedType) {
+                    TypeNode.createRepeatedTypeNode(it.realTypeDescriptiveName)
+                } else {
+                    TypeNode.createRepeatedTypeNode(it.nameWithNullable)
+                }
+            }.emptyToNull(),
+            isNullable = isNullable
+        )
     }
 
     fun asTypeWithErasedTypeParameters(symbolTable: SymbolTable): ObjectType {
@@ -294,14 +314,14 @@ data class RepeatedType(val realTypeDescriptiveName: String, override val isNull
 
     fun actualTypeOrAny(): DataType = actualType ?: AnyType(isNullable = isNullable)
 
-    override fun isConvertibleFrom(other: DataType): Boolean {
+    override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
         if (actualType == null) return true
         val other = if (other is RepeatedType) {
             other.actualTypeOrAny()
         } else {
             other
         }
-        return actualType!!.isConvertibleFrom(other)
+        return actualType!!.isConvertibleFrom(other, isResolveTypeArguments = false)
 
 //        if (other is RepeatedType) {
 //            return realTypeDescriptiveName == other.realTypeDescriptiveName
@@ -310,9 +330,24 @@ data class RepeatedType(val realTypeDescriptiveName: String, override val isNull
 //                (other is ObjectType && name in other.superTypeNames)
     }
 
-    override fun toTypeNode(): TypeNode {
-        actualType?.toTypeNode()?.let { return it }
+    override fun toTypeNode(isResolveTypeArguments: Boolean): TypeNode {
+        actualType?.toTypeNode(isResolveTypeArguments = false)?.let { return it }
         return TypeNode(SourcePosition.NONE, name, listOf(TypeNode(SourcePosition.NONE, realTypeDescriptiveName, null, false)), isNullable)
+    }
+
+    // override to avoid infinite loop for cases like `T : Comparable<T>`
+    override fun equals(other: Any?): Boolean {
+        if (other is RepeatedType) {
+            return true
+        }
+        return actualType == other
+    }
+
+    // override to avoid infinite loop for cases like `T : Comparable<T>`
+    override fun hashCode(): Int {
+        var result = realTypeDescriptiveName.hashCode()
+        result = 31 * result + isNullable.hashCode()
+        return result
     }
 }
 
@@ -326,13 +361,16 @@ data class TypeParameterType(
 
     override fun copyOf(isNullable: Boolean) = if (this.isNullable == isNullable) this else copy(isNullable = isNullable)
 
-    override fun isConvertibleFrom(other: DataType): Boolean {
+    override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
         if (isAssignableFrom(other)) return true
         return upperBound.isConvertibleFrom(other)
     }
 
     override fun isAssignableFrom(other: DataType): Boolean {
         if (other is NothingType && isNullable) return true
+        if (other is RepeatedType) {
+            return other.realTypeDescriptiveName == "$name${if (isNullable) "?" else ""}"
+        }
         return other is TypeParameterType &&
                 other.name == name &&
                 (isNullable || !other.isNullable) &&
@@ -368,7 +406,7 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
         return true
     }
 
-    override fun isConvertibleFrom(other: DataType): Boolean {
+    override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
         if (other is NothingType && isNullable) return true
         if (other !is FunctionType) return false
         if (other.isNullable && !isNullable) return false
@@ -386,10 +424,18 @@ data class FunctionType(val arguments: List<DataType>, val returnType: DataType,
         return true
     }
 
-    override fun toTypeNode(): TypeNode {
+    override fun toTypeNode(isResolveTypeArguments: Boolean): TypeNode {
         return FunctionTypeNode(
             position = SourcePosition.NONE,
-            parameterTypes = arguments.map { it.toTypeNode() },
+            parameterTypes = arguments.map {
+                if (isResolveTypeArguments) {
+                    it.toTypeNode()
+                } else if (it is RepeatedType) {
+                    TypeNode.createRepeatedTypeNode(it.realTypeDescriptiveName)
+                } else {
+                    TypeNode.createRepeatedTypeNode(it.nameWithNullable)
+                }
+            }, // parameterTypes should be non-null, as type inference does not take place here
             returnType = returnType.toTypeNode(),
             isNullable = isNullable,
         )

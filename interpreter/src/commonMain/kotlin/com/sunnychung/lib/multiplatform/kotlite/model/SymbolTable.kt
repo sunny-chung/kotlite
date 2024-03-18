@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierException
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.log
@@ -14,6 +15,7 @@ open class SymbolTable(
     val scopeType: ScopeType,
     var parentScope: SymbolTable?,
     val returnType: DataType? = null,
+    val isInitOnCreate: Boolean = true,
 ) {
     init {
         if (parentScope == this) {
@@ -134,7 +136,7 @@ open class SymbolTable(
         if (parentScope != null || scopeLevel == 0) {
             rootScope = findScope(0)
 
-            if (scopeLevel > 1) { // user scopes
+            if (isInitOnCreate && scopeLevel > 1) { // user scopes
                 init()
             }
         }
@@ -161,8 +163,14 @@ open class SymbolTable(
             throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeAlias)
         }
         val typeUpperBound = typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-        typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound, visitCache = SymbolTableTypeVisitCache(name))!!
-        typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true), visitCache = SymbolTableTypeVisitCache("$name?"))!!
+        typeAlias[name] = SymbolTableTypeVisitCache(name).let { cache ->
+            referenceSymbolTable.typeNodeToDataType(typeUpperBound, visitCache = cache)!!
+                .also { result -> cache.postVisit(name, result) }
+        }
+        typeAlias["$name?"] = SymbolTableTypeVisitCache("$name?").let { cache ->
+            referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true), visitCache = cache)!!
+                .also { result -> cache.postVisit("$name?", result) }
+        }
     }
 
     fun declareTypeAliasResolution(position: SourcePosition, name: String, type: TypeNode, referenceSymbolTable: SymbolTable = this) {
@@ -192,6 +200,11 @@ open class SymbolTable(
     }
 
     fun assertToDataType(type: TypeNode, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): DataType {
+        if (type.name == "<Repeated>") {
+//            return assertToDataType(type.arguments!!.first(), visitCache)
+            return RepeatedType(type.arguments!!.first().name, type.arguments!!.first().name.endsWith("?"))
+        }
+
         val isCacheCreator = visitCache.isEmpty
 
         return typeNodeToDataType(type, visitCache)
@@ -216,8 +229,10 @@ open class SymbolTable(
 
         val alias = findTypeAlias("${type.name}${if (type.isNullable) "?" else ""}")
         if (alias != null) {
-            return findTypeAliasResolution("${type.name}${if (type.isNullable) "?" else ""}")
-                ?: TypeParameterType(type.name, type.isNullable, alias.first)
+            return (findTypeAliasResolution("${type.name}${if (type.isNullable) "?" else ""}")
+                ?: TypeParameterType(type.name, type.isNullable, alias.first)).also {
+                visitCache.postVisit(type, it)
+            }
         }
         if (type is FunctionTypeNode) {
             return FunctionType(
@@ -234,20 +249,26 @@ open class SymbolTable(
         if (clazz.typeParameters.size != (type.arguments?.size ?: 0)) {
             throw RuntimeException("Number of type arguments (${type.arguments?.size ?: 0}) does not match with number of type parameters ${clazz.typeParameters.size} of class ${clazz.fullQualifiedName}")
         }
+        val typeArgumentMap = clazz.typeParameters.withIndex().associate { it.value.name to type.arguments!![it.index] }
         type.arguments?.forEachIndexed { index, it ->
+            if (it.name == TypeNode.IGNORE.name) {
+                return@forEachIndexed
+            }
+
             // TODO refactor this repeated logic
-            val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
+            val upperBound = clazz.typeParameters[index].typeUpperBound?.resolveGenericParameterTypeArguments(typeArgumentMap) ?: TypeNode(SourcePosition.NONE, "Any", null, true)
             if (!assertToDataType(upperBound, visitCache.copy()).isAssignableFrom(assertToDataType(it, visitCache.copy()))) {
                 throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
             }
         }
 
+        val inputType = type
         val type = resolveObjectType(clazz, type.arguments, type.isNullable, visitCache = visitCache)
         if (type!!.clazz != clazz) {
             throw RuntimeException("genericResolver.genericResolutions is wrong")
         }
 
-        return type
+        return type.also { visitCache.postVisit(inputType, it) }
 //        return ObjectType(
 //            clazz = clazz,
 //            arguments = type.arguments?.map { assertToDataType(it) } ?: emptyList(),
