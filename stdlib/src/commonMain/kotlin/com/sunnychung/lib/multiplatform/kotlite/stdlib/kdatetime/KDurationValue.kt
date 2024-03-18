@@ -16,8 +16,8 @@ class KDurationValue(value: KDuration, symbolTable: SymbolTable) : DelegatedValu
             constructInstance = { interpreter, callArguments, callPosition ->
                 throw UnsupportedOperationException()
             },
-            superInterfaceTypeNames = listOf("KDateTimeFormattable"),
-            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
+            superInterfaceTypeNames = listOf("KDateTimeFormattable", "Comparable<KDuration>"),
+//            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
             position = SourcePosition("KDateTime", 1, 1),
         )
     }

@@ -13,16 +13,20 @@ class ExecutionEnvironment(
     private val builtinFunctions: MutableList<CustomFunctionDeclarationNode> = mutableListOf()
     private val extensionProperties: MutableList<ExtensionProperty> = mutableListOf()
     private val providedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
+    private val initiallyProvidedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
 
     private val generatedMapping: MutableMap<MappingKey, AnalyzedMapping> = mutableMapOf()
+    private val specialFunctionLookupCache: MutableMap<MappingKey, FunctionDeclarationNode> = mutableMapOf()
 
     init {
+        registerInitClass(ComparableInterface.interfaze)
+
         registerClass(PairValue.clazz)
         PairValue.properties.forEach {
             registerExtensionProperty(it)
         }
 
-        registerClass(ThrowableValue.clazz)
+        registerInitClass(ThrowableValue.clazz)
         ThrowableValue.properties.forEach {
             registerExtensionProperty(it)
         }
@@ -67,6 +71,12 @@ class ExecutionEnvironment(
         }
     }
 
+    fun registerInitClass(clazz: ProvidedClassDefinition) {
+        if (classRegistrationFilter(clazz.fullQualifiedName)) {
+            initiallyProvidedClasses += clazz
+        }
+    }
+
     internal fun getBuiltinFunctions(topmostSymbolTable: SymbolTable): List<CustomFunctionDeclarationNode> {
         return builtinFunctions.toList()
     }
@@ -76,57 +86,110 @@ class ExecutionEnvironment(
     }
 
     internal fun getBuiltinClasses(topmostSymbolTable: SymbolTable): List<ClassDefinition> {
-        return listOf("Int", "Double", "Long", "Boolean", "String", "Char", "Unit", "Nothing", "Function", "Class", "Any").flatMap { className ->
-            if (!classRegistrationFilter(className)) return@flatMap emptyList()
-            fun createTypeParameters(typeName: String): List<TypeParameterNode> {
-                return when (typeName) {
-                    "Class" -> listOf(TypeParameterNode(SourcePosition.BUILTIN, "T", TypeNode(SourcePosition.NONE, "Any", null, false)))
-                    else -> emptyList()
-                }
-            }
-            listOf(
-                ClassDefinition(
-                    currentScope = topmostSymbolTable,
-                    name = className,
-                    modifiers = emptySet(),
-                    typeParameters = createTypeParameters(className),
-                    isInstanceCreationAllowed = false,
-                    orderedInitializersAndPropertyDeclarations = emptyList(),
-                    declarations = emptyList(),
-                    rawMemberProperties = emptyList(),
-                    memberFunctions = emptyMap(),
-                    primaryConstructor = null,
-                ),
-                ClassDefinition(
-                    currentScope = topmostSymbolTable,
-                    name = "$className?",
-                    modifiers = emptySet(),
-                    typeParameters = createTypeParameters(className),
-                    isInstanceCreationAllowed = false,
-                    orderedInitializersAndPropertyDeclarations = emptyList(),
-                    declarations = emptyList(),
-                    rawMemberProperties = emptyList(),
-                    memberFunctions = emptyMap(),
-                    primaryConstructor = null,
-                ),
-                ClassDefinition(
-                    currentScope = topmostSymbolTable,
-                    name = "$className.Companion",
-                    modifiers = emptySet(),
-                    typeParameters = createTypeParameters(className),
-                    isInstanceCreationAllowed = false,
-                    orderedInitializersAndPropertyDeclarations = emptyList(),
-                    declarations = emptyList(),
-                    rawMemberProperties = emptyList(),
-                    memberFunctions = emptyMap(),
-                    primaryConstructor = null,
-                ),
-            )
-        } +
+        return initiallyProvidedClasses.filter { classRegistrationFilter(it.fullQualifiedName) }
+            .flatMap {
+                listOf(
+                    it.copyClassDefinition(),
+                    it.copyNullableClassDefinition(),
+                    it.copyCompanionClassDefinition(),
+                )
+            } +
+                listOf("Int", "Double", "Long", "Boolean", "String", "Char", "Byte", "Unit", "Nothing", "Function", "Class", "Any").flatMap { className ->
+                    if (!classRegistrationFilter(className)) return@flatMap emptyList()
+                    fun createTypeParameters(typeName: String): List<TypeParameterNode> {
+                        return when (typeName) {
+                            "Class" -> listOf(
+                                TypeParameterNode(
+                                    SourcePosition.BUILTIN,
+                                    "T",
+                                    TypeNode(SourcePosition.NONE, "Any", null, false)
+                                )
+                            )
+
+                            else -> emptyList()
+                        }
+                    }
+
+                    val interfaces = when (className) {
+                        in setOf("Int", "Double", "Long", "Boolean", "String", "Char") -> {
+                            listOf(
+                                TypeNode(
+                                    position = SourcePosition.BUILTIN,
+                                    name = "Comparable",
+                                    arguments = listOf(
+                                        TypeNode(
+                                            position = SourcePosition.BUILTIN,
+                                            name = className,
+                                            arguments = null,
+                                            isNullable = false,
+                                        )
+                                    ),
+                                    isNullable = false,
+                                ) to ComparableInterface.memberFunctions.map {
+                                    CustomFunctionDeclarationNode(
+                                        it.copy(
+                                            modifiers = setOf(
+                                                // Intentionally drop "operator" modifier to lessen performance penalty.
+                                                // Otherwise, it won't pass LoopTest.
+                                                // FunctionModifier.operator,
+                                                FunctionModifier.open,
+                                                FunctionModifier.override,
+                                            ),
+                                            parameterTypes = listOf(
+                                                CustomFunctionParameter(name = "other", type = className)
+                                            ),
+                                        )
+                                    )
+                                }
+                            )
+                        }
+
+                        else -> emptyList()
+                    }
+                    listOf(
+                        ClassDefinition(
+                            currentScope = topmostSymbolTable,
+                            name = className,
+                            modifiers = emptySet(),
+                            typeParameters = createTypeParameters(className),
+                            isInstanceCreationAllowed = false,
+                            orderedInitializersAndPropertyDeclarations = emptyList(),
+                            declarations = emptyList(),
+                            rawMemberProperties = emptyList(),
+                            memberFunctions = interfaces.flatMap { it.second },
+                            superInterfaceTypes = interfaces.map { it.first },
+                            primaryConstructor = null,
+                        ),
+                        ClassDefinition(
+                            currentScope = topmostSymbolTable,
+                            name = "$className?",
+                            modifiers = emptySet(),
+                            typeParameters = createTypeParameters(className),
+                            isInstanceCreationAllowed = false,
+                            orderedInitializersAndPropertyDeclarations = emptyList(),
+                            declarations = emptyList(),
+                            rawMemberProperties = emptyList(),
+                            memberFunctions = emptyList(),
+                            primaryConstructor = null,
+                        ),
+                        ClassDefinition(
+                            currentScope = topmostSymbolTable,
+                            name = "$className.Companion",
+                            modifiers = emptySet(),
+                            typeParameters = createTypeParameters(className),
+                            isInstanceCreationAllowed = false,
+                            orderedInitializersAndPropertyDeclarations = emptyList(),
+                            declarations = emptyList(),
+                            rawMemberProperties = emptyList(),
+                            memberFunctions = emptyList(),
+                            primaryConstructor = null,
+                        ),
+                    )
+                } +
                 providedClasses.filter { classRegistrationFilter(it.fullQualifiedName) }
                     .flatMap {
                         listOf(
-                            it,
+                            it.copyClassDefinition(),
                             it.copyNullableClassDefinition(),
                             it.copyCompanionClassDefinition(),
                         )
@@ -142,6 +205,17 @@ class ExecutionEnvironment(
         val key = MappingKey(type = type, receiverType = receiverType, name = name, parentName = parentName)
         return generatedMapping[key]
             ?: throw RuntimeException("$type ${receiverType?.let { "$it." }}${parentName?.let { "$it." }}$name is not analyzed")
+    }
+
+    internal fun registerSpecialFunction(type: SymbolType, receiverType: String?, parentName: String? = null, name: String, function: FunctionDeclarationNode) {
+        val key = MappingKey(type = type, receiverType = receiverType, parentName = parentName, name = name)
+        specialFunctionLookupCache[key] = function
+    }
+
+    internal fun findSpecialFunction(type: SymbolType, receiverType: String?, parentName: String? = null, name: String): FunctionDeclarationNode {
+        val key = MappingKey(type = type, receiverType = receiverType, name = name, parentName = parentName)
+        return specialFunctionLookupCache[key]
+            ?: throw RuntimeException("Function cache of $type ${receiverType?.let { "$it." }}${parentName?.let { "$it." }}$name is not found")
     }
 
 

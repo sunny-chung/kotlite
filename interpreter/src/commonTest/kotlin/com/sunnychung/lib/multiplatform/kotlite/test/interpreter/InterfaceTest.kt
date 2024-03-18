@@ -151,4 +151,37 @@ class InterfaceTest {
         assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(29, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
+
+    @Test
+    fun implementGenericInterfaces() {
+        val interpreter = interpreter("""
+            interface I<T> {
+                fun f(x: T): T
+            }
+            interface J<A> {
+                fun g(): A
+            }
+            interface K<A> : J<A> {
+                fun h(): A
+            }
+            class A : I<Int>, K<Int> {
+                override fun f(x: Int) = 2 * x
+                override fun g() = 20
+                override fun h() = 29
+            }
+            val o: K<Int> = A()
+            val a = (o as I<Int>).f(12)
+            val b = (o as A).f(12)
+            val c = o.g()
+            val d = o.h()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals(24, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(24, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+    }
 }

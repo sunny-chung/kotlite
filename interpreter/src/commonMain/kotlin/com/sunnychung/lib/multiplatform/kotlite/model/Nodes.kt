@@ -123,6 +123,24 @@ open class TypeNode(override val position: SourcePosition, val name: String, val
     }
 
     override fun toString(): String = descriptiveName()
+
+    companion object {
+        val IGNORE = TypeNode(SourcePosition.NONE, "<Ignore>", null, false)
+
+        fun createRepeatedTypeNode(actualTypeName: String): TypeNode {
+            return TypeNode(
+                position = SourcePosition.NONE,
+                name = "<Repeated>",
+                arguments = listOf(TypeNode(
+                    position = SourcePosition.NONE,
+                    name = actualTypeName,
+                    arguments = null,
+                    isNullable = false,
+                )),
+                isNullable = false,
+            )
+        }
+    }
 }
 
 data class PropertyDeclarationNode(
@@ -552,7 +570,7 @@ class FunctionTypeNode(override val position: SourcePosition, val receiverType: 
     : TypeNode(position, "Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
 
     override fun descriptiveName(): String {
-        var s = "(${parameterTypes!!.joinToString(", ") { it.descriptiveName() }}) -> ${returnType!!.descriptiveName()}"
+        var s = "(${parameterTypes?.joinToString(", ") { it.descriptiveName() } ?: "?"}) -> ${returnType?.descriptiveName() ?: "?"}"
         if (isNullable) s = "($s)?"
         return s
     }

@@ -1,9 +1,16 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.Interpreter
+import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
+import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
+import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
+import com.sunnychung.lib.multiplatform.kotlite.util.FunctionAndTypes
 
+/**
+ * This class is stateful and may not survive after Semantic Analyzer.
+ */
 open class ClassDefinition(
     /**
      * For storing parsed declarations
@@ -31,18 +38,32 @@ open class ClassDefinition(
     val declarations: List<ASTNode>,
 
     rawMemberProperties: List<PropertyDeclarationNode>,
-    private val memberFunctions: Map<String, FunctionDeclarationNode>,
+    private val memberFunctions: List<FunctionDeclarationNode>,
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superInterfaceTypes: List<TypeNode> = emptyList(),
     val superClassInvocation: FunctionCallNode? = null,
-    val superClass: ClassDefinition? = null,
-    val superInterfaces: List<ClassDefinition> = emptyList(),
+    var superClass: ClassDefinition? = null,
+    var superInterfaces: List<ClassDefinition> = emptyList(),
 ) {
 
     var enumValues: Map<String, ClassInstance> = emptyMap()
 
-    init {
+    internal var isInInterpreter = false
+    internal var memberFunctionsForInterpreter: Map<String, FunctionDeclarationNode>? = null
+    internal var memberFunctionsForSA: Map<String, FunctionDeclarationNode>? = null
+    val memberFunctionsMap: Map<String, FunctionDeclarationNode>
+        get() = if (isInInterpreter) {
+            memberFunctionsForInterpreter ?: throw RuntimeException("memberFunctionsForInterpreter not initialized for type $fullQualifiedName")
+        } else {
+            memberFunctionsForSA ?: throw RuntimeException("memberFunctionsForSA not initialized for type $fullQualifiedName")
+        }
+
+    // only used if the class extends `Comparable<*>`
+    var compareToFunctionNode: FunctionDeclarationNode? = null
+    var compareToExec: ((subject: RuntimeValue, other: RuntimeValue) -> Int)? = null
+
+    fun validateSuperClassesAndInterfaces() {
         if (isInterface) {
             if (superClass != null || superClassInvocation != null) {
                 throw SemanticException(SourcePosition.NONE, "Interface cannot extend from a class")
@@ -54,8 +75,8 @@ open class ClassDefinition(
         } else if (superClass == null && superClassInvocation != null) {
             throw SemanticException(SourcePosition.NONE, "superClass must be provided if there is a super class invocation")
         } else if (superClass != null && superClassInvocation != null) {
-            if (superClass.fullQualifiedName != (superClassInvocation.function as TypeNode).name) {
-                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass.fullQualifiedName} VS ${(superClassInvocation.function as TypeNode).name}")
+            if (superClass!!.fullQualifiedName != (superClassInvocation.function as TypeNode).name) {
+                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass!!.fullQualifiedName} VS ${(superClassInvocation.function as TypeNode).name}")
             }
         }
 
@@ -69,8 +90,8 @@ open class ClassDefinition(
                 ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaces on the super interface type ${type.name}")
         }
 
-        if (superClass != null && superClass.isInterface) {
-            throw SemanticException(SourcePosition.NONE, "superClass ${superClass.name} is not a class but an interface")
+        if (superClass != null && superClass!!.isInterface) {
+            throw SemanticException(SourcePosition.NONE, "superClass ${superClass!!.name} is not a class but an interface")
         }
 
         superInterfaces.forEach { def ->
@@ -92,13 +113,208 @@ open class ClassDefinition(
 
     private fun findIndex(): Int {
         if (superClass == null) return 0
-        return superClass.findIndex() + 1
+        return superClass!!.findIndex() + 1
     }
 
     val index = findIndex()
 
     init {
         rawMemberProperties.forEach { addProperty(currentScope, it) }
+    }
+
+    fun copyAsEmptyClass() = ClassDefinition(
+        currentScope = currentScope,
+        name = name,
+        fullQualifiedName = fullQualifiedName,
+        isInterface = isInterface,
+        modifiers = modifiers,
+        typeParameters = typeParameters,
+        isInstanceCreationAllowed = isInstanceCreationAllowed,
+        primaryConstructor = primaryConstructor,
+        rawMemberProperties = emptyList(),
+        memberFunctions = emptyList(),
+        orderedInitializersAndPropertyDeclarations = emptyList(),
+        declarations = emptyList(),
+        superClassInvocation = superClassInvocation,
+        superClass = superClass,
+        superInterfaceTypes = superInterfaceTypes,
+        superInterfaces = superInterfaces,
+    ).also { it.memberFunctionsForSA = emptyMap() }
+
+    /**
+     * Calls to this function should be after the class is registered to `currentScope`
+     */
+    fun attachToSemanticAnalyzer(sa: SemanticAnalyzer, isReady: Boolean = true) {
+        superClassInvocation?.function?.let { it as? TypeNode }?.name
+            ?.also { superClass = sa.currentScope.findClass(it)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find class $it") }
+
+        superInterfaces = superInterfaceTypes.map { sa.currentScope.findClass(it.name)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find interface $it") }
+
+        validateSuperClassesAndInterfaces()
+
+        val classMemberResolver = ClassMemberResolver.create(sa.currentScope, copyAsEmptyClass(), null)
+        memberFunctionsForSA = memberFunctions.onEach { thisFunc ->
+            with (sa) {
+                // TODO these are duplicating with ClassSemanticAnalyzer and SemanticAnalyzer. Refactor these
+                val superClassFunctions = classMemberResolver?.findMemberFunctionsAndExactTypesByDeclaredName(thisFunc.name) ?: emptyMap()
+                var hasOverridden = false
+                val identicalSuperClassFunctions = superClassFunctions.filter {
+                    it.value.resolvedValueParameterTypes.withIndex().all {
+                        it.value.type == thisFunc.valueParameters[it.index].type
+                    }
+                }.values
+                identicalSuperClassFunctions.forEach { superFunc ->
+                    if (FunctionModifier.open !in superFunc.function.modifiers) {
+                        throw SemanticException(thisFunc.position, "A function cannot override another function not marked as `open`")
+                    }
+                    superFunc.function.transformedRefName?.let {
+                        thisFunc.transformedRefName = it // reuse parent's transformedRefName to have less trouble in implementation
+                    }
+                }
+                hasOverridden = identicalSuperClassFunctions.isNotEmpty()
+                if (hasOverridden && FunctionModifier.override !in thisFunc.modifiers) {
+                    throw SemanticException(thisFunc.position, "A function cannot override anything without the modifier `override`")
+                }
+                if (!hasOverridden && FunctionModifier.override in thisFunc.modifiers) {
+                    throw SemanticException(thisFunc.position, "Function `${thisFunc.name}` of type `$fullQualifiedName` overrides nothing")
+                }
+                // --- end duplication
+
+                if (thisFunc.transformedRefName == null) {
+                    thisFunc.transformedRefName = thisFunc.toSignature(currentScope)
+                }
+                sa.executionEnvironment.registerGeneratedMapping(
+                    type = ExecutionEnvironment.SymbolType.Function,
+                    receiverType = fullQualifiedName,
+                    name = thisFunc.name,
+                    transformedName = thisFunc.transformedRefName!!,
+                )
+
+                thisFunc.valueParameters.forEach { p ->
+                    if (p.transformedRefName == null) {
+                        p.generateTransformedName()
+                        executionEnvironment.registerGeneratedMapping(
+                            type = ExecutionEnvironment.SymbolType.ValueParameter,
+                            receiverType = fullQualifiedName,
+                            parentName = thisFunc.name,
+                            name = p.name,
+                            transformedName = p.transformedRefName!!,
+                        )
+                    }
+                }
+            }
+        }.associateBy { it.toSignature(sa.currentScope) }
+
+        if (isReady && !isInterface && classMemberResolver?.containsSuperType("Comparable") == true) {
+            val reference = classMemberResolver.genericResolutionsByTypeName["Comparable"]!!
+            val symbolTable = sa.currentScope
+            var callables = sa.currentScope.findMatchingCallables(
+                currentSymbolTable = sa.currentScope,
+                originalName = "compareTo",
+                receiverType = symbolTable.assertToDataType(
+                    TypeNode(
+                        position = SourcePosition.NONE,
+                        name = fullQualifiedName,
+                        arguments = typeParameters.map {
+                            TypeNode(SourcePosition.NONE, it.name, null, false)
+                        }.emptyToNull(),
+                        isNullable = false
+                    )
+                ),
+                arguments = listOf(FunctionCallArgumentInfo(null, symbolTable.assertToDataType(reference.values.first()))),
+                modifierFilter = SearchFunctionModifier.OperatorFunctionOnly, // prefer operator (extension) functions over normal member functions
+            )
+            if (callables.isEmpty()) {
+                callables = sa.currentScope.findMatchingCallables(
+                    currentSymbolTable = sa.currentScope,
+                    originalName = "compareTo",
+                    receiverType = symbolTable.assertToDataType(
+                        TypeNode(
+                            position = SourcePosition.NONE,
+                            name = fullQualifiedName,
+                            arguments = typeParameters.map {
+                                TypeNode(SourcePosition.NONE, it.name, null, false)
+                            }.emptyToNull(),
+                            isNullable = false
+                        )
+                    ),
+                    arguments = listOf(FunctionCallArgumentInfo(null, symbolTable.assertToDataType(reference.values.first()))),
+                    modifierFilter = SearchFunctionModifier.NoRestriction,
+                )
+            }
+            if (callables.isEmpty()) {
+                throw SemanticException(SourcePosition.NONE, "`compareTo` function not found")
+            } else if (callables.size > 1) {
+                throw SemanticException(SourcePosition.NONE, "Ambiguous `compareTo` functions")
+            }
+            compareToFunctionNode = callables.single().definition as FunctionDeclarationNode
+            sa.executionEnvironment.registerSpecialFunction(
+                type = ExecutionEnvironment.SymbolType.Function,
+                receiverType = fullQualifiedName,
+                name = "compareTo",
+                function = compareToFunctionNode!!,
+            )
+        }
+    }
+
+    fun attachToInterpreter(interpreter: Interpreter) {
+        isInInterpreter = true
+
+        superClassInvocation?.function?.let { it as? TypeNode }?.name
+            ?.also { superClass = interpreter.symbolTable().findClass(it)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find class $it") }
+
+        superInterfaces = superInterfaceTypes.map { interpreter.symbolTable().findClass(it.name)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find interface $it") }
+
+        memberFunctionsForInterpreter = memberFunctions.onEach {
+            with(interpreter) {
+                it.valueParameters.forEach { p ->
+                    if (p.transformedRefName == null) {
+                        p.transformedRefName = executionEnvironment.findGeneratedMapping(
+                            type = ExecutionEnvironment.SymbolType.ValueParameter,
+                            receiverType = fullQualifiedName,
+                            parentName = it.name,
+                            name = p.name,
+                        ).transformedName
+                    }
+                }
+                if (it.transformedRefName == null) {
+                    it.transformedRefName = executionEnvironment.findGeneratedMapping(
+                        type = ExecutionEnvironment.SymbolType.Function,
+                        receiverType = fullQualifiedName,
+                        name = it.name,
+                    ).transformedName
+                }
+            }
+        }.associateBy { it.transformedRefName!! }
+
+        val classMemberResolver = ClassMemberResolver.create(interpreter.symbolTable(), copyAsEmptyClass(), null)
+
+        if (compareToFunctionNode == null && !isInterface && classMemberResolver?.containsSuperType("Comparable") == true) {
+            compareToFunctionNode = interpreter.executionEnvironment.findSpecialFunction(
+                type = ExecutionEnvironment.SymbolType.Function,
+                receiverType = fullQualifiedName,
+                name = "compareTo",
+            )
+        }
+
+        compareToExec = { subject, other ->
+            with(interpreter) {
+                val function = compareToFunctionNode ?: throw RuntimeException("`compareTo` function not found for type ${subject.type().descriptiveName}")
+                FunctionCallNode(
+                    function = function,
+                    arguments = listOf(
+                        FunctionCallArgumentNode(
+                            position = SourcePosition.NONE,
+                            index = 0,
+                            value = ValueNode(SourcePosition.NONE, other)
+                        )
+                    ),
+                    declaredTypeArguments = emptyList(),
+                    position = SourcePosition("", 1, 1)
+                ).evalClassMemberAnyFunctionCall(subject, function)
+                    .let { (it as IntValue).value }
+            }
+        }
     }
 
     fun isInstanceCreationByUserAllowed() = isInstanceCreationAllowed && ClassModifier.abstract !in modifiers
@@ -184,10 +400,10 @@ open class ClassDefinition(
      * Key: Function signature
      */
     fun getAllMemberFunctions(): Map<String, FunctionDeclarationNode> {
-        return memberFunctions.let { functionsInThisClass ->
+        return memberFunctionsMap.let { functionsInThisClass ->
             var result = functionsInThisClass
             if (superClass != null) {
-                result = result mergeIfNotExists superClass.getAllMemberFunctions()
+                result = result mergeIfNotExists superClass!!.getAllMemberFunctions()
             }
             superInterfaces.forEach {
                 result = result mergeIfNotExists it.getAllMemberFunctions()
@@ -200,16 +416,16 @@ open class ClassDefinition(
      * Key: Function signature
      */
     fun getMemberFunctionsDeclaredInThisClass(): Map<String, FunctionDeclarationNode> {
-        return memberFunctions
+        return memberFunctionsMap
     }
 
     @Deprecated("use findMemberFunctionsWithEnclosingTypeNameByDeclaredName")
     fun findMemberFunctionsWithIndexByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, Int>> =
-        memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
+        memberFunctionsMap.filter { it.value.name == declaredName }.mapValues { it.value to index } mergeIfNotExists
             (Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionsWithIndexByDeclaredName(declaredName, inThisClassOnly) } ?: emptyMap() )
 
     fun findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName: String, inThisClassOnly: Boolean = false): Map<String, Pair<FunctionDeclarationNode, String>> =
-        memberFunctions.filter { it.value.name == declaredName }.mapValues { it.value to fullQualifiedName } mergeIfNotExists
+        memberFunctionsMap.filter { it.value.name == declaredName }.mapValues { it.value to fullQualifiedName } mergeIfNotExists
             (Unit.takeIf { !inThisClassOnly }?.let {
                 val result = mutableMapOf<String, Pair<FunctionDeclarationNode, String>>()
                 superClass?.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(declaredName, inThisClassOnly)
@@ -227,28 +443,28 @@ open class ClassDefinition(
 
     @Deprecated("use findMemberFunctionWithEnclosingTypeNameByTransformedName")
     fun findMemberFunctionWithIndexByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
-        memberFunctions[transformedName]?.let { it to index } ?:
+        memberFunctionsMap[transformedName]?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedName(transformedName, inThisClassOnly) }
 
     /**
-     * For semantic analyzer use only. In SA, `memberFunctions` is not indexed by transformedRefName.
+     * For semantic analyzer use only. In SA, `memberFunctionsMap` is not indexed by transformedRefName.
      */
     fun findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, Int>? =
-        memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to index } ?:
+        memberFunctionsMap.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to index } ?:
             Unit.takeIf { !inThisClassOnly }?.let { superClass?.findMemberFunctionWithIndexByTransformedNameLinearSearch(transformedName, inThisClassOnly) }
 
     fun findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
-        memberFunctions[transformedName]?.let { it to fullQualifiedName } ?:
+        memberFunctionsMap[transformedName]?.let { it to fullQualifiedName } ?:
             Unit.takeIf { !inThisClassOnly }?.let {
                 superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly)
                     ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedName(transformedName, inThisClassOnly) }
             }
 
     /**
-     * For semantic analyzer use only. In SA, `memberFunctions` is not indexed by transformedRefName.
+     * For semantic analyzer use only. In SA, `memberFunctionsMap` is not indexed by transformedRefName.
      */
     fun findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName: String, inThisClassOnly: Boolean = false): Pair<FunctionDeclarationNode, String>? =
-        memberFunctions.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to fullQualifiedName } ?:
+        memberFunctionsMap.filter { it.value.transformedRefName == transformedName }.values.firstOrNull()?.let { it to fullQualifiedName } ?:
             Unit.takeIf { !inThisClassOnly }?.let {
                 superClass?.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly)
                     ?: superInterfaces.firstNotNullOfOrNull { it.findMemberFunctionWithEnclosingTypeNameByTransformedNameLinearSearch(transformedName, inThisClassOnly) }

@@ -25,6 +25,8 @@ class CallStack {
         )
     }
 
+    internal fun builtinScope() = activationRecords[0].symbolTable
+
     internal fun provideBuiltinClass(clazz: ClassDefinition) {
         activationRecords[0].symbolTable.declareClass(SourcePosition.BUILTIN, clazz)
     }

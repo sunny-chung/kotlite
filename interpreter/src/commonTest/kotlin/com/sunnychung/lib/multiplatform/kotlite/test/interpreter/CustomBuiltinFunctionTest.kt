@@ -23,8 +23,11 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "Int"),
                     CustomFunctionParameter("c", "String"),
                 ),
-                executable = { _, _, args, typeArgs ->
-                    val s = StringValue("${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
+                executable = { interpreter, _, args, typeArgs ->
+                    val s = StringValue(
+                        "${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}",
+                        interpreter.symbolTable(),
+                    )
                     println(s.value)
                     s
                 },
@@ -51,8 +54,8 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
-                executable = { _, receiver, args, typeArgs ->
-                    IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
+                executable = { interpreter, receiver, args, typeArgs ->
+                    IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value, interpreter.symbolTable())
                 },
                 position = SourcePosition("<Test>", 1, 1),
             ))
@@ -78,8 +81,8 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int", defaultValueExpression = "1")),
-                executable = { _, receiver, args, typeArgs ->
-                    IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
+                executable = { interpreter, receiver, args, typeArgs ->
+                    IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value, interpreter.symbolTable())
                 },
                 position = SourcePosition("<Test>", 1, 1),
             ))
@@ -113,8 +116,8 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "Int"),
                     CustomFunctionParameter("c", "Int", defaultValueExpression = "a + b + this")
                 ),
-                executable = { _, receiver, args, typeArgs ->
-                    IntValue(((args[0] as IntValue).value + (args[1] as IntValue).value) * (args[2] as IntValue).value)
+                executable = { interpreter, receiver, args, typeArgs ->
+                    IntValue(((args[0] as IntValue).value + (args[1] as IntValue).value) * (args[2] as IntValue).value, interpreter.symbolTable())
                 },
                 position = SourcePosition("<Test>", 1, 1),
             ))
@@ -149,8 +152,8 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "Int"),
                     CustomFunctionParameter("c", "String"),
                 ),
-                executable = { _, _, args, typeArgs ->
-                    val s = StringValue("A|${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}")
+                executable = { interpreter, _, args, typeArgs ->
+                    val s = StringValue("A|${(args[0] as StringValue).value}|${(args[1] as IntValue).value + 100}|${(args[2] as StringValue).value}", interpreter.symbolTable())
                     s
                 },
                 position = SourcePosition("<Test>", 1, 1),
@@ -164,8 +167,8 @@ class CustomBuiltinFunctionTest {
                     CustomFunctionParameter("b", "String"),
                     CustomFunctionParameter("c", "String"),
                 ),
-                executable = { _, _, args, typeArgs ->
-                    val s = StringValue("B|${(args[0] as StringValue).value}|${(args[1] as StringValue).value}|${(args[2] as StringValue).value}")
+                executable = { interpreter, _, args, typeArgs ->
+                    val s = StringValue("B|${(args[0] as StringValue).value}|${(args[1] as StringValue).value}|${(args[2] as StringValue).value}", interpreter.symbolTable())
                     s
                 },
                 position = SourcePosition("<Test>", 1, 1),
@@ -191,8 +194,8 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
-                executable = { _, receiver, args, typeArgs ->
-                    IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value)
+                executable = { interpreter, receiver, args, typeArgs ->
+                    IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value, interpreter.symbolTable())
                 },
                 position = SourcePosition("<Test>", 1, 1),
             ))
@@ -201,8 +204,8 @@ class CustomBuiltinFunctionTest {
                 functionName = "size",
                 returnType = "Int",
                 parameterTypes = listOf(CustomFunctionParameter("factor", "Int"), CustomFunctionParameter("factor2", "Int")),
-                executable = { _, receiver, args, typeArgs ->
-                    IntValue((receiver as StringValue).value.length * ((args[0] as IntValue).value + (args[1] as IntValue).value))
+                executable = { interpreter, receiver, args, typeArgs ->
+                    IntValue((receiver as StringValue).value.length * ((args[0] as IntValue).value + (args[1] as IntValue).value), interpreter.symbolTable())
                 },
                 position = SourcePosition("<Test>", 1, 1),
             ))

@@ -13,7 +13,7 @@ class CollectionInterface {
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("Iterable<T>"),
-            superInterfaces = listOf(IterableInterface.clazz),
+//            superInterfaces = listOf(IterableInterface.clazz),
             position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
 
@@ -25,7 +25,7 @@ class CollectionInterface {
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("Collection<T>"),
-            superInterfaces = listOf(collectionClazz),
+//            superInterfaces = listOf(collectionClazz),
             position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
     }

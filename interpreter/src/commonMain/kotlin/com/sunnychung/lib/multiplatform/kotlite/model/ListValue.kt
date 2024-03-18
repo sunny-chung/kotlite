@@ -12,7 +12,7 @@ class ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: 
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("Collection<T>"),
-            superInterfaces = listOf(CollectionInterface.collectionClazz),
+//            superInterfaces = listOf(CollectionInterface.collectionClazz),
             position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
         )
     }

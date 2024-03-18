@@ -25,9 +25,9 @@ class KZonedInstantValue(value: KZonedInstant, symbolTable: SymbolTable) : Deleg
                 ), interpreter.symbolTable())
             },
             superInterfaceTypeNames = listOf("KDateTimeFormattable"),
-            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
-            superClassInvocation = "KPointOfTime()",
-            superClass = KPointOfTimeValue.clazz,
+//            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
+            superClassInvocationString = "KPointOfTime()",
+//            superClass = KPointOfTimeValue.clazz,
             position = SourcePosition("KDateTime", 1, 1),
         )
     }

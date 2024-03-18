@@ -20,28 +20,78 @@ data object NullValue : RuntimeValue {
     override fun convertToString() = "null"
 }
 
-data class BooleanValue(val value: Boolean) : RuntimeValue {
-    override fun type() = BooleanType()
+class BooleanValue(val value: Boolean, symbolTable: SymbolTable) : PrimitiveValue(symbolTable) {
 
+    override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.BooleanType
     override fun convertToString() = value.toString()
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is BooleanValue) return false
+
+        if (value != other.value) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return value.hashCode()
+    }
 }
 
-data class LongValue(override val value: Long) : NumberValue<Long> {
-    override fun type() = LongType()
+class LongValue(override val value: Long, symbolTable: SymbolTable) : NumberValue<Long>, PrimitiveValue(symbolTable) {
 
+    override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.LongType
     override fun convertToString() = value.toString()
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is LongValue) return false
+
+        if (value != other.value) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return value.hashCode()
+    }
 }
 
-data class StringValue(override val value: String) : ComparableRuntimeValue<String> {
-    override fun type() = StringType()
+class StringValue(override val value: String, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<String>, PrimitiveValue(symbolTable) {
 
+    override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.StringType
     override fun convertToString() = value
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is StringValue) return false
+
+        if (value != other.value) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return value.hashCode()
+    }
 }
 
-data class CharValue(override val value: Char) : ComparableRuntimeValue<Char> {
-    override fun type() = CharType()
+class CharValue(override val value: Char, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<Char>, PrimitiveValue(symbolTable) {
 
+    override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.CharType
     override fun convertToString() = value.toString()
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CharValue) return false
+
+        if (value != other.value) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return value.hashCode()
+    }
 }
 
 class LambdaValue(val value: LambdaLiteralNode, private val resolvedType: FunctionType, val symbolRefs: SymbolTable, private val interpreter: Interpreter) : RuntimeValue {
@@ -52,4 +102,15 @@ class LambdaValue(val value: LambdaLiteralNode, private val resolvedType: Functi
     fun execute(arguments: Array<RuntimeValue?>): RuntimeValue {
         return interpreter.evalFunctionCall(arguments, emptyArray(), SourcePosition("TODO", 1, 1), value, emptyMap(), emptyList()).result
     }
+}
+
+internal fun findType(typeName: String, value1: RuntimeValue, value2: RuntimeValue): ObjectType {
+    val type = if (value1.type().name == typeName) {
+        value1.type()
+    } else if (value2.type().name == typeName) {
+        value2.type()
+    } else {
+        throw RuntimeException("Type $typeName not found")
+    }
+    return type as ObjectType
 }

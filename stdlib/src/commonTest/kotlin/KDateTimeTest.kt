@@ -1,9 +1,11 @@
 import com.sunnychung.lib.multiplatform.kdatetime.KInstant
 import com.sunnychung.lib.multiplatform.kdatetime.extension.hours
+import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.KDateTimeLibModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -98,5 +100,36 @@ class KDateTimeTest {
 //        assertEquals(86400 * 3, (symbolTable.findPropertyByDeclaredName("b") as LongValue).value)
         assertEquals(-9999, (symbolTable.findPropertyByDeclaredName("c") as LongValue).value)
         assertEquals(-7.hours().toMilliseconds(), (symbolTable.findPropertyByDeclaredName("d") as LongValue).value)
+    }
+
+    @Test
+    fun comparisonAndSorting() {
+        val env = ExecutionEnvironment().apply {
+            install(KDateTimeLibModule())
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val t1: KZonedInstant = KInstant(1710250706001) at KZoneOffset(-7, 0)
+            val t2: KInstant = KInstant(1710250716000)
+            val t3: KZonedInstant = KInstant(1610250706001) at KZoneOffset(8, 0)
+            val a = t1 < t2
+            val b = t2 < t3
+            val l = listOf(t1, t2, t3).sorted()
+            val c = l[2] >= l[1]
+            val d = l[1] > l[0]
+            
+            val d1 = 3.milliseconds()
+            val d2 = 4.milliseconds()
+            val e = d1 > d2
+            val f = d1 < d2
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
     }
 }

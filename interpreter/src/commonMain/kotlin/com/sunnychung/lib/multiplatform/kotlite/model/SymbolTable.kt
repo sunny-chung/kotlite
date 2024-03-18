@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.error.DuplicateIdentifierException
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.log
@@ -14,6 +15,7 @@ open class SymbolTable(
     val scopeType: ScopeType,
     var parentScope: SymbolTable?,
     val returnType: DataType? = null,
+    val isInitOnCreate: Boolean = true,
 ) {
     init {
         if (parentScope == this) {
@@ -45,6 +47,105 @@ open class SymbolTable(
     private val typeAlias = mutableMapOf<String, DataType>()
     private val typeAliasResolution = mutableMapOf<String, DataType>()
 
+    internal lateinit var rootScope: SymbolTable
+    lateinit var IntType: PrimitiveType
+        private set
+    lateinit var LongType: PrimitiveType
+        private set
+    lateinit var DoubleType: PrimitiveType
+        private set
+    lateinit var BooleanType: PrimitiveType
+        private set
+    lateinit var StringType: PrimitiveType
+        private set
+    lateinit var CharType: PrimitiveType
+        private set
+    lateinit var ByteType: PrimitiveType
+        private set
+    lateinit var NullableIntType: PrimitiveType
+        private set
+    lateinit var NullableLongType: PrimitiveType
+        private set
+    lateinit var NullableDoubleType: PrimitiveType
+        private set
+    lateinit var NullableBooleanType: PrimitiveType
+        private set
+    lateinit var NullableStringType: PrimitiveType
+        private set
+    lateinit var NullableCharType: PrimitiveType
+        private set
+    lateinit var NullableByteType: PrimitiveType
+        private set
+
+    protected fun initPrimitiveTypes() {
+        fun getPrimitiveClass(typeName: PrimitiveTypeName, isNullable: Boolean): ClassDefinition {
+            return rootScope.findClass("${typeName.name}${if (isNullable) "?" else ""}", isThisScopeOnly = true)?.first
+                ?: throw RuntimeException("Cannot find class ${typeName.name}")
+        }
+
+        fun getPrimitiveType(typeName: PrimitiveTypeName, isNullable: Boolean) : PrimitiveType {
+            val nonNullableClass = getPrimitiveClass(typeName, isNullable = false)
+            val nullableClass = getPrimitiveClass(typeName, isNullable = true)
+            return PrimitiveType(
+                typeName = typeName,
+                isNullable = isNullable,
+                nonNullableClass = nonNullableClass,
+                nullableClass = nullableClass,
+                superTypes = rootScope.resolveObjectType(
+                    clazz = if (isNullable) nullableClass else nonNullableClass,
+                    typeArguments = null,
+                    isNullable = isNullable,
+                ).superTypes
+            )
+        }
+
+        if (scopeLevel == 0) {
+            IntType = getPrimitiveType(PrimitiveTypeName.Int, isNullable = false)
+            LongType = getPrimitiveType(PrimitiveTypeName.Long, isNullable = false)
+            DoubleType = getPrimitiveType(PrimitiveTypeName.Double, isNullable = false)
+            BooleanType = getPrimitiveType(PrimitiveTypeName.Boolean, isNullable = false)
+            StringType = getPrimitiveType(PrimitiveTypeName.String, isNullable = false)
+            CharType = getPrimitiveType(PrimitiveTypeName.Char, isNullable = false)
+            ByteType = getPrimitiveType(PrimitiveTypeName.Byte, isNullable = false)
+            NullableIntType = getPrimitiveType(PrimitiveTypeName.Int, isNullable = true)
+            NullableLongType = getPrimitiveType(PrimitiveTypeName.Long, isNullable = true)
+            NullableDoubleType = getPrimitiveType(PrimitiveTypeName.Double, isNullable = true)
+            NullableBooleanType = getPrimitiveType(PrimitiveTypeName.Boolean, isNullable = true)
+            NullableStringType = getPrimitiveType(PrimitiveTypeName.String, isNullable = true)
+            NullableCharType = getPrimitiveType(PrimitiveTypeName.Char, isNullable = true)
+            NullableByteType = getPrimitiveType(PrimitiveTypeName.Byte, isNullable = true)
+        } else {
+            IntType = rootScope.IntType
+            LongType = rootScope.LongType
+            DoubleType = rootScope.DoubleType
+            BooleanType = rootScope.BooleanType
+            StringType = rootScope.StringType
+            CharType = rootScope.CharType
+            ByteType = rootScope.ByteType
+            NullableIntType = rootScope.NullableIntType
+            NullableLongType = rootScope.NullableLongType
+            NullableDoubleType = rootScope.NullableDoubleType
+            NullableBooleanType = rootScope.NullableBooleanType
+            NullableStringType = rootScope.NullableStringType
+            NullableCharType = rootScope.NullableCharType
+            NullableByteType = rootScope.NullableByteType
+        }
+    }
+
+    init {
+        if (parentScope != null || scopeLevel == 0) {
+            rootScope = findScope(0)
+
+            if (isInitOnCreate && scopeLevel > 1) { // user scopes
+                init()
+            }
+        }
+    }
+
+    open fun init() {
+        initPrimitiveTypes()
+    }
+
     fun declareProperty(position: SourcePosition, name: String, type: TypeNode, isMutable: Boolean) {
         if (hasProperty(name = name, true)) {
             throw DuplicateIdentifierException(position = position, name = name, classifier = IdentifierClassifier.Property)
@@ -62,8 +163,14 @@ open class SymbolTable(
             throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeAlias)
         }
         val typeUpperBound = typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-        typeAlias[name] = referenceSymbolTable.typeNodeToDataType(typeUpperBound)!!
-        typeAlias["$name?"] = referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true))!!
+        typeAlias[name] = SymbolTableTypeVisitCache(name).let { cache ->
+            referenceSymbolTable.typeNodeToDataType(typeUpperBound, visitCache = cache)!!
+                .also { result -> cache.postVisit(name, result) }
+        }
+        typeAlias["$name?"] = SymbolTableTypeVisitCache("$name?").let { cache ->
+            referenceSymbolTable.typeNodeToDataType(typeUpperBound.copy(isNullable = true), visitCache = cache)!!
+                .also { result -> cache.postVisit("$name?", result) }
+        }
     }
 
     fun declareTypeAliasResolution(position: SourcePosition, name: String, type: TypeNode, referenceSymbolTable: SymbolTable = this) {
@@ -92,19 +199,40 @@ open class SymbolTable(
         return typeAliasResolution[name] ?: parentScope?.findTypeAliasResolution(name)
     }
 
-    fun assertToDataType(type: TypeNode): DataType {
-        return typeNodeToDataType(type) ?: throw RuntimeException("Cannot resolve type ${type.descriptiveName()}")
+    fun assertToDataType(type: TypeNode, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): DataType {
+        if (type.name == "<Repeated>") {
+//            return assertToDataType(type.arguments!!.first(), visitCache)
+            return RepeatedType(type.arguments!!.first().name, type.arguments!!.first().name.endsWith("?"))
+        }
+
+        val isCacheCreator = visitCache.isEmpty
+
+        return typeNodeToDataType(type, visitCache)
+            ?.also {
+                if (isCacheCreator) {
+                    visitCache.throwErrorIfThereIsUnprocessedRepeatedType()
+                }
+            }
+            ?: throw RuntimeException("Cannot resolve type ${type.descriptiveName()}")
     }
 
-    fun typeNodeToDataType(type: TypeNode): DataType? {
+    fun typeNodeToDataType(type: TypeNode, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): DataType? {
         if (type.name == "*") {
             return StarType // TODO: additional validations of use of type *?
         }
 
+        if (visitCache.isVisited(type)) {
+            return RepeatedType(type.descriptiveName(), type.isNullable).also {
+                visitCache.postVisit(type, it)
+            }
+        }
+
         val alias = findTypeAlias("${type.name}${if (type.isNullable) "?" else ""}")
         if (alias != null) {
-            return findTypeAliasResolution("${type.name}${if (type.isNullable) "?" else ""}")
-                ?: TypeParameterType(type.name, type.isNullable, alias.first)
+            return (findTypeAliasResolution("${type.name}${if (type.isNullable) "?" else ""}")
+                ?: TypeParameterType(type.name, type.isNullable, alias.first)).also {
+                visitCache.postVisit(type, it)
+            }
         }
         if (type is FunctionTypeNode) {
             return FunctionType(
@@ -113,7 +241,7 @@ open class SymbolTable(
                 isNullable = type.isNullable,
             )
         }
-        type.toPrimitiveDataType()?.let { return it }
+        type.toPrimitiveDataType(rootScope)?.let { return it }
 
         val clazz = findClass(type.name)?.first ?: return null
         // validate type arguments
@@ -121,20 +249,26 @@ open class SymbolTable(
         if (clazz.typeParameters.size != (type.arguments?.size ?: 0)) {
             throw RuntimeException("Number of type arguments (${type.arguments?.size ?: 0}) does not match with number of type parameters ${clazz.typeParameters.size} of class ${clazz.fullQualifiedName}")
         }
+        val typeArgumentMap = clazz.typeParameters.withIndex().associate { it.value.name to type.arguments!![it.index] }
         type.arguments?.forEachIndexed { index, it ->
+            if (it.name == TypeNode.IGNORE.name) {
+                return@forEachIndexed
+            }
+
             // TODO refactor this repeated logic
-            val upperBound = clazz.typeParameters[index].typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-            if (!assertToDataType(upperBound).isAssignableFrom(assertToDataType(it))) {
+            val upperBound = clazz.typeParameters[index].typeUpperBound?.resolveGenericParameterTypeArguments(typeArgumentMap) ?: TypeNode(SourcePosition.NONE, "Any", null, true)
+            if (!assertToDataType(upperBound, visitCache.copy()).isAssignableFrom(assertToDataType(it, visitCache.copy()))) {
                 throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
             }
         }
 
-        val type = resolveObjectType(clazz, type.arguments, type.isNullable)
+        val inputType = type
+        val type = resolveObjectType(clazz, type.arguments, type.isNullable, visitCache = visitCache)
         if (type!!.clazz != clazz) {
             throw RuntimeException("genericResolver.genericResolutions is wrong")
         }
 
-        return type
+        return type.also { visitCache.postVisit(inputType, it) }
 //        return ObjectType(
 //            clazz = clazz,
 //            arguments = type.arguments?.map { assertToDataType(it) } ?: emptyList(),
@@ -142,8 +276,8 @@ open class SymbolTable(
 //        )
     }
 
-    fun resolveObjectType(clazz: ClassDefinition, typeArguments: List<TypeNode>?, isNullable: Boolean, upToIndex: Int = -1): ObjectType? {
-        val genericResolver = ClassMemberResolver(this, clazz, typeArguments ?: emptyList())
+    fun resolveObjectType(clazz: ClassDefinition, typeArguments: List<TypeNode>?, isNullable: Boolean, upToIndex: Int = -1, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): ObjectType {
+        val genericResolver = ClassMemberResolver.create(this, clazz, typeArguments ?: emptyList())!!
 //        var superType: ObjectType? = null
 //        genericResolver.genericResolutions.forEachIndexed { index, resolutions ->
 //            if (upToIndex >= 0 && index > upToIndex) return superType
@@ -160,17 +294,25 @@ open class SymbolTable(
 //        }
 //        return superType
 
+//        val visitedTypes = mutableSetOf<String>()
+
         fun resolve(type: ClassDefinition): ObjectType {
             val resolution = genericResolver.genericResolutionsByTypeName[type.name]!!
+            visitCache.preVisit(type)
+//            log.v { "resolve visit ${type.name}" }
+//            log.v { "resolve visited = ${visitedTypes}" }
             return ObjectType(
                 clazz = type,
                 arguments = type.typeParameters.map { tp ->
                     val argument = resolution[tp.name]!!
-                    assertToDataType(argument)
+                    assertToDataType(argument, visitCache)
                 },
                 isNullable = isNullable,
                 superTypes = (listOfNotNull(type.superClass) + type.superInterfaces)
                     .flatMap {
+                        if (visitCache.isVisited(it)) {
+                            return@flatMap emptyList()
+                        }
                         log.v { "resolve ${it.name} from ${type.name}" }
                         val superType = resolve(it)
                         log.v { "superType ${superType.descriptiveName} with super types ${superType.superTypes}" }
@@ -188,10 +330,18 @@ open class SymbolTable(
                         it.value.first()
                     }
                     .values.toList(),
-            )
+            ).also {
+                visitCache.postVisit(type, it)
+            }
         }
 
-        return resolve(clazz)
+        val isCacheCreator = visitCache.isEmpty
+
+        return resolve(clazz).also {
+            if (isCacheCreator) {
+                visitCache.throwErrorIfThereIsUnprocessedRepeatedType()
+            }
+        }
     }
 
     fun typeNodeToPropertyType(type: TypeNode, isMutable: Boolean): PropertyType? {
@@ -545,6 +695,21 @@ open class SymbolTable(
 
     fun listTypeAliasResolutionInThisScope(): Map<String, DataType> {
         return typeAliasResolution
+    }
+
+    fun findScope(level: Int): SymbolTable {
+        if (level > scopeLevel) {
+            throw RuntimeException("Cannot find scope with level $level")
+        }
+        var scope: SymbolTable? = this
+        while (scope != null && scope.scopeLevel != level) {
+            scope = scope.parentScope
+        }
+        if (scope != null) {
+            return scope
+        } else {
+            throw RuntimeException("Cannot find scope with level $level")
+        }
     }
 
     fun mergeFrom(position: SourcePosition, other: SymbolTable) { // this is only involved in runtime

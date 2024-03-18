@@ -8,13 +8,27 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyType
-import com.sunnychung.lib.multiplatform.kotlite.model.SemanticAnalyzerSymbolTable
+import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
+import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.typeUpperBoundOrAny
 
-class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefinition, private val typeArguments: List<TypeNode>?) {
+class ClassMemberResolver private constructor(symbolTable: SymbolTable, private val clazz: ClassDefinition, private val typeArguments: List<TypeNode>?) {
+    companion object {
+        /**
+         * If `createOnlyIfClassExists` == true, returns a resolver only if `clazz` can be found in `symbolTable`; null otherwise.
+         * If `createOnlyIfClassExists` == false, always returns a resolver.
+         */
+        fun create(symbolTable: SymbolTable, clazz: ClassDefinition, typeArguments: List<TypeNode>?, createOnlyIfClassExists: Boolean = false): ClassMemberResolver? {
+            if (createOnlyIfClassExists && symbolTable.findClass(clazz.fullQualifiedName) == null) {
+                return null
+            }
+            return ClassMemberResolver(symbolTable, clazz, typeArguments)
+        }
+    }
+
     // [n-1] = clazz; [n-2] = superclass of clazz; etc.
     @Deprecated("use genericResolutionsByTypeName") val genericResolutions: List<Pair<ClassDefinition, Map<String, TypeNode>>>
     @Deprecated("use genericUpperBoundsByTypeName") val genericUpperBounds: List<Pair<ClassDefinition, Map<String, TypeNode>>>
@@ -30,6 +44,14 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
         val genericResolutionsByTypeName: MutableMap<String, Map<String, TypeNode>> = mutableMapOf()
         val genericUpperBoundsByTypeName: MutableMap<String, Map<String, TypeNode>> = mutableMapOf()
         val typeDefinitions: MutableMap<String, ClassDefinition> = mutableMapOf()
+
+        val symbolTable = SymbolTable(
+            scopeLevel = symbolTable.scopeLevel + 1,
+            scopeName = "ClassMemberResolver",
+            scopeType = ScopeType.ExtraWrap,
+            parentScope = symbolTable,
+            isInitOnCreate = false, // don't init. primitive types would fail to be resolved when initializing root symbol table
+        )
 
         fun checkAndPutResolution(typeDef: ClassDefinition, resolvedTypeArguments: Map<String, TypeNode>, destination: MutableMap<String, Map<String, TypeNode>>) {
             if (destination.containsKey(typeDef.name)) {
@@ -86,8 +108,10 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
             }
         }
 
-        if (typeArguments == null && symbolTable is SemanticAnalyzerSymbolTable) {
-            symbolTable.declareTempTypeAlias(clazz.typeParameters.map { it.name to it.typeUpperBoundOrAny() })
+        if (typeArguments == null) {
+            clazz.typeParameters.map { it.name to it.typeUpperBoundOrAny() }.forEach {
+                symbolTable.declareTypeAlias(SourcePosition.NONE, it.first, it.second)
+            }
         }
 
         val firstTypeArgumentMap = clazz.typeParameters.mapIndexed { index, tp ->
@@ -118,10 +142,6 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
             clazz = superClass
         }
         genericResolutions.reverse()
-
-        if (typeArguments == null && symbolTable is SemanticAnalyzerSymbolTable) {
-            symbolTable.popTempTypeAlias()
-        }
 
         this.genericResolutions = genericResolutions.toList()
         this.genericResolutionsByTypeName = genericResolutionsByTypeName.toMap()
@@ -197,6 +217,10 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
 //        )
 //    }
 
+    fun resolveTypes(function: FunctionDeclarationNode, encloseTypeName: String): FunctionAndTypes {
+        return Pair(function, encloseTypeName).resolveTypes()!!
+    }
+
     private fun Pair<FunctionDeclarationNode, String>?.resolveTypes(): FunctionAndTypes? {
         val (function, encloseTypeName) = this ?: return null
 
@@ -249,6 +273,17 @@ class ClassMemberResolver(symbolTable: SymbolTable, private val clazz: ClassDefi
                 enclosingTypeName = it.value.second,
             )
         }
+    }
+
+    fun findMemberFunctionsAndExactTypesByDeclaredName(memberName: String, clazz: ClassDefinition = this.clazz): Map<String, FunctionAndTypes> {
+        val lookup: Map<String, Pair<FunctionDeclarationNode, String>> = clazz.findMemberFunctionsWithEnclosingTypeNameByDeclaredName(memberName)
+        return lookup.mapValues {
+            it.value.resolveTypes()!!
+        }
+    }
+
+    fun containsSuperType(typeName: String): Boolean {
+        return genericResolutionsByTypeName.containsKey(typeName)
     }
 }
 

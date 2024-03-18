@@ -275,4 +275,147 @@ class ListTest {
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals("7\n9\n2\n1\n5\n", console.toString())
     }
+
+    @Test
+    fun binarySearchElement() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val l = mutableListOf(1, 4, 6, 7, 11)
+            l += 16
+            val a = l.binarySearch(1)
+            val b = l.binarySearch(4)
+            val c = l.binarySearch(6)
+            val d = l.binarySearch(7)
+            val e = l.binarySearch(11)
+            val f = l.binarySearch(16)
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(0, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(4, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+    }
+
+    @Test
+    fun maxMaxByMinMinByOrNull() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val value: Int)
+            val l = listOf(V("A", 7), V("B", 29), V("C", 6), V("D", 14), V("E", 27))
+            val l2 = l.map { it.value }
+            val a = l2.max()
+            val b = l2.min()
+            val c = l.maxBy { it.value }.name
+            val d = l.minByOrNull { it.value }?.name
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(29, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals("B", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals("C", (symbolTable.findPropertyByDeclaredName("d") as StringValue).value)
+    }
+
+    @Test
+    fun sorted() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val list1 = listOf(1, 7, 4, -2, 9)
+            val list = list1.sorted()
+            for (e in list) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("-2\n1\n4\n7\n9\n", console.toString())
+    }
+
+    @Test
+    fun sort() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val list = mutableListOf(1, 7, 4)
+            list += -2
+            list += 9
+            list.sort()
+            for (e in list) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("-2\n1\n4\n7\n9\n", console.toString())
+    }
+
+    @Test
+    fun sortedByCustomClass() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int)
+            val list1 = listOf(V("A", 7), V("B", 29), V("C", 6), V("D", 14), V("E", 27))
+            val list = list1.sortedBy { it.num }
+            for (e in list) {
+                println(e.name)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("C\nA\nD\nE\nB\n", console.toString())
+    }
+
+    @Test
+    fun sortedListOfCustomClass() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int) : Comparable<V> {
+                override operator fun compareTo(other: V): Int {
+                    return num.compareTo(other.num)
+                }
+            }
+            val list1 = listOf(V("A", 7), V("B", 29), V("C", 6), V("D", 14), V("E", 27))
+            val list = list1.sorted()
+            for (e in list) {
+                println(e.name)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("C\nA\nD\nE\nB\n", console.toString())
+    }
 }

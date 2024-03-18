@@ -19,7 +19,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableType
 import com.sunnychung.lib.multiplatform.kotlite.model.CatchNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CharNode
-import com.sunnychung.lib.multiplatform.kotlite.model.CharType
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
@@ -35,7 +34,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
-import com.sunnychung.lib.multiplatform.kotlite.model.DoubleType
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
@@ -54,20 +52,20 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
-import com.sunnychung.lib.multiplatform.kotlite.model.IntType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntegerNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LabelNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
-import com.sunnychung.lib.multiplatform.kotlite.model.LongType
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveTypeName
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyOwnerInfo
+import com.sunnychung.lib.multiplatform.kotlite.model.RepeatedType
 import com.sunnychung.lib.multiplatform.kotlite.model.ReturnNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType.Companion.isLoop
@@ -78,9 +76,9 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SemanticDummyRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
-import com.sunnychung.lib.multiplatform.kotlite.model.StringType
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolReferenceSet
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
+import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTableTypeVisitCache
 import com.sunnychung.lib.multiplatform.kotlite.model.ThrowNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeNode
@@ -101,6 +99,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassSemanticAnalyzer
+import com.sunnychung.lib.multiplatform.kotlite.util.FunctionAndTypes
 
 class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: ExecutionEnvironment) {
     val builtinSymbolTable = SemanticAnalyzerSymbolTable(scopeLevel = 0, scopeName = ":builtin", scopeType = ScopeType.Script, parentScope = null)
@@ -150,6 +149,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "timesAssign",
         "divAssign",
         "remAssign",
+        "compareTo",
     )
 
     fun ExtensionProperty.generateTransformedName() {
@@ -157,9 +157,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     init {
+        val classes = mutableListOf<ClassDefinition>()
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
             builtinSymbolTable.declareClass(SourcePosition.BUILTIN, it)
+            it.attachToSemanticAnalyzer(this, isReady = false) // make "ObjectType" resolvable
+            classes += it
         }
+        builtinSymbolTable.init()
 
         executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
             it.generateTransformedName()
@@ -169,6 +173,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         libFunctions.forEach {
             it.visit()
         }
+        classes.forEach { // do this again after registering functions to make the post-resolution logic works
+            it.attachToSemanticAnalyzer(this, isReady = true)
+        }
+
+        symbolTable.init()
 
         currentScope = symbolTable
     }
@@ -203,8 +212,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         } catch (e: SemanticException) {
             throw e
         } catch (e: RuntimeException) {
-            e.printStackTrace()
-            throw SemanticException(position, e.message ?: e.toString())
+//            e.printStackTrace()
+            throw SemanticException(position, e.message ?: e.toString(), e)
         }
     }
 
@@ -250,6 +259,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "*=" -> "timesAssign"
         "/=" -> "divAssign"
         "%=" -> "remAssign"
+        "<", ">", "<=", ">=" -> "compareTo"
         else -> null
     }
 
@@ -401,7 +411,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
         node1.visit(modifier = modifier)
         node2.visit(modifier = modifier)
-        val functionName = if (operator in setOf("+", "-", "*", "/", "%")) {
+        val functionName = if (operator in setOf("+", "-", "*", "/", "%", "<", ">", "<=", ">=")) {
             operatorToFunctionName(operator)
         } else null
         val node1Type = node1.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
@@ -580,7 +590,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 return
             }
 
-            if (operator == "+=" && subjectType is StringType) {
+            if (operator == "+=" && subjectType isPrimitiveTypeOf PrimitiveTypeName.String) {
                 return // string can concat anything
             }
             if (!subjectType.isNonNullNumberType()) {
@@ -589,10 +599,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             if (!valueType.isNonNullNumberType()) {
                 throw TypeMismatchException(position, "non-null number type", valueType.nameWithNullable)
             }
-            if (subjectType is DoubleType) {
+            if (subjectType isPrimitiveTypeOf PrimitiveTypeName.Double) {
                 return // ok
             }
-            if (subjectType is LongType && valueType.isNonNullIntegralType()) {
+            if (subjectType isPrimitiveTypeOf PrimitiveTypeName.Long && valueType.isNonNullIntegralType()) {
                 return // ok
             }
         }
@@ -757,6 +767,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             if (name !in supportedOperatorFunctionNames) {
                 throw SemanticException(position, "`$name` is not a supported operator function name. Supported names are: ${supportedOperatorFunctionNames.joinToString(", ")}")
             }
+            when (name) {
+                "compareTo" -> {
+                    if (valueParameters.size != 1) {
+                        throw SemanticException(position, "Operator function `$name` must have exactly one value parameter")
+                    }
+                    if (returnType != typeRegistry["Int"]) {
+                        throw SemanticException(position, "Operator function `$name` must return Int")
+                    }
+                }
+            }
         }
         if (FunctionModifier.infix in modifiers) {
             if (isVararg) {
@@ -825,11 +845,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
             val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException(position, "Class `${receiver.descriptiveName()}` not found")
             if (clazz.superClass != null) {
-                val superClassTypeResolutions = ClassMemberResolver(currentScope, clazz, typeNode.arguments).genericResolutionsByTypeName[clazz.fullQualifiedName]!!
+                val superClassTypeResolutions = ClassMemberResolver.create(currentScope, clazz, typeNode.arguments)!!
+                    .genericResolutionsByTypeName[clazz.fullQualifiedName]!!
                 val superClassType = TypeNode(
                     SourcePosition.NONE,
-                    clazz.superClass.name,
-                    clazz.superClass.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
+                    clazz.superClass!!.name,
+                    clazz.superClass!!.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
                     isNullable = false,
                 )
                 currentScope.declareProperty(position = position, name = "super", type = superClassType, isMutable = false)
@@ -1042,10 +1063,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
                 val resolutions = lookupReceiverTypes.flatMap {
                     currentScope.findMatchingCallables(
-                        currentScope,
-                        function.member.name,
-                        it,
-                        arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
+                        currentSymbolTable = currentScope,
+                        originalName = function.member.name,
+                        receiverType = it,
+                        arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
                         modifierFilter = modifierFilter!!,
                     )
                 }
@@ -1272,7 +1293,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         (function as NavigationNode).subject.type(ResolveTypeModifier(isSkipGenerics = isSkipGenerics))
 
                     var type = argumentType.toDataType() as? ObjectType
-                    val resolver = type?.let { ClassMemberResolver(currentScope, it.clazz, it.arguments.map { it.toTypeNode() }) }
+                    val resolver = type?.let { ClassMemberResolver.create(currentScope, it.clazz, it.arguments.map { it.toTypeNode() }) }
 //                    while (type != null && type.name != parameterType.name) {
 ////                        type = (type as? ObjectType)?.clazz?.superClass?.let {
 ////                            val typeResolutions = resolver!!.genericResolutions[it.index].second
@@ -1664,9 +1685,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 orderedInitializersAndPropertyDeclarations = emptyList(),
                 declarations = emptyList(),
                 rawMemberProperties = emptyList(),
-                memberFunctions = emptyMap(),
+                memberFunctions = emptyList(),
                 primaryConstructor = null,
-            )
+            ).also { it.attachToSemanticAnalyzer(this@SemanticAnalyzer) }
         )
 
         // Declare companion object
@@ -1693,30 +1714,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                             executable = { interpreter, receiver, args, typeArgs ->
                                 throw NotImplementedError()
                             }
-                        )).also {
-                            it.transformedRefName = it.toSignature(currentScope)
-                            executionEnvironment.registerGeneratedMapping(
-                                type = ExecutionEnvironment.SymbolType.Function,
-                                receiverType = it.receiver?.descriptiveName(),
-                                name = it.name,
-                                transformedName = it.transformedRefName!!,
-                            )
-
-                            it.valueParameters.forEach { p ->
-                                p.generateTransformedName()
-                                executionEnvironment.registerGeneratedMapping(
-                                    type = ExecutionEnvironment.SymbolType.ValueParameter,
-                                    receiverType = it.receiver?.descriptiveName(),
-                                    parentName = it.name,
-                                    name = p.name,
-                                    transformedName = p.transformedRefName!!,
-                                )
-                            }
-                        })
+                        )))
                     }
-                }.associateBy { it.toSignature(currentScope) },
+                },
                 primaryConstructor = null,
-            )
+            ).also { it.attachToSemanticAnalyzer(this@SemanticAnalyzer) }
         )
 
         if (ClassModifier.enum in modifiers) {
@@ -1780,12 +1782,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
             clazz
         }
-        val superClassFunctions = (listOfNotNull(superClass) + superInterfaces)
-            .map { it.getAllMemberFunctions() }
-            .fold(mutableMapOf<String, FunctionDeclarationNode>()) { acc, map ->
-                acc.putAll(map)
-                acc
-            }
         val superClassProperties = superClass?.getAllMemberProperties()
 
         fun checkForOverriddenProperties(property: PropertyDeclarationNode) {
@@ -1821,7 +1817,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 popScope()
 
                 val type = superClassInvocation.type()
-                ClassMemberResolver(superClassScope, superClass!!, type.arguments ?: emptyList()).forEachSuperClassesFromRoot { index, clazz, typeResolutions, typeUpperBounds ->
+                val superClassMemberResolver = ClassMemberResolver.create(superClassScope, superClass!!, type.arguments ?: emptyList())
+                superClassMemberResolver?.forEachSuperClassesFromRoot { index, clazz, typeResolutions, typeUpperBounds ->
                     pushScope(clazz.fullQualifiedName, ScopeType.Class)
                     ++numExtraSuperScopes
                     clazz.currentScope?.let { currentScope.mergeDeclarationsFrom(position, it, typeResolutions) }
@@ -1897,25 +1894,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         ).also { checkForOverriddenProperties(it) }
                     } ?: emptyList() /* intentionally exclude non-constructor property declarations, in order to allow inferring types */,
                 memberFunctions = declarations
-                    .filterIsInstance<FunctionDeclarationNode>()
-                    .associateBy {
-                        it.toSignature(currentScope).also { signature ->
-                            log.v { "Class `$name` member function `${it.name}` signature = `$signature`" }
-                            val superClassFunction = superClassFunctions?.get(signature)
-                            if (superClassFunction != null) {
-                                if (FunctionModifier.open !in superClassFunction.modifiers) {
-                                    throw SemanticException(it.position, "A function cannot override another function not marked as `open`")
-                                }
-                                if (FunctionModifier.override !in it.modifiers) {
-                                    throw SemanticException(it.position, "A function cannot override anything without the modifier `override`")
-                                }
-                            } else {
-                                if (FunctionModifier.override in it.modifiers) {
-                                    throw SemanticException(it.position, "Function `${it.name}` overrides nothing")
-                                }
-                            }
-                        }
-                    },
+                    .filterIsInstance<FunctionDeclarationNode>(),
                 orderedInitializersAndPropertyDeclarations = declarations
                     .filter { it is ClassInstanceInitializerNode || it is PropertyDeclarationNode },
                 declarations = declarations,
@@ -1925,6 +1904,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 superInterfaces = superInterfaces,
             )
             declarationScope.declareClass(position, classDefinition)
+            classDefinition.attachToSemanticAnalyzer(this@SemanticAnalyzer)
+
+            // define an empty class for ClassMemberResolver's use to resolve functions from superclasses and
+            // interfaces, not to resolve members from current class
+            val emptyClassDefinition = classDefinition.copyAsEmptyClass()
+            val classMemberResolver = ClassMemberResolver.create(currentScope, emptyClassDefinition, null)
 
             // typeParameters.map { it.typeUpperBound ?: TypeNode("Any", null, true) }.emptyToNull()
             val pseudoTypeArguments = typeParameters.map { TypeNode(it.position, it.name, null, false) }.emptyToNull()
@@ -1969,21 +1954,28 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             declarations.filterIsInstance<FunctionDeclarationNode>()
                 .forEach {
 //                    it.transformedRefName = "${it.name}/${++functionDefIndex}"
-                    it.transformedRefName = it.toSignature(currentScope)
+//                    if (it.transformedRefName == null) {
+//                        it.transformedRefName = it.toSignature(currentScope)
+//                    }
                     currentScope.declareFunctionOwner(it.name, it, "this/$fullQualifiedClassName")
                 }
 
             declarations.filterIsInstance<FunctionDeclarationNode>()
-                .forEach {
-                    it.visit(modifier = modifier, isClassMemberFunction = true)
+                .forEach { thisFunc ->
+                    // TODO these are duplicating with ClassSemanticAnalyzer and ClassDefinition. Refactor these
+                    val superClassFunctions = classMemberResolver?.findMemberFunctionsAndExactTypesByDeclaredName(thisFunc.name) ?: emptyMap()
+                    val identicalSuperClassFunctions: Collection<FunctionAndTypes> = superClassFunctions.filter {
+                        it.value.resolvedValueParameterTypes.withIndex().all {
+                            it.value.type == thisFunc.valueParameters[it.index].type
+                        }
+                    }.values
+
+                    thisFunc.visit(modifier = modifier, isClassMemberFunction = true)
 
                     // check type after type inference
-                    it.toSignature(currentScope).also { signature ->
-                        val superClassFunction = superClassFunctions?.get(signature)
-                        if (superClassFunction != null) {
-                            if (currentScope.assertToDataType(it.returnType) != currentScope.assertToDataType(superClassFunction.returnType)) {
-                                throw SemanticException(it.position, "Return type of function `${it.name}` `${it.returnType.descriptiveName()}` is not the same as the overridden one `${superClassFunction.returnType.descriptiveName()}`")
-                            }
+                    identicalSuperClassFunctions.forEach { superFunc ->
+                        if (currentScope.assertToDataType(thisFunc.returnType) != currentScope.assertToDataType(superFunc.resolvedReturnType)) {
+                            throw SemanticException(thisFunc.position, "Return type of function `${thisFunc.name}` `${thisFunc.returnType.descriptiveName()}` is not the same as the overridden one `${superFunc.resolvedReturnType.descriptiveName()}`")
                         }
                     }
                 }
@@ -2411,28 +2403,34 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is ValueParameterDeclarationNode -> TODO()
     }
 
-    fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode =
-        type
-            ?: call?.type(modifier = modifier)?.also { type = it }
+    fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        return type
             ?: when (operator) {
                 "+", "-", "*", "/", "%" -> {
+                    call?.type(modifier = modifier)?.also {
+                        type = it
+                        return it
+                    }
+
                     val t1 = node1.type(modifier = modifier).toDataType()
                     val t2 = node2.type(modifier = modifier).toDataType()
-                    if (t1 is StringType || t1 is NothingType || t2 is StringType || t2 is NothingType) {
+                    if (t1 isPrimitiveTypeOf PrimitiveTypeName.String || t1 is NothingType || t2 isPrimitiveTypeOf PrimitiveTypeName.String || t2 is NothingType) {
                         typeRegistry["String"]!!
-                    } else if ((t1 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
-                        || (t2 == DoubleType(isNullable = false) && t2.isNonNullNumberType())
+                    } else if ((t1.`is`(PrimitiveTypeName.Double, isNullable = false) && t2.isNonNullNumberType())
+                        || (t2.`is`(PrimitiveTypeName.Double, isNullable = false) && t2.isNonNullNumberType())
                     ) {
                         typeRegistry["Double"]!!
-                    } else if ((t1 == LongType(isNullable = false) && t2.isNonNullIntegralType())
-                        || (t2 == LongType(isNullable = false) && t2.isNonNullIntegralType())
+                    } else if ((t1.`is`(PrimitiveTypeName.Long, isNullable = false) && t2.isNonNullIntegralType())
+                        || (t2.`is`(PrimitiveTypeName.Long, isNullable = false) && t2.isNonNullIntegralType())
                     ) {
                         typeRegistry["Long"]!!
-                    } else if (t1 == IntType(isNullable = false) && t2 == IntType(isNullable = false)) {
+                    } else if (t1.`is`(PrimitiveTypeName.Int, isNullable = false)
+                        && t2.`is`(PrimitiveTypeName.Int, isNullable = false)
+                    ) {
                         typeRegistry["Int"]!!
-                    } else if (operator == "+" && t1 is CharType && t2 is IntType) {
+                    } else if (operator == "+" && t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Int) {
                         typeRegistry["Char"]!!
-                    } else if (operator == "-" && t1 is CharType && t2 is CharType) {
+                    } else if (operator == "-" && t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Char) {
                         typeRegistry["Int"]!!
                     } else {
                         throw SemanticException(
@@ -2448,6 +2446,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }.also {
                 type = it
             }
+    }
 
     fun UnaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
         type?.let { return it }
@@ -2497,15 +2496,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 //            return subjectArguments[typeParameterIndex]
         }
 
-        val resolver = ClassMemberResolver(currentScope, clazz, subjectType.arguments)
+        val resolver = ClassMemberResolver.create(currentScope, clazz, subjectType.arguments)
         if (lookupType == IdentifierClassifier.Property) {
             /**
              * As of Kotlin 1.9, resolution order is Companion Property > Enum Entry
              */
-            resolver.findMemberPropertyCustomAccessorWithType(memberName)?.let {
+            resolver?.findMemberPropertyCustomAccessorWithType(memberName)?.let {
                 return it.second.also { type = it }
             }
-            resolver.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
+            resolver?.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
                 return it.second.also { type = it }
             }
             if (clazz.fullQualifiedName.endsWith(".Companion") && !subjectType.isNullable) {
@@ -2528,7 +2527,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 return it.typeNode!!.resolveMemberType()
             }
         } else {
-            resolver.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
+            resolver?.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
                 return FunctionTypeNode(
                     position = it.function.position,
                     parameterTypes = emptyList(),
@@ -2614,7 +2613,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         return if (type1.name == "Nothing") {
             type2
         } else {
-            superTypeOf(type1, type2)
+            superTypeOf(type1.copy(isNullable = false), type2)
         }.also { type = it }
     }
 
@@ -2650,7 +2649,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             return types + type.superTypes
         }
 
-        fun superTypeOf(type1: TypeNode, type2: TypeNode): TypeNode {
+        fun superTypeOf(type1: TypeNode, type2: TypeNode, visitCache: SymbolTableTypeVisitCache): TypeNode {
             if (type1 == type2) return type1
             if (type1.name == type2.name && (type1.isNullable || type2.isNullable)) {
                 return type1.toNullable()
@@ -2669,6 +2668,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     type1
                 }
             }
+            if (visitCache.isVisited(type1) || visitCache.isVisited(type2)) {
+                return TypeNode(SourcePosition.NONE, "*", null, false)
+            }
+            visitCache.preVisit(type1)
+            visitCache.preVisit(type2)
 
             val typeTree1 = superTypeTree(currentScope.assertToDataType(type1))
             val typeTree2 = superTypeTree(currentScope.assertToDataType(type2))
@@ -2685,7 +2689,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                                     position = SourcePosition.NONE,
                                     name = superType1.name,
                                     arguments = superType1.arguments.mapIndexed { index, it ->
-                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode())
+                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode(), visitCache)
                                     }.emptyToNull(),
                                     isNullable = isNullable,
                                 )
@@ -2696,7 +2700,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                                 return FunctionTypeNode(
                                     position = SourcePosition.NONE,
                                     parameterTypes = superType1.arguments.mapIndexed { index, it ->
-                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode())
+                                        superTypeOf(it.toTypeNode(), superType2.arguments[index].toTypeNode(), visitCache)
                                     },
                                     returnType = superTypeOf(superType1.returnType.toTypeNode(), superType2.returnType.toTypeNode()),
                                     isNullable = isNullable,
@@ -2714,9 +2718,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             return typeRegistry["Any${if (type1.isNullable || type2.isNullable) "?" else ""}"]!!
         }
 
+        val visitCache = SymbolTableTypeVisitCache()
         var type = types.first()
         types.drop(1)
-            .forEach { type = superTypeOf(type, it) }
+            .forEach { type = superTypeOf(type, it, visitCache) }
         return type
     }
 }

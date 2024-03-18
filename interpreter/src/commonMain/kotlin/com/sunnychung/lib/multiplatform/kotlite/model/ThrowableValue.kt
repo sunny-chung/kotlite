@@ -44,7 +44,7 @@ open class ThrowableValue(
                 receiver = "Throwable",
                 type = "String?",
                 getter = { interpreter, receiver, typeArgs ->
-                    (receiver as ThrowableValue).message?.let { StringValue(it) } ?: NullValue
+                    (receiver as ThrowableValue).message?.let { StringValue(it, interpreter.symbolTable()) } ?: NullValue
                 },
             ),
             ExtensionProperty(
@@ -63,7 +63,7 @@ open class ThrowableValue(
                 type = "String",
                 getter = { interpreter, receiver, typeArgs ->
                     val value = receiver as ThrowableValue
-                    StringValue(value.externalExceptionClassName ?: value.fullClassName)
+                    StringValue(value.externalExceptionClassName ?: value.fullClassName, interpreter.symbolTable())
                 },
             ),
         )
@@ -76,7 +76,7 @@ open class ThrowableValue(
                 returnType = "String",
                 parameterTypes = emptyList(),
                 executable = { interpreter, receiver, args, typeArgs ->
-                    (receiver as ThrowableValue).stacktrace.joinToString("\n").let { StringValue(it) }
+                    (receiver as ThrowableValue).stacktrace.joinToString("\n").let { StringValue(it, interpreter.symbolTable()) }
                 },
             ),
         )
@@ -117,8 +117,8 @@ open class ExceptionValue(
                 val cause = callArguments[1] as? ThrowableValue
                 ExceptionValue(interpreter.symbolTable(), message, cause, interpreter.callStack.getStacktrace())
             },
-            superClassInvocation = "Throwable(message, cause)",
-            superClass = ThrowableValue.clazz,
+            superClassInvocationString = "Throwable(message, cause)",
+//            superClass = ThrowableValue.clazz,
             modifiers = setOf(ClassModifier.open),
         )
     }
@@ -152,8 +152,8 @@ class NullPointerExceptionValue(
                 val cause = callArguments[1] as? ThrowableValue
                 NullPointerExceptionValue(interpreter.symbolTable(), message, cause, interpreter.callStack.getStacktrace())
             },
-            superClassInvocation = "Exception(message, cause)",
-            superClass = ExceptionValue.clazz,
+            superClassInvocationString = "Exception(message, cause)",
+//            superClass = ExceptionValue.clazz,
         )
     }
 }
@@ -186,8 +186,8 @@ class TypeCastExceptionValue(
                 val targetType = (callArguments[1] as StringValue).value
                 TypeCastExceptionValue(interpreter.symbolTable(), valueType, targetType, interpreter.callStack.getStacktrace())
             },
-            superClassInvocation = "Exception()",
-            superClass = ExceptionValue.clazz,
+            superClassInvocationString = "Exception()",
+//            superClass = ExceptionValue.clazz,
         )
     }
 }

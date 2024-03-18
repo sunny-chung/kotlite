@@ -35,7 +35,11 @@ class SemanticAnalyzerSymbolTable(
         // e.g. `<T, L : List<T>>`
         tempTypeAlias += alias
         typeAliasAndUpperBounds.forEach {
-            alias[it.first] = assertToDataType(it.second)
+            alias[it.first] = SymbolTableTypeVisitCache(it.first).let { cache ->
+                assertToDataType(it.second, visitCache = cache).also { result ->
+                    cache.postVisit(it.first, result)
+                }
+            }
         }
     }
 
@@ -135,14 +139,22 @@ class SemanticAnalyzerSymbolTable(
 //                    scope = this
 //                )
 //            }.let { thisScopeCandidates += it }
-            ClassMemberResolver(this, receiverClass, null).findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName).map { lookup ->
+            ClassMemberResolver.create(this, receiverClass, null, createOnlyIfClassExists = true)?.findMemberFunctionsAndTypeUpperBoundsByDeclaredName(originalName)?.mapNotNull { lookup ->
                 val it = lookup.value.function
+                val receiverType = when (receiverType) {
+                    is TypeParameterType -> receiverType.upperBound
+                    is ObjectType -> receiverType
+                    else -> null
+                }
+                if (receiverType !is ObjectType) return@mapNotNull null
+
                 // TODO this is slow, O(n^2). optimize this
-                ClassMemberResolver(
-                    this,
-                    receiverClass,
-                    (receiverType as ObjectType).arguments.map { it.toTypeNode() }
-                ).findMemberFunctionWithIndexByTransformedNameLinearSearch(it.transformedRefName!!).let { lookup2 ->
+                ClassMemberResolver.create(
+                    symbolTable = this,
+                    clazz = receiverClass,
+                    typeArguments = (receiverType as ObjectType).arguments.map { it.toTypeNode() },
+                    createOnlyIfClassExists = true
+                )?.findMemberFunctionWithIndexByTransformedNameLinearSearch(it.transformedRefName!!)?.let { lookup2 ->
                     FindCallableResult(
                         transformedName = it.transformedRefName!!,
                         originalName = it.name,
@@ -158,7 +170,7 @@ class SemanticAnalyzerSymbolTable(
                         scope = this
                     )
                 }
-            }.let { thisScopeCandidates += it }
+            }?.let { thisScopeCandidates += it }
 
             findExtensionFunctionsIncludingSuperClasses(receiverType!!, originalName, isThisScopeOnly = true).map {
                 FindCallableResult(
@@ -261,9 +273,12 @@ class SemanticAnalyzerSymbolTable(
     }
 
     fun assertToDataTypeWithTypeParameters(type: TypeNode, typeParameters: List<TypeParameterNode>): DataType {
-        declareTempTypeAlias(typeParameters.map {
-            it.name to it.typeUpperBoundOrAny()
-        })
+        declareTempTypeAlias(typeParameters.flatMap {
+            listOf(
+                it.name to it.typeUpperBoundOrAny(),
+                "${it.name}?" to it.typeUpperBoundOrAny().copy(isNullable = true),
+            )
+        }.distinctBy { it.first })
         try {
             return assertToDataType(type)
         } finally {

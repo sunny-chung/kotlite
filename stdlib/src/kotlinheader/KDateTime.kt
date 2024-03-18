@@ -17,6 +17,7 @@ fun KPointOfTime.toEpochMilliseconds(): Long
 operator fun KPointOfTime.minus(other: KPointOfTime): KDuration
 fun KPointOfTime.toIso8601String(): String
 fun KPointOfTime.toIso8601StringWithMilliseconds(): String
+operator fun KPointOfTime.compareTo(other: KPointOfTime): Int
 
 operator fun KZonedInstant.plus(duration: KDuration): KZonedInstant
 operator fun KZonedInstant.minus(duration: KDuration): KZonedInstant
@@ -39,6 +40,7 @@ fun KZoneOffset.Companion.fromMilliseconds(millis: Long): KZoneOffset
 fun KZoneOffset.Companion.local(): KZoneOffset
 
 operator fun KDuration.plus(other: KDuration): KDuration
+operator fun KDuration.compareTo(other: KDuration): Int
 //fun KDuration.Companion.of(value: Int, unit: KFixedTimeUnit): KDuration
 //fun KDuration.Companion.of(value: Long, unit: KFixedTimeUnit): KDuration
 val KDuration.Companion.ZERO: KDuration

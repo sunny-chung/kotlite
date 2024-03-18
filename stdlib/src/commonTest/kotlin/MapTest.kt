@@ -399,4 +399,27 @@ class MapTest {
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck1") as BooleanValue).value)
         assertEquals(listOf("101", "102", "103"), console.split("\n").sorted().filter { it.isNotEmpty() })
     }
+
+    @Test
+    fun maxOfOrNull() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val m1 = mapOf(
+                "a" to 3,
+                "abc" to 1590,
+                "d" to -26,
+                "ef" to 891,
+            )
+            val m2 = mapOf<String, Int>()
+            
+            val a = m1.maxOfOrNull { it.value }
+            val b = m2.maxOfOrNull { it.value }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(1590, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
+    }
 }

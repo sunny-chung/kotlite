@@ -13,6 +13,8 @@ import com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZonedInstantVa
 
 class KDateTimeLibModule : AbstractKDateTimeLibModule() {
     override val classes: List<ProvidedClassDefinition> = listOf(
+        KDateTimeFormattableInterface.interfaze,
+        KPointOfTimeValue.clazz,
         KDateTimeFormatValue.clazz,
         KDateValue.clazz,
         KDurationValue.clazz,
@@ -20,7 +22,5 @@ class KDateTimeLibModule : AbstractKDateTimeLibModule() {
         KZonedDateTimeValue.clazz,
         KZonedInstantValue.clazz,
         KZoneOffsetValue.clazz,
-        KDateTimeFormattableInterface.interfaze,
-        KPointOfTimeValue.clazz,
     )
 }

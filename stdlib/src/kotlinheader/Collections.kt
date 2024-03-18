@@ -18,10 +18,21 @@ fun <T> MutableCollection<T>.addAll(elements: Iterable<T>): Boolean
 fun <T> Iterable<T>.all(predicate: (T) -> Boolean): Boolean
 fun <T> Iterable<T>.any(predicate: (T) -> Boolean): Boolean
 fun <T> List<T>.asReversed(): List<T>
+fun <T : Comparable<T>> List<T?>.binarySearch(
+    element: T?,
+    fromIndex: Int = 0,
+    toIndex: Int = size,
+): Int
 fun <T> List<T>.binarySearch(
     fromIndex: Int = 0,
     toIndex: Int = size,
     comparison: (T) -> Int
+): Int
+fun <T, K : Comparable<K>> List<T>.binarySearchBy(
+    key: K?,
+    fromIndex: Int = 0,
+    toIndex: Int = size,
+    selector: (T) -> K?
 ): Int
 //fun <T> Iterable<T>.chunked(size: Int): List<List<T>>
 fun <T, R> Iterable<T>.chunked(size: Int, transform: (List<T>) -> R): List<R>
@@ -112,6 +123,18 @@ fun <T, R> Iterable<T>.map(transform: (T) -> R): List<R>
 fun <T, R> Iterable<T>.mapIndexed(transform: (index: Int, T) -> R): List<R>
 fun <T, R : Any> Iterable<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
 fun <T, R : Any> Iterable<T>.mapNotNull(transform: (T) -> R?): List<R>
+fun <T : Comparable<T>> Iterable<T>.max(): T
+fun <T, R : Comparable<R>> Iterable<T>.maxBy(selector: (T) -> R): T
+fun <T, R : Comparable<R>> Iterable<T>.maxByOrNull(selector: (T) -> R): T?
+fun <T, R : Comparable<R>> Iterable<T>.maxOf(selector: (T) -> R): R
+fun <T, R : Comparable<R>> Iterable<T>.maxOfOrNull(selector: (T) -> R): R?
+fun <T : Comparable<T>> Iterable<T>.maxOrNull(): T?
+fun <T : Comparable<T>> Iterable<T>.min(): T
+fun <T, R : Comparable<R>> Iterable<T>.minBy(selector: (T) -> R): T
+fun <T, R : Comparable<R>> Iterable<T>.minByOrNull(selector: (T) -> R): T?
+fun <T, R : Comparable<R>> Iterable<T>.minOf(selector: (T) -> R): R
+fun <T, R : Comparable<R>> Iterable<T>.minOfOrNull(selector: (T) -> R): R?
+fun <T : Comparable<T>> Iterable<T>.minOrNull(): T?
 operator fun <T> Iterable<T>.minus(element: T): List<T>
 operator fun <T> Iterable<T>.minus(elements: Iterable<T>): List<T>
 operator fun <T> MutableCollection<T>.minusAssign(element: T)
@@ -152,6 +175,14 @@ fun <T> Iterable<T>.single(predicate: (T) -> Boolean): T
 fun <T> Iterable<T>.singleOrNull(): T?
 fun <T> Iterable<T>.singleOrNull(predicate: (T) -> Boolean): T?
 //fun <T> List<T>.slice(indices: Iterable<Int>): List<T>
+fun <T : Comparable<T>> MutableList<T>.sort()
+fun <T, R : Comparable<R>> MutableList<T>.sortBy(selector: (T) -> R?)
+fun <T, R : Comparable<R>> MutableList<T>.sortByDescending(selector: (T) -> R?)
+fun <T : Comparable<T>> MutableList<T>.sortDescending()
+fun <T : Comparable<T>> Iterable<T>.sorted(): List<T>
+fun <T, R : Comparable<R>> Iterable<T>.sortedBy(selector: (T) -> R?): List<T>
+fun <T, R : Comparable<R>> Iterable<T>.sortedByDescending(selector: (T) -> R?): List<T>
+fun <T : Comparable<T>> Iterable<T>.sortedDescending(): List<T>
 fun <T> List<T>.subList(fromIndex: Int, toIndex: Int): List<T>
 //fun <T> List<Int>.sum(): Int
 //fun <T> List<Long>.sum(): Long
@@ -268,6 +299,14 @@ fun <K, V, R> Map<K, V>.map(transform: (MapEntry<K, V>) -> R): List<R>
 fun <K, V, R> Map<K, V>.mapKeys(transform: (MapEntry<K, V>) -> R): Map<R, V>
 fun <K, V, R : Any> Map<K, V>.mapNotNull(transform: (MapEntry<K, V>) -> R?): List<R>
 fun <K, V, R> Map<K, V>.mapValues(transform: (MapEntry<K, V>) -> R): Map<K, R>
+fun <K, V, R : Comparable<R>> Map<K, V>.maxBy(selector: (MapEntry<K, V>) -> R): MapEntry<K, V>
+fun <K, V, R : Comparable<R>> Map<K, V>.maxByOrNull(selector: (MapEntry<K, V>) -> R): MapEntry<K, V>?
+fun <K, V, R : Comparable<R>> Map<K, V>.maxOf(selector: (MapEntry<K, V>) -> R): R
+fun <K, V, R : Comparable<R>> Map<K, V>.maxOfOrNull(selector: (MapEntry<K, V>) -> R): R?
+fun <K, V, R : Comparable<R>> Map<K, V>.minBy(selector: (MapEntry<K, V>) -> R): MapEntry<K, V>
+fun <K, V, R : Comparable<R>> Map<K, V>.minByOrNull(selector: (MapEntry<K, V>) -> R): MapEntry<K, V>?
+fun <K, V, R : Comparable<R>> Map<K, V>.minOf(selector: (MapEntry<K, V>) -> R): R
+fun <K, V, R : Comparable<R>> Map<K, V>.minOfOrNull(selector: (MapEntry<K, V>) -> R): R?
 operator fun <K, V> Map<K, V>.minus(key: K): Map<K, V>
 operator fun <K, V> Map<K, V>.minus(keys: List<K>): Map<K, V>
 operator fun <K, V> MutableMap<K, V>.minusAssign(key: K)

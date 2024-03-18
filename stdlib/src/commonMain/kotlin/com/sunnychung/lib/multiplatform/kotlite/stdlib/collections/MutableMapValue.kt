@@ -21,8 +21,8 @@ class MutableMapValue(value: Map<RuntimeValue, RuntimeValue>, keyType: DataType,
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-            superClassInvocation = "Map<K, V>()",
-            superClass = MapValue.clazz,
+            superClassInvocationString = "Map<K, V>()",
+//            superClass = MapValue.clazz,
             position = SourcePosition("Collections", 1, 1),
         )
     }

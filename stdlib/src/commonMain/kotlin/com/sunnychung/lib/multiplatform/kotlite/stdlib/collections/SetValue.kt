@@ -22,7 +22,7 @@ class SetValue(value: Set<RuntimeValue>, typeArgument: DataType, symbolTable: Sy
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
             superInterfaceTypeNames = listOf("Collection<T>"),
-            superInterfaces = listOf(CollectionInterface.collectionClazz),
+//            superInterfaces = listOf(CollectionInterface.collectionClazz),
             position = SourcePosition("Collections", 1, 1),
         )
     }

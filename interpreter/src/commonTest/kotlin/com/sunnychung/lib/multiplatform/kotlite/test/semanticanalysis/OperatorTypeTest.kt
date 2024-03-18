@@ -110,4 +110,40 @@ class OperatorTypeTest {
             a += B()
         """.trimIndent())
     }
+
+    @Test
+    fun compareToShouldContainSingleParameter1() {
+        assertSemanticFail("""
+            class A {
+                operator fun compareTo(): Int = 1
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun compareToShouldContainSingleParameter2() {
+        assertSemanticFail("""
+            class A {
+                operator fun compareTo(a: A, b: A): Int = 1
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun compareToShouldReturnInt1() {
+        assertSemanticFail("""
+            class A {
+                operator fun compareTo(a: A): Double = 1.2
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun compareToShouldReturnInt2() {
+        assertSemanticFail("""
+            class A {
+                operator fun compareTo(a: A): Int? = 1
+            }
+        """.trimIndent())
+    }
 }
