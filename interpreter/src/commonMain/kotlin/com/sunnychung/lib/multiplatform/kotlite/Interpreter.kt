@@ -1468,15 +1468,22 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             }
             entries.forEach { entry ->
                 if (entry.conditions.isEmpty() || entry.conditions.any {
-                        if (it.testType == WhenConditionNode.TestType.TypeTest) {
-                            val type = symbolTable().assertToDataType(it.expression as TypeNode)
-                            return@any type.isAssignableFrom(subjectValue.type())
-                        }
-                        val evalExprResult = it.expression.eval()
-                        if (subject == null) {
-                            return@any (evalExprResult as BooleanValue).value
-                        } else {
-                            return@any evalExprResult == subjectValue
+                        when (it.testType) {
+                            WhenConditionNode.TestType.TypeTest -> {
+                                val type = symbolTable().assertToDataType(it.expression as TypeNode)
+                                type.isAssignableFrom(subjectValue.type())
+                            }
+                            WhenConditionNode.TestType.RangeTest -> {
+                                (it.call!!.eval(replaceArguments = mapOf(0 to subjectValue)) as BooleanValue).value
+                            }
+                            else -> {
+                                val evalExprResult = it.expression.eval()
+                                if (subject == null) {
+                                    (evalExprResult as BooleanValue).value
+                                } else {
+                                    evalExprResult == subjectValue
+                                }
+                            }
                         }
                     }
                 ) {

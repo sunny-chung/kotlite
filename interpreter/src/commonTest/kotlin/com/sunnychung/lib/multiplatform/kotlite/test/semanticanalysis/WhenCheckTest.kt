@@ -101,4 +101,34 @@ class WhenCheckTest {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun ambiguousSubjectTypeForRangeTests() {
+        assertSemanticFail("""
+            fun <T: Comparable<T>> makeList(vararg values: T): List<T> = values
+            class MyRange<T : Comparable<T>>(val from: T, val to: T) {
+                operator fun contains(a: T): Boolean {
+                    return from <= a && a <= to
+                }
+            }
+            fun f(x: Any): Int = when (x) {
+                in makeList(1, 4, 5, 8) -> 21
+                in MyRange(from = 4.5, to = 7.2) -> 22
+                in makeList(2, 16) -> 23
+                in MyRange(14, 50) -> 24
+                else -> 25
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun invalidInExpression() {
+        assertSemanticFail("""
+            val x: Int = 10
+            when (x) {
+                in 3 -> 1
+                else -> 2
+            }
+        """.trimIndent())
+    }
 }

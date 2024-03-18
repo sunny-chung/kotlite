@@ -266,4 +266,55 @@ class WhenTest {
         assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
         assertEquals("D", (symbolTable.findPropertyByDeclaredName("c") as ClassInstance).clazz!!.fullQualifiedName)
     }
+
+    @Test
+    fun rangeTest() {
+        val interpreter = interpreter("""
+            fun <T: Comparable<T>> makeList(vararg values: T): List<T> = values
+            operator fun List<Int>.contains(x: Int): Boolean {
+                for (it in this) {
+                    if (it == x) {
+                        return true
+                    }
+                }
+                return false
+            }
+            class MyRange<T : Comparable<T>>(val from: T, val to: T) {
+                operator fun contains(a: T): Boolean {
+                    return from <= a && a <= to
+                }
+            }
+            fun f(x: Int): Int {
+                var x = x - 1
+                return when (++x) { // test for the "subject" is only evaluated once
+                    in makeList(1, 4, 5, 8) -> 21
+                    in MyRange(from = 5, to = 7) -> 22
+                    in makeList(2, 16) -> 23
+                    in MyRange(14, 50) -> 24
+                    66 -> 25
+                    else -> 26
+                }
+            }
+            val a: Int = f(8)
+            val b: Int = f(5)
+            val c: Int = f(7)
+            val d: Int = f(3)
+            val e: Int = f(16)
+            val f: Int = f(29)
+            val g: Int = f(51)
+            val h: Int = f(66)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(8, symbolTable.propertyValues.size)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(21, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(22, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(26, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(23, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+        assertEquals(24, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(26, (symbolTable.findPropertyByDeclaredName("g") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("h") as IntValue).value)
+    }
 }

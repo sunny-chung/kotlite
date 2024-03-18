@@ -2104,6 +2104,30 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         this.type.visit(modifier = modifier)
     }
 
+    fun assertInOperatorCall(modifier: Modifier = Modifier(), position: SourcePosition, subject: ASTNode, iterable: ASTNode): FunctionCallNode {
+        val type1 = subject.type().toDataType()
+        val type2 = iterable.type().toDataType()
+
+        if (currentScope.findMatchingCallables(
+                currentSymbolTable = currentScope,
+                originalName = "contains",
+                receiverType = type2,
+                arguments = listOf(FunctionCallArgumentInfo(name = null, type = type1)),
+                modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+            ).isNotEmpty()
+        ) {
+            return FunctionCallNode(
+                function = NavigationNode(position, iterable, ".", ClassMemberReferenceNode(position, "contains")),
+                arguments = listOf(FunctionCallArgumentNode(position = subject.position, index = 0, value = subject)),
+                declaredTypeArguments = emptyList(),
+                position = position,
+                modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
+            ).also { it.visit(modifier = modifier) }
+        } else {
+            throw SemanticException(position, "Operator function `contains` for type ${type2.descriptiveName} not found.")
+        }
+    }
+
     fun InfixFunctionCallNode.visit(modifier: Modifier = Modifier()) {
         this.node1.visit(modifier = modifier)
         this.node2.visit(modifier = modifier)
@@ -2111,27 +2135,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         when (functionName) {
             in setOf("to", "is", "!is") -> {}
             in setOf("in", "!in") -> {
-                val type1 = node1.type().toDataType()
-                val type2 = node2.type().toDataType()
-
-                if (currentScope.findMatchingCallables(
-                        currentSymbolTable = currentScope,
-                        originalName = "contains",
-                        receiverType = type2,
-                        arguments = listOf(FunctionCallArgumentInfo(name = null, type = type1)),
-                        modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
-                    ).isNotEmpty()
-                ) {
-                    call = FunctionCallNode(
-                        function = NavigationNode(position, node2, ".", ClassMemberReferenceNode(position, "contains")),
-                        arguments = listOf(FunctionCallArgumentNode(position = node1.position, index = 0, value = node1)),
-                        declaredTypeArguments = emptyList(),
-                        position = position,
-                        modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
-                    ).also { it.visit(modifier = modifier) }
-                } else {
-                    throw SemanticException(position, "Operator function `contains` for type ${type2.descriptiveName} not found.")
-                }
+                call = assertInOperatorCall(modifier = modifier, position = position, subject = node1, iterable = node2)
             }
             else -> {
                 val type1 = node1.type().toDataType()
@@ -2240,9 +2244,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         }
     }
 
-    fun WhenConditionNode.visit(modifier: Modifier = Modifier(), isWithoutSubject: Boolean) {
+    fun WhenConditionNode.visit(modifier: Modifier = Modifier(), subject: ASTNode?) {
         expression.visit(modifier = modifier)
         val expressionType = expression.type()
+        val isWithoutSubject = subject == null
 
         if (isWithoutSubject) {
             if (testType != WhenConditionNode.TestType.Regular) {
@@ -2257,14 +2262,23 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             throw SemanticException(expression.position, "`is` must be followed by a type")
         }
 
+        if (testType == WhenConditionNode.TestType.RangeTest) {
+            call = assertInOperatorCall(
+                modifier = modifier,
+                position = position,
+                subject = subject!!,
+                iterable = expression
+            )
+        }
+
         type = expressionType
     }
 
-    fun WhenEntryNode.visit(modifier: Modifier = Modifier(), isWithoutSubject: Boolean) {
-        if (isWithoutSubject && conditions.size > 1) {
+    fun WhenEntryNode.visit(modifier: Modifier = Modifier(), subject: ASTNode?) {
+        if (subject == null && conditions.size > 1) {
             throw SemanticException(position, "Use '||' instead of commas in when-condition for 'when' without argument")
         }
-        conditions.forEach { it.visit(modifier = modifier, isWithoutSubject = isWithoutSubject) }
+        conditions.forEach { it.visit(modifier = modifier, subject = subject) }
 
         body.visit(modifier = modifier)
         bodyType = body.type()
@@ -2291,7 +2305,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             throw SemanticException(entries[elseIndex].position, "`else` branch must be the last branch of a `when` expression")
         }
 
-        entries.forEach { it.visit(modifier = modifier, isWithoutSubject = subject == null) }
+        entries.forEach { it.visit(modifier = modifier, subject = subject) }
 
         // there is at least 1 else branch, so there is at least 1 branch
         type = superTypeOf(*entries.map { it.bodyType }.toTypedArray())
@@ -2428,7 +2442,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is WhenConditionNode -> TODO()
             is WhenEntryNode -> TODO()
             is WhenNode -> type!!
-            is WhenSubjectNode -> TODO()
+            is WhenSubjectNode -> this.type(modifier = modifier)
             is LabelNode -> TODO()
             is EnumEntryNode -> TODO()
             is ForNode -> typeRegistry["Unit"]!!
@@ -2663,6 +2677,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         }
         this.type = type
         return type
+    }
+
+    fun WhenSubjectNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
+        type?.let { return it }
+        return value.type(modifier = modifier).also { type = it }
     }
 
     fun superTypeOf(vararg types: TypeNode?): TypeNode {

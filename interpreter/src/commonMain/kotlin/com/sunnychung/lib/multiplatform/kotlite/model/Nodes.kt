@@ -715,6 +715,8 @@ data class WhenConditionNode(
     val expression: ASTNode,
     @ModifyByAnalyzer var type: TypeNode? = null,
 ) : ASTNode {
+    @ModifyByAnalyzer var call: FunctionCallNode? = null
+
     enum class TestType {
         RangeTest, TypeTest, Regular
     }

@@ -393,7 +393,7 @@ class OperatorFunctionTest {
     @Test
     fun inOperators() {
         val interpreter = interpreter("""
-            class MyRange<T: Comparable<T>>(val low: T, val high: T) {
+            class MyRange<T : Comparable<T>>(val low: T, val high: T) {
                 operator fun contains(a: T): Boolean {
                     return low <= a && a <= high
                 }

@@ -894,16 +894,33 @@ class Parser(protected val lexer: Lexer) {
      *     expression
      *     | rangeTest
      *     | typeTest
+     *
+     * rangeTest:
+     *     inOperator {NL} expression
+     *
+     * typeTest:
+     *     isOperator {NL} type
+     *
      */
     fun whenCondition(): WhenConditionNode {
         // TODO: rangeTest
         if (currentToken.`is`(TokenType.Identifier, "is")) {
             val t = eat(TokenType.Identifier, "is")
+            repeatedNL()
             val type = type()
             return WhenConditionNode(
                 position = t.position,
                 testType = WhenConditionNode.TestType.TypeTest,
                 expression = type,
+            )
+        } else if (currentToken.`is`(TokenType.Identifier, "in")) {
+            val t = eat(TokenType.Identifier, "in")
+            repeatedNL()
+            val expr = expression()
+            return WhenConditionNode(
+                position = t.position,
+                testType = WhenConditionNode.TestType.RangeTest,
+                expression = expr,
             )
         } else {
             val t = currentToken
