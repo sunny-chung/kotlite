@@ -44,11 +44,32 @@ class PairTest {
     }
 
     @Test
-    fun pairOfNestedGenericClasses() {
+    fun pairOfNestedGenericClasses1() {
         val interpreter = interpreter("""
             class Value<T>(val value: T)
             class A(val a: Int, val b: String)
             class B(val x: Value<Double>)
+            val p = Value(Value(A(123, "abc"))) to Value(B(Value(45.6)))
+            val a: Int = p.first.value.value.a
+            val b: String = p.first.value.value.b
+            val c = p.second.value.x.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        compareNumber(45.6, symbolTable.findPropertyByDeclaredName("c") as DoubleValue)
+    }
+
+    @Test
+    fun pairOfNestedGenericClasses2() {
+        val interpreter = interpreter("""
+            open class Base
+            class Value<T>(val value: T) : Base()
+            class A(val a: Int, val b: String) : Base()
+            class B(val x: Value<Double>) : Base()
             val p = Value(Value(A(123, "abc"))) to Value(B(Value(45.6)))
             val a: Int = p.first.value.value.a
             val b: String = p.first.value.value.b
@@ -83,5 +104,23 @@ class PairTest {
         assertEquals(67, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
         assertEquals("abc", (symbolTable.findPropertyByDeclaredName("d") as StringValue).value)
         assertEquals(89, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+    }
+
+    @Test
+    fun pairOfSameClass() {
+        val interpreter = interpreter("""
+            open class Base
+            class Value<T>(val value: T) : Base()
+            class B(val x: Int) : Base()
+            val p = Pair(Value(B(123)), Value(B(234)))
+            val a: Int = p.first.value.x
+            val b: Int = p.second.value.x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(234, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
 }

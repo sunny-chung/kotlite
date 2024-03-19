@@ -19,6 +19,7 @@ class ExecutionEnvironment(
     private val specialFunctionLookupCache: MutableMap<MappingKey, FunctionDeclarationNode> = mutableMapOf()
 
     init {
+        registerInitClass(AnyClass.clazz)
         registerInitClass(ComparableInterface.interfaze)
 
         registerClass(PairValue.clazz)
@@ -94,7 +95,7 @@ class ExecutionEnvironment(
                     it.copyCompanionClassDefinition(),
                 )
             } +
-                listOf("Int", "Double", "Long", "Boolean", "String", "Char", "Byte", "Unit", "Nothing", "Function", "Class", "Any").flatMap { className ->
+                listOf("Int", "Double", "Long", "Boolean", "String", "Char", "Byte", "Unit", "Nothing", "Function", "Class").flatMap { className ->
                     if (!classRegistrationFilter(className)) return@flatMap emptyList()
                     fun createTypeParameters(typeName: String): List<TypeParameterNode> {
                         return when (typeName) {

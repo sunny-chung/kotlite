@@ -296,8 +296,8 @@ open class SymbolTable(
 
 //        val visitedTypes = mutableSetOf<String>()
 
-        fun resolve(type: ClassDefinition): ObjectType {
-            val resolution = genericResolver.genericResolutionsByTypeName[type.name]!!
+        fun resolve(type: ClassDefinition, visitCache: SymbolTableTypeVisitCache): ObjectType {
+            val resolution = genericResolver.genericResolutionsByTypeName[type.fullQualifiedName]!!
             visitCache.preVisit(type)
 //            log.v { "resolve visit ${type.name}" }
 //            log.v { "resolve visited = ${visitedTypes}" }
@@ -305,7 +305,7 @@ open class SymbolTable(
                 clazz = type,
                 arguments = type.typeParameters.map { tp ->
                     val argument = resolution[tp.name]!!
-                    assertToDataType(argument, visitCache)
+                    assertToDataType(argument, visitCache.copy())
                 },
                 isNullable = isNullable,
                 superTypes = (listOfNotNull(type.superClass) + type.superInterfaces)
@@ -313,8 +313,8 @@ open class SymbolTable(
                         if (visitCache.isVisited(it)) {
                             return@flatMap emptyList()
                         }
-                        log.v { "resolve ${it.name} from ${type.name}" }
-                        val superType = resolve(it)
+                        log.v { "resolve ${it.fullQualifiedName} from ${type.fullQualifiedName}" }
+                        val superType = resolve(it, visitCache.copy())
                         log.v { "superType ${superType.descriptiveName} with super types ${superType.superTypes}" }
                         listOf(superType) + superType.superTypes
                      }
@@ -337,7 +337,7 @@ open class SymbolTable(
 
         val isCacheCreator = visitCache.isEmpty
 
-        return resolve(clazz).also {
+        return resolve(clazz, visitCache).also {
             if (isCacheCreator) {
                 visitCache.throwErrorIfThereIsUnprocessedRepeatedType()
             }

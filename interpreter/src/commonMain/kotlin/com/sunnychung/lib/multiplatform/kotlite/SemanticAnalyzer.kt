@@ -8,6 +8,7 @@ import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
+import com.sunnychung.lib.multiplatform.kotlite.extension.unboxRepeatedType
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
@@ -852,10 +853,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException(position, "Class `${receiver.descriptiveName()}` not found")
             if (clazz.superClass != null) {
                 val superClassTypeResolutions = ClassMemberResolver.create(currentScope, clazz, typeNode.arguments)!!
-                    .genericResolutionsByTypeName[clazz.fullQualifiedName]!!
+                    .let {
+                        it.genericResolutionsByTypeName[clazz.fullQualifiedName]!!
+                    }
                 val superClassType = TypeNode(
                     SourcePosition.NONE,
-                    clazz.superClass!!.name,
+                    clazz.superClass!!.fullQualifiedName,
                     clazz.superClass!!.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
                     isNullable = false,
                 )
@@ -1252,9 +1255,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     if (t is ObjectType && t.name != tpUpperBounds[resolvedArgumentTypeName]!!.name) {
                         t = t.findSuperType(tpUpperBounds[resolvedArgumentTypeName]!!.name)
                     }
+                    if (t == null) {
+                        return
+                    }
                     (tpUpperBounds[resolvedArgumentTypeName] as? ObjectType)?.arguments?.forEachIndexed { i, it ->
                         if (tpUpperBounds.containsKey(it.name)) {
-                            val resolvedArgumentType = (t as ObjectType).arguments[i].toTypeNode()
+                            val argument = (t as ObjectType).arguments[i]
+                            if (argument is RepeatedType && argument.actualType == null) {
+                                return@forEachIndexed
+                            }
+                            val resolvedArgumentType = argument.toTypeNode()
                             tpResolutions[it.name] = superTypeOf(tpResolutions[it.name] ?: resolvedArgumentType, resolvedArgumentType)
                         }
                     }
@@ -1377,7 +1387,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         }.toMap().toMutableMap()
         tpUpperBounds.forEach {
             if (!it.value.isConvertibleFrom(tpResolutions[it.key]!!.toDataType())) {
-                throw SemanticException(tpResolutions[it.key]!!.position, "Provided value arguments are out of bound of type parameters")
+                throw SemanticException(position, "Provided value arguments type ${tpResolutions[it.key]!!.toDataType().descriptiveName} are out of upper bound ${it.value.descriptiveName} of type parameter ${it.key}")
             }
         }
 
@@ -2591,7 +2601,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
         }
 
-        throw SemanticException(position, "Could not find member `$memberName` for type ${clazz.name}")
+        throw SemanticException(position, "Could not find member `$memberName` for type ${clazz.fullQualifiedName}")
     }
 
     fun FunctionCallArgumentNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
@@ -2686,6 +2696,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
     fun superTypeOf(vararg types: TypeNode?): TypeNode {
         val types = types.filterNotNull()
+            .map { it.unboxRepeatedType() }
         if (types.isEmpty()) throw IllegalArgumentException("superTypeOf input cannot be empty")
 
         fun superTypeTree(type: DataType): List<DataType> {
@@ -2731,7 +2742,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             run {
                 typeTree1.forEach { superType1 ->
                     typeTree2.forEach { superType2 ->
-                        if (superType1.name == superType2.name) {
+                        if (superType1.name == superType2.name && superType1.name != "Any") {
                             if (superType1 is ObjectType && superType2 is ObjectType) {
                                 if (superType1.arguments.size != superType2.arguments.size) {
                                     return@run

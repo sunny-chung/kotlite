@@ -59,3 +59,9 @@ fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypePa
     }
     return resolve(this)
 }
+
+fun TypeNode.unboxRepeatedType(): TypeNode = if (name == "<Repeated>") {
+    arguments!!.first()
+} else {
+    this
+}

@@ -806,7 +806,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             callArguments.forEachIndexed { index, it ->
                 val parameterNode = parameters[index].parameter
                 if (it == null && parameterNode.defaultValue == null) {
-                    throw RuntimeException("Missing parameter `${parameterNode.name} in constructor call of ${clazz.name}`")
+                    throw RuntimeException("Missing parameter `${parameterNode.name} in constructor call of ${clazz.fullQualifiedName}`")
                 }
             }
 
@@ -868,9 +868,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 //            }
 
         // variable "this" is available after primary constructor
-        symbolTable.declareProperty(callPosition, "this", TypeNode(callPosition, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty(callPosition, "this", TypeNode(callPosition, instance.clazz!!.fullQualifiedName, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this", instance)
-        symbolTable.declareProperty(callPosition, "this/${instance.clazz!!.fullQualifiedName}", TypeNode(callPosition, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty(callPosition, "this/${instance.clazz!!.fullQualifiedName}", TypeNode(callPosition, instance.clazz!!.fullQualifiedName, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
 //        symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this", "this")
         symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this/${instance.clazz!!.fullQualifiedName}", "this")
@@ -884,7 +884,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             symbolTable.declareProperty(
                 callPosition,
                 "super",
-                TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
+                TypeNode(SourcePosition.NONE, instance.clazz!!.fullQualifiedName, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
                 false
             )
             symbolTable.assign("super", instance)
@@ -961,9 +961,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             if (subject.type() is ObjectType) {
                 var clazz: ClassDefinition? = (subject.type() as ObjectType).clazz
                 while (clazz != null) {
-                    declaredThisClassNames += clazz.name
-                    symbolTable.declareProperty(position, "this/${clazz.name}", subject.type().toTypeNode(), false)
-                    symbolTable.assign("this/${clazz.name}", subject)
+                    declaredThisClassNames += clazz.fullQualifiedName
+                    symbolTable.declareProperty(position, "this/${clazz.fullQualifiedName}", subject.type().toTypeNode(), false)
+                    symbolTable.assign("this/${clazz.fullQualifiedName}", subject)
                     clazz = clazz.superClass
                 }
             } else {

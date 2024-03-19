@@ -42,10 +42,38 @@ open class ClassDefinition(
 
     val primaryConstructor: ClassPrimaryConstructorNode?,
     val superInterfaceTypes: List<TypeNode> = emptyList(),
-    val superClassInvocation: FunctionCallNode? = null,
+    superClassInvocation: FunctionCallNode? = null,
     var superClass: ClassDefinition? = null,
     var superInterfaces: List<ClassDefinition> = emptyList(),
 ) {
+    val superClassInvocation: FunctionCallNode?
+    init {
+        if (
+            superClass == null
+            && superClassInvocation == null
+            && !isInterface
+            && fullQualifiedName != "Any"
+            && !fullQualifiedName.endsWith("?")
+        ) {
+            superClass = AnyClass.clazz
+            this.superClassInvocation = FunctionCallNode(
+                function = TypeNode(
+                    position = SourcePosition.BUILTIN,
+                    name = "Any",
+                    arguments = null,
+                    isNullable = false,
+                ),
+                arguments = emptyList(),
+                declaredTypeArguments = emptyList(),
+                position = SourcePosition.BUILTIN,
+                isSuperclassConstruction = true,
+                callableType = CallableType.Constructor,
+                functionRefName = "Any",
+            )
+        } else {
+            this.superClassInvocation = superClassInvocation
+        }
+    }
 
     var enumValues: Map<String, ClassInstance> = emptyMap()
 
@@ -81,8 +109,8 @@ open class ClassDefinition(
         }
 
         superInterfaces.forEach { def ->
-            superInterfaceTypes.singleOrNull { it.name == def.name }
-                ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaceTypes on the super interface type ${def.name}")
+            superInterfaceTypes.singleOrNull { it.name in setOf(def.name, def.fullQualifiedName) }
+                ?: throw SemanticException(SourcePosition.NONE, "Missing or repeated superInterfaceTypes on the super interface type ${def.fullQualifiedName}")
         }
 
         superInterfaceTypes.forEach { type ->
@@ -91,12 +119,12 @@ open class ClassDefinition(
         }
 
         if (superClass != null && superClass!!.isInterface) {
-            throw SemanticException(SourcePosition.NONE, "superClass ${superClass!!.name} is not a class but an interface")
+            throw SemanticException(SourcePosition.NONE, "superClass ${superClass!!.fullQualifiedName} is not a class but an interface")
         }
 
         superInterfaces.forEach { def ->
             if (!def.isInterface) {
-                throw SemanticException(SourcePosition.NONE, "superInterfaces ${def.name} is not an interface but a class")
+                throw SemanticException(SourcePosition.NONE, "superInterfaces ${def.fullQualifiedName} is not an interface but a class")
             }
         }
     }
@@ -330,7 +358,7 @@ open class ClassDefinition(
         val type = (currentScope!!.typeNodeToPropertyType(
             it.type,
             it.isMutable
-        ) ?: if (it.type.name == name) {
+        ) ?: if (it.type.name in setOf(name, fullQualifiedName)) {
             val type = currentScope!!.resolveObjectType(this, this.typeParameters.map { TypeNode(it.position, it.name, null, false) }, it.type.isNullable, upToIndex = index - 1)
             PropertyType(type!!, it.isMutable)
 //            PropertyType(ObjectType(this, it.type.arguments?.map { currentScope!!.typeNodeToDataType(it)!! } ?: emptyList(), it.type.isNullable, superType), it.isMutable)
