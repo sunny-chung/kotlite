@@ -275,7 +275,7 @@ class WhenTest {
     fun rangeTest() {
         val interpreter = interpreter("""
             fun <T: Comparable<T>> makeList(vararg values: T): List<T> = values
-            operator fun List<Int>.contains(x: Int): Boolean {
+            operator fun <T: Comparable<T>> List<T>.contains(x: T): Boolean {
                 for (it in this) {
                     if (it == x) {
                         return true

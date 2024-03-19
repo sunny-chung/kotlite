@@ -1986,7 +1986,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     }
                 }
 
-            ClassSemanticAnalyzer(symbolTable = symbolTable, position = position, classDefinition = classDefinition)
+            ClassSemanticAnalyzer(symbolTable = currentScope, position = position, classDefinition = classDefinition)
                 .check()
 
             // enum
@@ -1999,7 +1999,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 knownEnumNames += it.name
             }
             classDefinition.enumValues = enumEntries.associate {
-                it.name to ClassInstance(symbolTable, classDefinition.fullQualifiedName, classDefinition, emptyList())
+                it.name to ClassInstance(currentScope, classDefinition.fullQualifiedName, classDefinition, emptyList())
             }
 
             (1..numExtraSuperScopes).forEach { popScope() }
@@ -2334,9 +2334,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             returnType = null,
         )
 
-        symbolTable.declareProperty(subject.position, "#subject", subjectType.toTypeNode(), false)
-        symbolTable.registerTransformedSymbol(subject.position, IdentifierClassifier.Property, "#subject", "#subject")
-        symbolTable.assign("#subject", SemanticDummyRuntimeValue(subjectType))
+        currentScope.declareProperty(subject.position, "#subject", subjectType.toTypeNode(), false)
+        currentScope.registerTransformedSymbol(subject.position, IdentifierClassifier.Property, "#subject", "#subject")
+        currentScope.assign("#subject", SemanticDummyRuntimeValue(subjectType))
 
         val call = FunctionCallNode(
             function = NavigationNode(

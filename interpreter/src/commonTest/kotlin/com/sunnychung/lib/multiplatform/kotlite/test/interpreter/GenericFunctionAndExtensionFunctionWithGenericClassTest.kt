@@ -1,5 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
+import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
@@ -384,5 +385,33 @@ class GenericFunctionAndExtensionFunctionWithGenericClassTest {
         println(symbolTable.propertyValues)
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(12, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun genericExtensionFunctionWithRecursiveUpperBound() {
+        val interpreter = interpreter("""
+            fun <T: Comparable<T>> makeList(vararg values: T): List<T> = values
+            fun <T: Comparable<T>> List<T>.contains(x: T): Boolean {
+                for (it in this) {
+                    if (it == x) {
+                        return true
+                    }
+                }
+                return false
+            }
+            val l = makeList(1, 3, 4, 3, 8)
+            val a = l.contains(0)
+            val b = l.contains(1)
+            val c = l.contains(2)
+            val d = l.contains(3)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(5, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+        assertEquals(false, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
     }
 }
