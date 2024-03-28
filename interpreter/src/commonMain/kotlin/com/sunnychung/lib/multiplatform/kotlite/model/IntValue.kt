@@ -1,5 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
+import com.sunnychung.lib.multiplatform.kotlite.extension.fullClassName
+
 class IntValue(override val value: Int, symbolTable: SymbolTable) : NumberValue<Int>, PrimitiveValue(symbolTable) {
     override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.IntType
 
@@ -14,5 +16,9 @@ class IntValue(override val value: Int, symbolTable: SymbolTable) : NumberValue<
 
     override fun hashCode(): Int {
         return value
+    }
+
+    override fun toString(): String {
+        return "$fullClassName($value)"
     }
 }

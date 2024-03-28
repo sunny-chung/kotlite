@@ -54,15 +54,15 @@ class ClassMemberResolver private constructor(symbolTable: SymbolTable, private 
         )
 
         fun checkAndPutResolution(typeDef: ClassDefinition, resolvedTypeArguments: Map<String, TypeNode>, destination: MutableMap<String, Map<String, TypeNode>>) {
-            if (destination.containsKey(typeDef.name)) {
-                val previousResolution = destination[typeDef.name]!!
+            if (destination.containsKey(typeDef.fullQualifiedName)) {
+                val previousResolution = destination[typeDef.fullQualifiedName]!!
                 if (resolvedTypeArguments == null || previousResolution.size != resolvedTypeArguments.size) {
-                    throw RuntimeException("Inconsistent type argument resolution for type ${typeDef.name} -- ${previousResolution} VS ${resolvedTypeArguments}")
+                    throw RuntimeException("Inconsistent type argument resolution for type ${typeDef.fullQualifiedName} -- ${previousResolution} VS ${resolvedTypeArguments}")
                 }
                 val changes = mutableMapOf<String, TypeNode>()
                 resolvedTypeArguments.forEach {
                     if (previousResolution[it.key] == null) {
-                        throw RuntimeException("Inconsistent type argument `${it.key}` resolution for type ${typeDef.name}")
+                        throw RuntimeException("Inconsistent type argument `${it.key}` resolution for type ${typeDef.fullQualifiedName}")
                     }
                     val previousResolvedType = symbolTable.assertToDataType(changes[it.key] ?: previousResolution[it.key]!!)
                     val currentResolvedType = symbolTable.assertToDataType(it.value)
@@ -71,15 +71,15 @@ class ClassMemberResolver private constructor(symbolTable: SymbolTable, private 
                             changes[it.key] = it.value
                         }
                     } else {
-                        throw SemanticException(it.value.position, "Type argument ${it.value.descriptiveName()} for type parameter ${it.key} of type ${typeDef.name} is in conflict with ${previousResolvedType.descriptiveName}")
+                        throw SemanticException(it.value.position, "Type argument ${it.value.descriptiveName()} for type parameter ${it.key} of type ${typeDef.fullQualifiedName} is in conflict with ${previousResolvedType.descriptiveName}")
                     }
                 }
                 if (changes.isNotEmpty()) {
-                    destination[typeDef.name] = destination[typeDef.name]!! + changes
+                    destination[typeDef.fullQualifiedName] = destination[typeDef.fullQualifiedName]!! + changes
                 }
             } else {
-                destination[typeDef.name] = resolvedTypeArguments
-                typeDefinitions[typeDef.name] = typeDef
+                destination[typeDef.fullQualifiedName] = resolvedTypeArguments
+                typeDefinitions[typeDef.fullQualifiedName] = typeDef
             }
         }
 

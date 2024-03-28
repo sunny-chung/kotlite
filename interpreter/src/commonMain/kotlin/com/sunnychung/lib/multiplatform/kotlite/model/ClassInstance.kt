@@ -86,7 +86,7 @@ open class ClassInstance(
     fun assign(interpreter: Interpreter? = null, name: String, value: RuntimeValue): Pair<Boolean, FunctionDeclarationNode?> {
         val name = clazz!!.findMemberPropertyDeclaredName(name, inThisClassOnly = true)
             ?: return parentInstance?.assign(interpreter = interpreter, name = name, value = value)
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.fullQualifiedName}")
 
         // TODO remove
         val customAccessor = clazz!!.findMemberPropertyCustomAccessor(name, inThisClassOnly = true)
@@ -97,7 +97,7 @@ open class ClassInstance(
         }
 
         val propertyDefinition = clazz!!.findMemberPropertyWithoutAccessor(name, inThisClassOnly = true)
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.fullQualifiedName}")
 //        if (!propertyDefinition.isMutable && memberPropertyValues.containsKey(name)) {
 //            throw RuntimeException("val cannot be reassigned")
 //        }
@@ -115,7 +115,7 @@ open class ClassInstance(
     fun read(interpreter: Interpreter? = null, name: String): Any {
         val name = clazz!!.findMemberPropertyDeclaredName(name, inThisClassOnly = true)
             ?: return parentInstance?.read(interpreter = interpreter, name = name)
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.fullQualifiedName}")
 
         // TODO remove
         val customAccessor = clazz!!.findMemberPropertyCustomAccessor(name, inThisClassOnly = true)
@@ -125,7 +125,7 @@ open class ClassInstance(
         }
 
         val propertyDefinition = clazz!!.findMemberPropertyWithoutAccessor(name, inThisClassOnly = true)
-            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.name}")
+            ?: throw RuntimeException("Property $name is not defined in class ${clazz!!.fullQualifiedName}")
 
         return memberPropertyValues[name]!!.read(interpreter)
     }
@@ -133,7 +133,7 @@ open class ClassInstance(
     fun getPropertyHolder(name: String): RuntimeValueAccessor? {
         val name = clazz!!.findMemberPropertyDeclaredName(name, inThisClassOnly = true)
             ?: return parentInstance?.getPropertyHolder(name)
-            ?: throw RuntimeException("Property $name is not declared in class ${clazz!!.name}")
+            ?: throw RuntimeException("Property $name is not declared in class ${clazz!!.fullQualifiedName}")
 
         return memberPropertyValues[name]
     }
@@ -141,7 +141,7 @@ open class ClassInstance(
     fun findPropertyByDeclaredName(declaredName: String, interpreter: Interpreter? = null): RuntimeValue {
         return memberPropertyValues[declaredName]?.read(interpreter)
             ?: parentInstance?.findPropertyByDeclaredName(declaredName, interpreter)
-            ?: throw RuntimeException("Property $declaredName is not declared in class ${clazz!!.name}")
+            ?: throw RuntimeException("Property $declaredName is not declared in class ${clazz!!.fullQualifiedName}")
     }
 
     internal fun getAllMemberProperties(): Map<String, RuntimeValueAccessor> {
@@ -164,7 +164,35 @@ open class ClassInstance(
         throw RuntimeException("Class ${clazz!!.fullQualifiedName} is not comparable")
     }
 
-    override fun convertToString(): String = "${clazz!!.fullQualifiedName}()" // TODO
+    override fun equals(other: Any?): Boolean {
+        if (other !is RuntimeValue) return false
+        clazz?.getSpecialFunction(SpecialFunction.Name.Equals)
+            ?.call(clazz!!.interpreter!!, this, listOf(other))
+            ?.let { return (it as BooleanValue).value }
+        return super.equals(other)
+    }
+
+    override fun hashCode(): Int {
+        clazz?.getSpecialFunction(SpecialFunction.Name.HashCode)
+            ?.call(clazz!!.interpreter!!, this, emptyList())
+            ?.let { return (it as IntValue).value }
+        return super.hashCode()
+    }
+
+    fun originalHashCode() = super.hashCode()
+
+    override fun convertToString(isCallCustomFunction: Boolean): String {
+        if (isCallCustomFunction) {
+            clazz?.getSpecialFunction(SpecialFunction.Name.ToString)
+                ?.call(clazz!!.interpreter!!, this, emptyList())
+                ?.let { return (it as StringValue).value }
+        }
+        return "${clazz!!.fullQualifiedName}()"
+    }
+
+    override fun convertToString(): String {
+        return convertToString(isCallCustomFunction = true)
+    }
 
     override fun toString(): String = "${clazz!!.fullQualifiedName}($memberPropertyValues)"
 }

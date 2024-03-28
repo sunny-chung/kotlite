@@ -2,6 +2,8 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 /**
  * Currently, only cater types without type parameters
+ *
+ * TODO: This should be implemented as a stack, to reduce performance penalty of copying the cache all the time
  */
 class SymbolTableTypeVisitCache(vararg initialTypeNames: String) {
     private val visitedTypes = mutableSetOf<String>(*initialTypeNames)
@@ -21,7 +23,7 @@ class SymbolTableTypeVisitCache(vararg initialTypeNames: String) {
 
     fun preVisit(type: ClassDefinition) {
         if (!isEligible(type)) return
-        visitedTypes += type.name
+        visitedTypes += type.fullQualifiedName
     }
 
     fun isVisited(type: TypeNode): Boolean {
@@ -29,7 +31,7 @@ class SymbolTableTypeVisitCache(vararg initialTypeNames: String) {
     }
 
     fun isVisited(type: ClassDefinition): Boolean {
-        return isEligible(type) && visitedTypes.contains(type.name)
+        return isEligible(type) && visitedTypes.contains(type.fullQualifiedName)
     }
 
     fun postVisit(type: TypeNode, resolution: DataType) {
@@ -37,7 +39,7 @@ class SymbolTableTypeVisitCache(vararg initialTypeNames: String) {
     }
 
     fun postVisit(type: ClassDefinition, resolution: DataType) {
-        postVisit(type.name, resolution)
+        postVisit(type.fullQualifiedName, resolution)
     }
 
     fun postVisit(typeName: String, resolution: DataType) {
@@ -72,7 +74,9 @@ class SymbolTableTypeVisitCache(vararg initialTypeNames: String) {
         return SymbolTableTypeVisitCache().also {
             it.visitedTypes.addAll(visitedTypes)
             it.typeResolution.putAll(typeResolution)
-            it.unprocessedRepeatedTypes.putAll(unprocessedRepeatedTypes)
+            unprocessedRepeatedTypes.forEach { e ->
+                it.unprocessedRepeatedTypes[e.key] = e.value.toMutableList()
+            }
         }
     }
 }

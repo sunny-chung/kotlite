@@ -80,6 +80,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
+import com.sunnychung.lib.multiplatform.kotlite.model.SpecialFunction
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
@@ -253,6 +254,12 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 if (r1 is NumberValue<*> && r2 is NumberValue<*>) {
                     return castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a == b) }
                 }
+                if (r1 is ClassInstance) {
+                    r1.clazz!!.getSpecialFunction(SpecialFunction.Name.Equals)?.let { func ->
+                        log.d { "equals($r1, $r2)" }
+                        return func.call(interpreter = this@Interpreter, subject = r1, arguments = listOf(r2))
+                    }
+                }
                 return BooleanValue(r1 == r2)
             }
             "!=" -> {
@@ -262,7 +269,14 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 //                    return BooleanValue(r1 != r2)
 //                }
                 if (r1 is NumberValue<*> && r2 is NumberValue<*>) {
-                    castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a != b) }
+                    return castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a != b) }
+                }
+                if (r1 is ClassInstance) {
+                    r1.clazz!!.getSpecialFunction(SpecialFunction.Name.Equals)?.let { func ->
+                        log.d { "!equals($r1, $r2)" }
+                        return (func.call(interpreter = this@Interpreter, subject = r1, arguments = listOf(r2)) as BooleanValue)
+                            .let { BooleanValue(!it.value) }
+                    }
                 }
                 return BooleanValue(r1 != r2)
             }
@@ -277,7 +291,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
     fun UnaryOpNode.eval(): RuntimeValue {
         val result = node!!.eval()
         if (operator == "!!") {
-            if (result == NullValue) {
+            if (result === NullValue) {
                 throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
             }
             return result as RuntimeValue
@@ -536,7 +550,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 
             is NavigationNode -> {
                 val subject = function.subject.eval()
-                if (subject == NullValue) {
+                if (subject === NullValue) {
                     if (function.operator == "?.") {
                         return NullValue // TODO not always true for extension functions
                     } else {
@@ -545,7 +559,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 }
                 when (callableType) {
                     CallableType.ClassMemberFunction -> {
-                        if (subject == NullValue) {
+                        if (subject === NullValue) {
                             throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
                         (subject as? ClassInstance)
@@ -565,7 +579,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                     CallableType.ExtensionFunction -> {
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
                             ?: throw RuntimeException("Analysed function $functionRefName not found")
-                        if (subject == NullValue && !function.receiver!!.isNullable) {
+                        if (subject === NullValue && !function.receiver!!.isNullable) {
                             throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
                         return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function, replaceArguments = replaceArguments)
@@ -806,7 +820,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             callArguments.forEachIndexed { index, it ->
                 val parameterNode = parameters[index].parameter
                 if (it == null && parameterNode.defaultValue == null) {
-                    throw RuntimeException("Missing parameter `${parameterNode.name} in constructor call of ${clazz.name}`")
+                    throw RuntimeException("Missing parameter `${parameterNode.name} in constructor call of ${clazz.fullQualifiedName}`")
                 }
             }
 
@@ -868,9 +882,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 //            }
 
         // variable "this" is available after primary constructor
-        symbolTable.declareProperty(callPosition, "this", TypeNode(callPosition, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty(callPosition, "this", TypeNode(callPosition, instance.clazz!!.fullQualifiedName, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this", instance)
-        symbolTable.declareProperty(callPosition, "this/${instance.clazz!!.fullQualifiedName}", TypeNode(callPosition, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
+        symbolTable.declareProperty(callPosition, "this/${instance.clazz!!.fullQualifiedName}", TypeNode(callPosition, instance.clazz!!.fullQualifiedName, typeArguments.map { it.toTypeNode() }.emptyToNull(), false), false)
         symbolTable.assign("this/${instance.clazz!!.fullQualifiedName}", instance)
 //        symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this", "this")
         symbolTable.registerTransformedSymbol(callPosition, IdentifierClassifier.Property, "this/${instance.clazz!!.fullQualifiedName}", "this")
@@ -884,7 +898,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             symbolTable.declareProperty(
                 callPosition,
                 "super",
-                TypeNode(SourcePosition.NONE, instance.clazz!!.name, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
+                TypeNode(SourcePosition.NONE, instance.clazz!!.fullQualifiedName, typeArguments.map { it.toTypeNode() }.emptyToNull(), false),
                 false
             )
             symbolTable.assign("super", instance)
@@ -961,9 +975,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             if (subject.type() is ObjectType) {
                 var clazz: ClassDefinition? = (subject.type() as ObjectType).clazz
                 while (clazz != null) {
-                    declaredThisClassNames += clazz.name
-                    symbolTable.declareProperty(position, "this/${clazz.name}", subject.type().toTypeNode(), false)
-                    symbolTable.assign("this/${clazz.name}", subject)
+                    declaredThisClassNames += clazz.fullQualifiedName
+                    symbolTable.declareProperty(position, "this/${clazz.fullQualifiedName}", subject.type().toTypeNode(), false)
+                    symbolTable.assign("this/${clazz.fullQualifiedName}", subject)
                     clazz = clazz.superClass
                 }
             } else {
@@ -1238,7 +1252,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!)
                 ?: throw RuntimeException("Extension property `${member.name}` on receiver `${obj.type().nameWithNullable}` could not be found")
 
-            if (obj == NullValue && !extensionProperty.receiverType!!.isNullable) {
+            if (obj === NullValue && !extensionProperty.receiverType!!.isNullable) {
                 if (operator == ".") {
                     throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                 } else if (operator == "?.") {
@@ -1263,7 +1277,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 ?: throw RuntimeException("No such enum `${member.name}` in class `$originalClassName`")
         }
 
-        if (obj == NullValue) throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
+        if (obj === NullValue) throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
         obj as? ClassInstance ?: throw RuntimeException("Cannot access member `${member.name}` for type `${obj.type().nameWithNullable}`")
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(interpreter = this@Interpreter, name = obj.clazz!!.findMemberPropertyTransformedName(member.name)!!)) {

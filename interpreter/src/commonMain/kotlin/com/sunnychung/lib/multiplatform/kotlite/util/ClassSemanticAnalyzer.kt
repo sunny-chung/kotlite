@@ -54,13 +54,16 @@ class ClassSemanticAnalyzer(val symbolTable: SemanticAnalyzerSymbolTable, val po
                     .distinctBy { it.function }
                     .filter { FunctionModifier.open in it.function.modifiers }
                     .filter {
-                        it.resolvedValueParameterTypes.withIndex().all {
-                            it.value.type == resolvedFunc.function.valueParameters[it.index].type
-                        }
+                        it.resolvedValueParameterTypes.size == resolvedFunc.function.valueParameters.size
+                            && it.resolvedValueParameterTypes.withIndex().all {
+                                it.value.type == resolvedFunc.function.valueParameters[it.index].type
+                            }
                     }
                 if (superClassIdenticalFunctions.isNotEmpty()) {
                     implementedFunctions += func
                     implementedFunctions += superClassIdenticalFunctions.map { it.function }
+//                } else {
+//                    throw SemanticException(func.position, "Function `${func.name}` overrides nothing.")
                 }
             }
 

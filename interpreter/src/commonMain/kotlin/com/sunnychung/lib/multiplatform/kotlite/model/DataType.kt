@@ -77,13 +77,32 @@ data class NothingType(override val isNullable: Boolean) : DataType {
         }
     }
 }
-data class AnyType(override val isNullable: Boolean = false) : DataType {
-    override val name: String = "Any"
+//data class AnyType(override val isNullable: Boolean = false) : DataType {
+//    override val name: String = "Any"
+//
+//    override fun copyOf(isNullable: Boolean): DataType = if (this.isNullable == isNullable) this else AnyType(isNullable)
+//
+//    override fun isAssignableFrom(other: DataType): Boolean {
+//        return isNullable || !other.isNullable
+//    }
+//}
 
-    override fun copyOf(isNullable: Boolean): DataType = if (this.isNullable == isNullable) this else AnyType(isNullable)
+/**
+ * TODO: Dynamic runtime class instead of constant `AnyClass.clazz` should be passed in.
+ * Otherwise some states may be lost.
+ */
+class AnyType(isNullable: Boolean = false) : ObjectType(AnyClass.clazz, emptyList(), isNullable, emptyList()) {
+    override val name: String = "Any"
+    override val descriptiveName: String = "Any${if (isNullable) "?" else ""}" // if this line is absent, a strange Kotlin bug evaluates this field to be a String literal of "null"
+
+    override fun copyOf(isNullable: Boolean): ObjectType = if (this.isNullable == isNullable) this else AnyType(isNullable)
 
     override fun isAssignableFrom(other: DataType): Boolean {
         return isNullable || !other.isNullable
+    }
+
+    override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
+        return isAssignableFrom(other)
     }
 }
 data object StarType : DataType {
@@ -185,7 +204,7 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     // B.isConvertibleFrom(A) = false
     override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
         if (other is NothingType && isNullable) return true
-        if (other is RepeatedType) return this.isConvertibleFrom(other.actualType!!, isResolveTypeArguments = false) // this is the key
+        if (other is RepeatedType) return other.actualType == null || this.isConvertibleFrom(other.actualType!!, isResolveTypeArguments = false) // this is the key
         if (other is TypeParameterType) return this.isConvertibleFrom(other.upperBound)
         if (other !is ObjectType) return false
         if (other.isNullable && !isNullable) return false
@@ -233,7 +252,7 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     // A.isSubTypeOf(B) = false
     // B.isSubTypeOf(A) = true
     override fun isSubTypeOf(other: DataType): Boolean {
-        if (other is AnyType && (other.isNullable || !isNullable)) return true
+        if (other is AnyType && (other.isNullable || !isNullable)) return name != "Any"
         if ((other !is ObjectType && other !is TypeParameterType) || other == this) return false
         return other.isConvertibleFrom(this)
     }
@@ -272,6 +291,13 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
+        if (other is RepeatedType) {
+            return if (other.actualType != null) {
+                equals(other.actualType)
+            } else {
+                other.realTypeDescriptiveName == descriptiveName
+            }
+        }
         if (other !is ObjectType) return false
 
         if (clazz != other.clazz) return false
@@ -288,6 +314,10 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
         result = 31 * result + isNullable.hashCode()
         result = 31 * result + name.hashCode()
         return result
+    }
+
+    override fun toString(): String {
+        return "ObjectType($descriptiveName)"
     }
 }
 
@@ -332,7 +362,7 @@ data class RepeatedType(val realTypeDescriptiveName: String, override val isNull
 
     override fun toTypeNode(isResolveTypeArguments: Boolean): TypeNode {
         actualType?.toTypeNode(isResolveTypeArguments = false)?.let { return it }
-        return TypeNode(SourcePosition.NONE, name, listOf(TypeNode(SourcePosition.NONE, realTypeDescriptiveName, null, false)), isNullable)
+        return TypeNode(SourcePosition.NONE, "<Repeated>", listOf(TypeNode(SourcePosition.NONE, realTypeDescriptiveName, null, false)), isNullable)
     }
 
     // override to avoid infinite loop for cases like `T : Comparable<T>`
@@ -340,7 +370,13 @@ data class RepeatedType(val realTypeDescriptiveName: String, override val isNull
         if (other is RepeatedType) {
             return true
         }
-        return actualType == other
+        return if (actualType != null) {
+            actualType == other
+        } else if (other is DataType) {
+            realTypeDescriptiveName == other.descriptiveName
+        } else {
+            false
+        }
     }
 
     // override to avoid infinite loop for cases like `T : Comparable<T>`
