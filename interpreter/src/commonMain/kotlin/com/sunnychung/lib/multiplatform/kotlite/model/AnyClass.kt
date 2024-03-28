@@ -15,7 +15,11 @@ class AnyClass {
                 parameterTypes = listOf(CustomFunctionParameter(name = "other", type = "Any?")),
                 executable = exe@ { interpreter, receiver, args, typeArgs ->
                     val other = args[0]
-                    BooleanValue(receiver == other, interpreter.symbolTable())
+                    if (receiver is ClassInstance) { // prevent infinite loop of `equals()` calls
+                        BooleanValue(receiver === other, interpreter.symbolTable())
+                    } else {
+                        BooleanValue(receiver == other, interpreter.symbolTable())
+                    }
                 }
             ),
             CustomFunctionDefinition(
@@ -26,7 +30,11 @@ class AnyClass {
                 modifiers = setOf(FunctionModifier.open),
                 parameterTypes = emptyList(),
                 executable = exe@ { interpreter, receiver, args, typeArgs ->
-                    IntValue(receiver.hashCode(), interpreter.symbolTable())
+                    if (receiver is ClassInstance) { // prevent infinite loop
+                        IntValue(receiver.originalHashCode(), interpreter.symbolTable())
+                    } else {
+                        IntValue(receiver.hashCode(), interpreter.symbolTable())
+                    }
                 }
             ),
             CustomFunctionDefinition(

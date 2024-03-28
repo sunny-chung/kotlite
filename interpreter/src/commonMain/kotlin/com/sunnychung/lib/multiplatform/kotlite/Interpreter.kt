@@ -291,7 +291,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
     fun UnaryOpNode.eval(): RuntimeValue {
         val result = node!!.eval()
         if (operator == "!!") {
-            if (result == NullValue) {
+            if (result === NullValue) {
                 throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
             }
             return result as RuntimeValue
@@ -550,7 +550,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 
             is NavigationNode -> {
                 val subject = function.subject.eval()
-                if (subject == NullValue) {
+                if (subject === NullValue) {
                     if (function.operator == "?.") {
                         return NullValue // TODO not always true for extension functions
                     } else {
@@ -559,7 +559,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 }
                 when (callableType) {
                     CallableType.ClassMemberFunction -> {
-                        if (subject == NullValue) {
+                        if (subject === NullValue) {
                             throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
                         (subject as? ClassInstance)
@@ -579,7 +579,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                     CallableType.ExtensionFunction -> {
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
                             ?: throw RuntimeException("Analysed function $functionRefName not found")
-                        if (subject == NullValue && !function.receiver!!.isNullable) {
+                        if (subject === NullValue && !function.receiver!!.isNullable) {
                             throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
                         return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function, replaceArguments = replaceArguments)
@@ -1252,7 +1252,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             val extensionProperty = symbolTable().findExtensionProperty(transformedRefName!!)
                 ?: throw RuntimeException("Extension property `${member.name}` on receiver `${obj.type().nameWithNullable}` could not be found")
 
-            if (obj == NullValue && !extensionProperty.receiverType!!.isNullable) {
+            if (obj === NullValue && !extensionProperty.receiverType!!.isNullable) {
                 if (operator == ".") {
                     throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                 } else if (operator == "?.") {
@@ -1277,7 +1277,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 ?: throw RuntimeException("No such enum `${member.name}` in class `$originalClassName`")
         }
 
-        if (obj == NullValue) throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
+        if (obj === NullValue) throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
         obj as? ClassInstance ?: throw RuntimeException("Cannot access member `${member.name}` for type `${obj.type().nameWithNullable}`")
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(interpreter = this@Interpreter, name = obj.clazz!!.findMemberPropertyTransformedName(member.name)!!)) {

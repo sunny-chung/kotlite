@@ -90,6 +90,7 @@ open class ClassDefinition(
     var enumValues: Map<String, ClassInstance> = emptyMap()
 
     internal var isInInterpreter = false
+    internal var interpreter: Interpreter? = null
     internal var memberFunctionsForInterpreter: Map<String, FunctionDeclarationNode>? = null
     internal var memberFunctionsForSA: Map<String, FunctionDeclarationNode>? = null
     val memberFunctionsMap: Map<String, FunctionDeclarationNode>
@@ -369,6 +370,7 @@ open class ClassDefinition(
 
     fun attachToInterpreter(interpreter: Interpreter) {
         isInInterpreter = true
+        this.interpreter = interpreter
 
         initSuperClass(interpreter.symbolTable(), null)
 

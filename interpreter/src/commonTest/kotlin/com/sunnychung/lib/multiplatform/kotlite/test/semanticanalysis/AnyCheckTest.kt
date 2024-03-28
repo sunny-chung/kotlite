@@ -32,10 +32,46 @@ class AnyCheckTest {
     }
 
     @Test
+    fun equalsWithIncorrectValueParameterType3() {
+        assertSemanticFail("""
+            class A {
+                override fun equals(other: Any?, o: Int) = true
+            }
+        """.trimIndent())
+    }
+
+    @Test
     fun equalsWithIncorrectReturnType() {
         assertSemanticFail("""
             class A {
                 override fun equals(o: Any?): Int = 1
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun hashCodeWithoutOverride() {
+        assertSemanticFail("""
+            class A {
+                fun hashCode(): Int = 1
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun hashCodeWithIncorrectValueParameterType() {
+        assertSemanticFail("""
+            class A {
+                override fun hashCode(o: Any): Int = 1
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun hashCodeWithIncorrectReturnType() {
+        assertSemanticFail("""
+            class A {
+                override fun hashCode(): Long = 1L
             }
         """.trimIndent())
     }

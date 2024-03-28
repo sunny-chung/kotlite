@@ -164,6 +164,23 @@ open class ClassInstance(
         throw RuntimeException("Class ${clazz!!.fullQualifiedName} is not comparable")
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (other !is RuntimeValue) return false
+        clazz?.getSpecialFunction(SpecialFunction.Name.Equals)
+            ?.call(clazz!!.interpreter!!, this, listOf(other))
+            ?.let { return (it as BooleanValue).value }
+        return super.equals(other)
+    }
+
+    override fun hashCode(): Int {
+        clazz?.getSpecialFunction(SpecialFunction.Name.HashCode)
+            ?.call(clazz!!.interpreter!!, this, emptyList())
+            ?.let { return (it as IntValue).value }
+        return super.hashCode()
+    }
+
+    fun originalHashCode() = super.hashCode()
+
     override fun convertToString(): String = "${clazz!!.fullQualifiedName}()" // TODO
 
     override fun toString(): String = "${clazz!!.fullQualifiedName}($memberPropertyValues)"

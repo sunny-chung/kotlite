@@ -422,4 +422,50 @@ class MapTest {
         assertEquals(1590, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
     }
+
+    @Test
+    fun customKey() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class MyTriple(val a: Int, val b: Int, val c: Int) {
+                override fun equals(other: Any?): Boolean {
+                    if (other !is MyTriple) return false
+                    val o = other as MyTriple
+                    return o.a == a && o.b == b && o.c == c
+                }
+                
+                override fun hashCode(): Int {
+                    return (a * 43 + b) * 43 + c
+                }
+            }
+            fun t(a: Int, b: Int, c: Int) = MyTriple(a, b, c)
+            val m = mutableMapOf(
+                t(1, 3, 4) to 123,
+                t(2, 0, 2) to 234,
+            )
+            val a = m[t(2, 0, 2)]
+            val b = m[t(1, 3, 4)]
+            
+            m[t(1, 6, 8)] = 2000
+            m[t(1, 3, 4)] = 15
+            m[t(7, 2, 1)] = 831
+            
+            val c = m[t(2, 0, 2)]
+            val d = m[t(1, 3, 4)]
+            val e = m[t(1, 2, 3)]
+            val f = m[t(1, 6, 8)]
+            val g = m[t(8, 6, 1)]
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(234, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(234, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("e"))
+        assertEquals(2000, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("g"))
+    }
 }

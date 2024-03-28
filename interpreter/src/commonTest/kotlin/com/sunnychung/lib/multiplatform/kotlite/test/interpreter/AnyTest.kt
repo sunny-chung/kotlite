@@ -222,4 +222,30 @@ class AnyTest {
         assertEquals(4, (symbolTable.findPropertyByDeclaredName("ca11") as IntValue).value)
         assertEquals(8, (symbolTable.findPropertyByDeclaredName("cb11") as IntValue).value)
     }
+
+    @Test
+    fun overrideHashCode() {
+        val interpreter = interpreter("""
+            open class A(val x: Int) {
+                override fun hashCode(): Int {
+                    return x
+                }
+            }
+            
+            class B(override val x: Int, val y: Int) : A(x) {
+                override fun hashCode(): Int {
+                    return super.hashCode() * 47 + y
+                }
+            }
+            
+            val a = A(5).hashCode()
+            val b = B(5, 7).hashCode()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(5, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(5 * 47 + 7, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }
