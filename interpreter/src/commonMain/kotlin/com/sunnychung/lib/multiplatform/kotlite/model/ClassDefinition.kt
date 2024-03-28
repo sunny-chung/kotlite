@@ -220,9 +220,10 @@ open class ClassDefinition(
                 val superClassFunctions = classMemberResolver?.findMemberFunctionsAndExactTypesByDeclaredName(thisFunc.name) ?: emptyMap()
                 var hasOverridden = false
                 val identicalSuperClassFunctions = superClassFunctions.filter {
-                    it.value.resolvedValueParameterTypes.withIndex().all {
-                        it.value.type == thisFunc.valueParameters[it.index].type
-                    }
+                    it.value.resolvedValueParameterTypes.size == thisFunc.valueParameters.size
+                        && it.value.resolvedValueParameterTypes.withIndex().all {
+                            it.value.type == thisFunc.valueParameters[it.index].type
+                        }
                 }.values
                 identicalSuperClassFunctions.forEach { superFunc ->
                     if (FunctionModifier.open !in superFunc.function.modifiers) {

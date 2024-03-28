@@ -1980,9 +1980,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     // TODO these are duplicating with ClassSemanticAnalyzer and ClassDefinition. Refactor these
                     val superClassFunctions = classMemberResolver?.findMemberFunctionsAndExactTypesByDeclaredName(thisFunc.name) ?: emptyMap()
                     val identicalSuperClassFunctions: Collection<FunctionAndTypes> = superClassFunctions.filter {
-                        it.value.resolvedValueParameterTypes.withIndex().all {
-                            it.value.type == thisFunc.valueParameters[it.index].type
-                        }
+                        it.value.resolvedValueParameterTypes.size == thisFunc.valueParameters.size
+                            && it.value.resolvedValueParameterTypes.withIndex().all {
+                                it.value.type == thisFunc.valueParameters[it.index].type
+                            }
                     }.values
 
                     thisFunc.visit(modifier = modifier, isClassMemberFunction = true)
