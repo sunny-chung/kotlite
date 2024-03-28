@@ -45,7 +45,10 @@ class AnyClass {
                 modifiers = setOf(FunctionModifier.open),
                 parameterTypes = emptyList(),
                 executable = exe@ { interpreter, receiver, args, typeArgs ->
-                    StringValue(receiver?.convertToString() ?: "null", interpreter.symbolTable())
+                    StringValue(
+                        value = receiver?.convertToString(isCallCustomFunction = false) ?: "null",
+                        symbolTable = interpreter.symbolTable(),
+                    )
                 }
             ),
         )

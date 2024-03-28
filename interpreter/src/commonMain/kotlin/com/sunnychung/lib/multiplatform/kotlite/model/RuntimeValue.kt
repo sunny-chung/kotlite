@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 sealed interface RuntimeValue {
     fun type(): DataType
 
+    fun convertToString(isCallCustomFunction: Boolean): String = convertToString()
     fun convertToString(): String
 }
 //data class RuntimeValue(val type: DataType, val value: Any?)

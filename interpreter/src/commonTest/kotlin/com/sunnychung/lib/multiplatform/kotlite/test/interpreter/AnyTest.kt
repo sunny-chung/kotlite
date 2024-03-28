@@ -2,6 +2,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -247,5 +248,76 @@ class AnyTest {
         assertEquals(2, symbolTable.propertyValues.size)
         assertEquals(5, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(5 * 47 + 7, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun overrideToString() {
+        val interpreter = interpreter("""
+            open class A(val x: Int) {
+                override fun toString(): String {
+                    return "<${'$'}x>"
+                }
+            }
+            
+            class B(override val x: Int, val y: Int) : A(x) {
+                override fun toString(): String = "<${'$'}x, ${'$'}y>"
+            }
+            
+            val a = A(5).toString()
+            val b = B(5, 7).toString()
+            val num = 45
+            val c = "${'$'}{A(30)}/${'$'}num/${'$'}{B(12, 34)}"
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals("<5>", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("<5, 7>", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals("<30>/45/<12, 34>", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+    }
+
+    @Test
+    fun notOverrideToString() {
+        val interpreter = interpreter("""
+            open class A(val x: Int)
+            class B(override val x: Int, val y: Int) : A(x)
+            
+            val a = A(5).toString()
+            val b = B(5, 7).toString()
+            val num = 45
+            val c = "${'$'}{A(30)}/${'$'}num/${'$'}{B(12, 34)}"
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals("A()", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("B()", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals("A()/45/B()", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+    }
+
+    @Test
+    fun cyclicToString() {
+        val interpreter = interpreter("""
+            open class A(val x: Int) {
+                override fun toString(): String {
+                    return super.toString()
+                }
+            }
+            class B(override val x: Int, val y: Int) : A(x)
+            
+            val a = A(5).toString()
+            val b = B(5, 7).toString()
+            val num = 45
+            val c = "${'$'}{A(30)}/${'$'}num/${'$'}{B(12, 34)}"
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals("A()", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("B()", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals("A()/45/B()", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
     }
 }

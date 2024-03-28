@@ -181,7 +181,18 @@ open class ClassInstance(
 
     fun originalHashCode() = super.hashCode()
 
-    override fun convertToString(): String = "${clazz!!.fullQualifiedName}()" // TODO
+    override fun convertToString(isCallCustomFunction: Boolean): String {
+        if (isCallCustomFunction) {
+            clazz?.getSpecialFunction(SpecialFunction.Name.ToString)
+                ?.call(clazz!!.interpreter!!, this, emptyList())
+                ?.let { return (it as StringValue).value }
+        }
+        return "${clazz!!.fullQualifiedName}()"
+    }
+
+    override fun convertToString(): String {
+        return convertToString(isCallCustomFunction = true)
+    }
 
     override fun toString(): String = "${clazz!!.fullQualifiedName}($memberPropertyValues)"
 }

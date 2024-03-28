@@ -75,4 +75,31 @@ class AnyCheckTest {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun toStringWithoutOverride() {
+        assertSemanticFail("""
+            class A {
+                fun toString(): String = "1"
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun toStringWithIncorrectValueParameterType() {
+        assertSemanticFail("""
+            class A {
+                override fun toString(o: Any): String = "1"
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun toStringWithIncorrectReturnType() {
+        assertSemanticFail("""
+            class A {
+                override fun toString(): Long = 1L
+            }
+        """.trimIndent())
+    }
 }
