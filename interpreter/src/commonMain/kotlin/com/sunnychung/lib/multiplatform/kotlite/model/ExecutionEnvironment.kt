@@ -213,9 +213,18 @@ class ExecutionEnvironment(
         specialFunctionLookupCache[key] = function
     }
 
-    internal fun findSpecialFunction(type: SymbolType, receiverType: String?, parentName: String? = null, name: String): FunctionDeclarationNode {
+    internal fun findNullableSpecialFunction(type: SymbolType, receiverType: String?, parentName: String? = null, name: String): FunctionDeclarationNode? {
         val key = MappingKey(type = type, receiverType = receiverType, name = name, parentName = parentName)
         return specialFunctionLookupCache[key]
+    }
+
+    internal fun findSpecialFunction(type: SymbolType, receiverType: String?, parentName: String? = null, name: String): FunctionDeclarationNode {
+        return findNullableSpecialFunction(
+            type = type,
+            receiverType = receiverType,
+            parentName = parentName,
+            name = name
+        )
             ?: throw RuntimeException("Function cache of $type ${receiverType?.let { "$it." }}${parentName?.let { "$it." }}$name is not found")
     }
 

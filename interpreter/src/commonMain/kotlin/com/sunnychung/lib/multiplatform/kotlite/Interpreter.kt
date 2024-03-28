@@ -80,6 +80,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ScopeType
 import com.sunnychung.lib.multiplatform.kotlite.model.ScriptNode
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
+import com.sunnychung.lib.multiplatform.kotlite.model.SpecialFunction
 import com.sunnychung.lib.multiplatform.kotlite.model.StringLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringNode
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
@@ -253,6 +254,12 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 if (r1 is NumberValue<*> && r2 is NumberValue<*>) {
                     return castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a == b) }
                 }
+                if (r1 is ClassInstance) {
+                    r1.clazz!!.getSpecialFunction(SpecialFunction.Name.Equals)?.let { func ->
+                        log.d { "equals($r1, $r2)" }
+                        return func.call(interpreter = this@Interpreter, subject = r1, arguments = listOf(r2))
+                    }
+                }
                 return BooleanValue(r1 == r2)
             }
             "!=" -> {
@@ -262,7 +269,14 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 //                    return BooleanValue(r1 != r2)
 //                }
                 if (r1 is NumberValue<*> && r2 is NumberValue<*>) {
-                    castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a != b) }
+                    return castType<NumberValue<*>, BooleanValue>(r1, r2) { a, b -> BooleanValue(a != b) }
+                }
+                if (r1 is ClassInstance) {
+                    r1.clazz!!.getSpecialFunction(SpecialFunction.Name.Equals)?.let { func ->
+                        log.d { "!equals($r1, $r2)" }
+                        return (func.call(interpreter = this@Interpreter, subject = r1, arguments = listOf(r2)) as BooleanValue)
+                            .let { BooleanValue(!it.value) }
+                    }
                 }
                 return BooleanValue(r1 != r2)
             }

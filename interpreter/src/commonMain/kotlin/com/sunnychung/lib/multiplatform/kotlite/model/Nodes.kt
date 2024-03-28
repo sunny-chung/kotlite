@@ -84,8 +84,12 @@ data class ScriptNode(override val position: SourcePosition, val nodes: List<AST
  */
 open class TypeNode(override val position: SourcePosition, val name: String, val arguments: List<TypeNode>?, val isNullable: Boolean, @ModifyByAnalyzer var transformedRefName: String? = null) : ASTNode {
     init {
-        if (arguments?.isEmpty() == true) throw IllegalArgumentException("empty argument")
-        if (name == "Function" && this !is FunctionTypeNode) throw IllegalArgumentException("function type node should be a FunctionTypeNode instance")
+        if (arguments?.isEmpty() == true) {
+            throw IllegalArgumentException("empty argument")
+        }
+        if (name == "Function" && this !is FunctionTypeNode) {
+            throw IllegalArgumentException("function type node should be a FunctionTypeNode instance")
+        }
     }
 
     open fun descriptiveName(): String = "$name${arguments?.let { "<${it.joinToString(", ") { it.descriptiveName() }}>" } ?: ""}${if (isNullable) "?" else ""}"

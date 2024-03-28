@@ -86,6 +86,11 @@ data class NothingType(override val isNullable: Boolean) : DataType {
 //        return isNullable || !other.isNullable
 //    }
 //}
+
+/**
+ * TODO: Dynamic runtime class instead of constant `AnyClass.clazz` should be passed in.
+ * Otherwise some states may be lost.
+ */
 class AnyType(isNullable: Boolean = false) : ObjectType(AnyClass.clazz, emptyList(), isNullable, emptyList()) {
     override val name: String = "Any"
     override val descriptiveName: String = "Any${if (isNullable) "?" else ""}" // if this line is absent, a strange Kotlin bug evaluates this field to be a String literal of "null"
@@ -247,7 +252,7 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
     // A.isSubTypeOf(B) = false
     // B.isSubTypeOf(A) = true
     override fun isSubTypeOf(other: DataType): Boolean {
-        if (other is AnyType && (other.isNullable || !isNullable)) return true
+        if (other is AnyType && (other.isNullable || !isNullable)) return name != "Any"
         if ((other !is ObjectType && other !is TypeParameterType) || other == this) return false
         return other.isConvertibleFrom(this)
     }

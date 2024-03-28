@@ -51,7 +51,7 @@ class AnyClass {
             constructInstance = { interpreter, _, _ -> ClassInstance(
                 currentScope = interpreter.symbolTable(),
                 fullClassName = "Any",
-                clazz = AnyClass.clazz,
+                clazz = interpreter.symbolTable().findClass("Any")!!.first,
                 typeArguments = emptyList(),
             ) },
             functions = memberFunctions,

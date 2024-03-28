@@ -6,7 +6,6 @@ import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.mergeIfNotExists
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
-import com.sunnychung.lib.multiplatform.kotlite.util.FunctionAndTypes
 
 /**
  * This class is stateful and may not survive after Semantic Analyzer.
@@ -46,16 +45,18 @@ open class ClassDefinition(
     var superClass: ClassDefinition? = null,
     var superInterfaces: List<ClassDefinition> = emptyList(),
 ) {
-    val superClassInvocation: FunctionCallNode?
-    init {
+    private val declaredSuperClassInvocation = superClassInvocation
+    var superClassInvocation: FunctionCallNode? = null
+
+    private fun initSuperClass(symbolTable: SymbolTable, semanticAnalyzer: SemanticAnalyzer?) {
         if (
             superClass == null
-            && superClassInvocation == null
+            && declaredSuperClassInvocation == null
             && !isInterface
             && fullQualifiedName != "Any"
             && !fullQualifiedName.endsWith("?")
         ) {
-            superClass = AnyClass.clazz
+//            superClass = (symbolTable.findClass("Any") ?: throw RuntimeException("Class `Any` not found")).first
             this.superClassInvocation = FunctionCallNode(
                 function = TypeNode(
                     position = SourcePosition.BUILTIN,
@@ -69,9 +70,20 @@ open class ClassDefinition(
                 isSuperclassConstruction = true,
                 callableType = CallableType.Constructor,
                 functionRefName = "Any",
-            )
-        } else {
-            this.superClassInvocation = superClassInvocation
+                returnType = TypeNode( // TypeNode cannot be reused
+                    position = SourcePosition.BUILTIN,
+                    name = "Any",
+                    arguments = null,
+                    isNullable = false,
+                ),
+            ).also {
+                with (semanticAnalyzer ?: return@also) {
+                    it.visit(isSuperClassInvocation = true)
+                }
+            }
+            index = findIndex() + 1 // a super class is added, so tree index increases by 1
+        } else if (this.superClassInvocation == null) {
+            this.superClassInvocation = declaredSuperClassInvocation
         }
     }
 
@@ -87,9 +99,15 @@ open class ClassDefinition(
             memberFunctionsForSA ?: throw RuntimeException("memberFunctionsForSA not initialized for type $fullQualifiedName")
         }
 
+    protected val specialFunctions = mutableMapOf<SpecialFunction.Name, SpecialFunction>()
+
     // only used if the class extends `Comparable<*>`
     var compareToFunctionNode: FunctionDeclarationNode? = null
     var compareToExec: ((subject: RuntimeValue, other: RuntimeValue) -> Int)? = null
+
+    fun getSpecialFunction(name: SpecialFunction.Name): SpecialFunction? {
+        return specialFunctions[name]
+    }
 
     fun validateSuperClassesAndInterfaces() {
         if (isInterface) {
@@ -99,12 +117,12 @@ open class ClassDefinition(
         }
 
         if (superClass != null && superClassInvocation == null) {
-            throw SemanticException(SourcePosition.NONE, "superClassInvocation must be provided if there is a super class")
+            throw SemanticException(SourcePosition.NONE, "superClassInvocation for class `$fullQualifiedName` must be provided if there is a super class")
         } else if (superClass == null && superClassInvocation != null) {
             throw SemanticException(SourcePosition.NONE, "superClass must be provided if there is a super class invocation")
         } else if (superClass != null && superClassInvocation != null) {
-            if (superClass!!.fullQualifiedName != (superClassInvocation.function as TypeNode).name) {
-                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass!!.fullQualifiedName} VS ${(superClassInvocation.function as TypeNode).name}")
+            if (superClass!!.fullQualifiedName != (superClassInvocation!!.function as TypeNode).name) {
+                throw SemanticException(SourcePosition.NONE, "superClass and superClassInvocation do not match -- ${superClass!!.fullQualifiedName} VS ${(superClassInvocation!!.function as TypeNode).name}")
             }
         }
 
@@ -144,7 +162,14 @@ open class ClassDefinition(
         return superClass!!.findIndex() + 1
     }
 
-    val index = findIndex()
+    var index = findIndex()
+        private set
+
+    val isRealClass: Boolean
+        get() = !isInterface
+                && fullQualifiedName !in setOf("Function", "Function?")
+                && !fullQualifiedName.endsWith("?")
+                && !fullQualifiedName.endsWith(".Companion")
 
     init {
         rawMemberProperties.forEach { addProperty(currentScope, it) }
@@ -167,14 +192,22 @@ open class ClassDefinition(
         superClass = superClass,
         superInterfaceTypes = superInterfaceTypes,
         superInterfaces = superInterfaces,
-    ).also { it.memberFunctionsForSA = emptyMap() }
+    ).also {
+        it.memberFunctionsForSA = emptyMap()
+        it.superClassInvocation = it.declaredSuperClassInvocation
+    }
 
     /**
      * Calls to this function should be after the class is registered to `currentScope`
      */
     fun attachToSemanticAnalyzer(sa: SemanticAnalyzer, isReady: Boolean = true) {
+        initSuperClass(sa.currentScope, sa)
+
         superClassInvocation?.function?.let { it as? TypeNode }?.name
-            ?.also { superClass = sa.currentScope.findClass(it)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find class $it") }
+            ?.also {
+                superClass = sa.currentScope.findClass(it)?.first
+                    ?: throw SemanticException(SourcePosition.NONE, "Cannot find class $it")
+            }
 
         superInterfaces = superInterfaceTypes.map { sa.currentScope.findClass(it.name)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find interface $it") }
 
@@ -233,9 +266,9 @@ open class ClassDefinition(
             }
         }.associateBy { it.toSignature(sa.currentScope) }
 
+        val symbolTable = sa.currentScope
         if (isReady && !isInterface && classMemberResolver?.containsSuperType("Comparable") == true) {
             val reference = classMemberResolver.genericResolutionsByTypeName["Comparable"]!!
-            val symbolTable = sa.currentScope
             var callables = sa.currentScope.findMatchingCallables(
                 currentSymbolTable = sa.currentScope,
                 originalName = "compareTo",
@@ -283,10 +316,60 @@ open class ClassDefinition(
                 function = compareToFunctionNode!!,
             )
         }
+
+        if (isReady && isRealClass) {
+            symbolTable.declareTempTypeAlias(typeParameters.map { it.name to it.typeUpperBoundOrAny() })
+            SpecialFunction.Name.entries.forEach { specialFunction ->
+                var callables: List<FindCallableResult> = emptyList()
+
+                specialFunction.acceptableValueParameterTypes.forEach { valueParameters ->
+                    if (callables.isEmpty()) {
+                        callables = sa.currentScope.findMatchingCallables(
+                            currentSymbolTable = sa.currentScope,
+                            originalName = specialFunction.functionName,
+                            receiverType = symbolTable.assertToDataType(
+                                TypeNode(
+                                    position = SourcePosition.NONE,
+                                    name = fullQualifiedName,
+                                    arguments = typeParameters.map {
+                                        TypeNode(SourcePosition.NONE, it.name, null, false)
+                                    }.emptyToNull(),
+                                    isNullable = false
+                                )
+                            ),
+                            arguments = valueParameters.map {
+                                FunctionCallArgumentInfo(
+                                    null,
+                                    symbolTable.assertToDataType(it)
+                                )
+                            },
+                            modifierFilter = SearchFunctionModifier.NoRestriction,
+                        )
+                            .filter { it.receiverType?.name != "Any" }
+                    }
+                    if (callables.size > 1) {
+                        throw SemanticException(SourcePosition.NONE, "Ambiguous `${specialFunction.functionName}` functions")
+                    }
+                }
+                if (callables.isNotEmpty()) {
+                    val function = callables.single().definition as FunctionDeclarationNode
+                    specialFunctions[specialFunction] = SpecialFunction(function)
+                    sa.executionEnvironment.registerSpecialFunction(
+                        type = ExecutionEnvironment.SymbolType.Function,
+                        receiverType = fullQualifiedName,
+                        name = specialFunction.functionName,
+                        function = function,
+                    )
+                }
+            }
+            symbolTable.popTempTypeAlias()
+        }
     }
 
     fun attachToInterpreter(interpreter: Interpreter) {
         isInInterpreter = true
+
+        initSuperClass(interpreter.symbolTable(), null)
 
         superClassInvocation?.function?.let { it as? TypeNode }?.name
             ?.also { superClass = interpreter.symbolTable().findClass(it)?.first ?: throw SemanticException(SourcePosition.NONE, "Cannot find class $it") }
@@ -341,6 +424,18 @@ open class ClassDefinition(
                     position = SourcePosition("", 1, 1)
                 ).evalClassMemberAnyFunctionCall(subject, function)
                     .let { (it as IntValue).value }
+            }
+        }
+
+        if (!isInterface && isRealClass) {
+            SpecialFunction.Name.entries.forEach { specialFunction ->
+                interpreter.executionEnvironment.findNullableSpecialFunction(
+                    type = ExecutionEnvironment.SymbolType.Function,
+                    receiverType = fullQualifiedName,
+                    name = specialFunction.functionName,
+                )?.let { func ->
+                    specialFunctions[specialFunction] = SpecialFunction(func)
+                }
             }
         }
     }

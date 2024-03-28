@@ -97,7 +97,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
-import com.sunnychung.lib.multiplatform.kotlite.model.toSignature
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassSemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.util.FunctionAndTypes
@@ -1934,7 +1933,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             currentScope.declareProperty(position, "this/${fullQualifiedClassName}", TypeNode(SourcePosition.NONE, name, pseudoTypeArguments, false), false)
             currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this/${fullQualifiedClassName}", "this")
 
-            superClassInvocation?.let { superClassInvocation ->
+            classDefinition.superClassInvocation?.let { superClassInvocation ->
                 currentScope.declareProperty(position, "super", superClassInvocation.type(), false)
                 currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "super", "super")
             }
