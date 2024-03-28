@@ -320,4 +320,27 @@ class AnyTest {
         assertEquals("B()", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
         assertEquals("A()/45/B()", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
     }
+
+    @Test
+    fun anyExtensionFunction() {
+        val interpreter = interpreter("""
+            fun Any.f() = "abc"
+            open class A(val x: Int)
+            
+            val a = A(5).f()
+            val b = 12.f()
+            val c = "ab".f()
+            val d = 12.3.f()
+            val e = false.f()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(5, symbolTable.propertyValues.size)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("c") as StringValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("d") as StringValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("e") as StringValue).value)
+    }
 }

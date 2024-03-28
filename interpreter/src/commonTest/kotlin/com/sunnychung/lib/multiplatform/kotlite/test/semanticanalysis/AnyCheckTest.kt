@@ -102,4 +102,12 @@ class AnyCheckTest {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun nonNullAnyExtensionFunction() {
+        assertSemanticFail("""
+            fun Any.f() = "abc"
+            val a = null.f()
+        """.trimIndent())
+    }
 }
