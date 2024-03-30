@@ -521,6 +521,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         if (operator == "=" && subjectRawType is FunctionTypeNode && value is LambdaLiteralNode) {
             value.parameterTypesUpperBound = subjectRawType.parameterTypes
             value.returnTypeUpperBound = subjectRawType.returnType
+            value.receiverType = subjectRawType.receiverType
         }
 
         value.visit(modifier = modifier)
@@ -644,6 +645,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             if (declaredType is FunctionTypeNode && initialValue is LambdaLiteralNode) {
                 initialValue.parameterTypesUpperBound = declaredType.parameterTypes
                 initialValue.returnTypeUpperBound = declaredType.returnType
+                initialValue.receiverType = declaredType.receiverType
             }
             initialValue?.visit(modifier = modifier)
         }
@@ -820,9 +822,37 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         val visitValueParameters = {
             valueParameters.forEach {
                 it.visit(modifier = modifier, functionDeclarationNode = this, isDeclareProperty = !isVararg)
+                if ((it.type as? FunctionTypeNode)?.receiverType != null) {
+                    val type = it.type as FunctionTypeNode
+                    currentScope.declareExtensionFunction(
+                        position = position,
+                        name = "${receiver?.descriptiveName() ?: "-"}/$name/${(it.type as FunctionTypeNode).receiverType!!.descriptiveName()}/${it.name}",
+                        node = FunctionDeclarationNode(
+                            position = it.position,
+                            name = it.name,
+                            receiver = type.receiverType,
+                            declaredReturnType = type.returnType,
+                            valueParameters = (type.parameterTypes ?: emptyList()).map {
+                                FunctionValueParameterNode(
+                                    position = it.position,
+                                    name = "",
+                                    declaredType = it,
+                                    defaultValue = null,
+                                    modifiers = emptySet(),
+                                )
+                            },
+                            body = null,
+                            transformedRefName = "${receiver?.descriptiveName() ?: "-"}/$name/${(it.type as FunctionTypeNode).receiverType!!.descriptiveName()}/${it.name}/${++functionDefIndex}"
+                        )//.also { it.visit(modifier = modifier) }
+                            .also { type.extensionFunctionRefName = it.transformedRefName }
+                    )
+                }
             }
             if (isVararg) {
                 with(valueParameters.single()) {
+                    if ((type as? FunctionTypeNode)?.receiverType != null) {
+                        throw SemanticException(position, "vararg parameter cannot be a function type with a receiver")
+                    }
                     val type = this@visit.resolveGenericParameterType(this).let {
                         TypeNode(position, "List", listOf(it), false)
                     }
@@ -846,75 +876,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
             previousScope.registerTransformedSymbol(position, IdentifierClassifier.Function, transformedRefName!!, name)
         } else {
-            val typeNode = receiver
-            currentScope.declareProperty(position = position, name = "this", type = typeNode, isMutable = false)
-            currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
-            val clazz = currentScope.findClass(typeNode.name)?.first ?: throw SemanticException(position, "Class `${receiver.descriptiveName()}` not found")
-            if (clazz.superClass != null) {
-                val superClassTypeResolutions = ClassMemberResolver.create(currentScope, clazz, typeNode.arguments)!!
-                    .let {
-                        it.genericResolutionsByTypeName[clazz.fullQualifiedName]!!
-                    }
-                val superClassType = TypeNode(
-                    SourcePosition.NONE,
-                    clazz.superClass!!.fullQualifiedName,
-                    clazz.superClass!!.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
-                    isNullable = false,
-                )
-                currentScope.declareProperty(position = position, name = "super", type = superClassType, isMutable = false)
-                currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "super", "super")
-            }
-            if (!typeNode.isNullable) {
-                clazz.typeParameters.forEachIndexed { index, it ->
-                    currentScope.declareTypeAlias(position, it.name, it.typeUpperBound)
-                    if ((receiver.arguments?.get(index) ?: throw SemanticException(position, "Missing receiver type argument")).name != "*") {
-                        currentScope.declareTypeAliasResolution(position, it.name, receiver.arguments!![index])
-                    }
-                }
-                clazz.getAllMemberPropertiesExcludingCustomAccessors().forEach {
-                    currentScope.declareProperty(
-                        position = position,
-                        name = it.key,
-                        type = it.value.type.toTypeNode(),
-                        isMutable = it.value.isMutable
-                    )
-                    val transformedName = clazz.findMemberPropertyTransformedName(it.key)
-                        ?: throw SemanticException(position, "Cannot find transformed property of `${it.key}`")
-                    currentScope.registerTransformedSymbol(
-                        position = position,
-                        identifierClassifier = IdentifierClassifier.Property,
-                        transformedName = transformedName,
-                        originalName = it.key,
-                    )
-                    currentScope.declarePropertyOwner(
-                        name = transformedName, // "${it.key}/${currentScope.scopeLevel}",
-                        owner = "this/${receiver.descriptiveName()}",
-                    )
-                }
-                clazz.getAllMemberFunctions().forEach {
-                    currentScope.declareFunction(position = position, name = it.key, node = it.value)
-                    currentScope.declareFunctionOwner(name = it.key, function = it.value, owner = "this" /*"this/${receiver.descriptiveName()}"*/)
-                }
-            }
-            currentScope.findExtensionPropertyByReceiver(typeNode.resolveGenericParameterTypeToUpperBound(clazz.typeParameters)).forEach {
-                currentScope.declareProperty(
-                    position = position,
-                    name = it.second.declaredName,
-                    type = it.second.typeNode!!,
-                    isMutable = it.second.setter != null
-                )
-                currentScope.registerTransformedSymbol(
-                    position = position,
-                    identifierClassifier = IdentifierClassifier.Property,
-                    transformedName = it.second.transformedName!!,
-                    originalName = it.second.declaredName,
-                )
-                currentScope.declarePropertyOwner(
-                    name = it.second.transformedName!!, //"${it.second.declaredName}/${currentScope.scopeLevel}",
-                    owner = "this/${receiver.descriptiveName()}",
-                    extensionPropertyRef = it.first,
-                )
-            }
+            copyReceiverIntoCurrentScope(position = position, receiver = receiver)
 
             pushScope("$name(valueParameters)", ScopeType.FunctionParameters)
             ++additionalScopeCount
@@ -924,11 +886,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             // 1. setting `transformedRefName` must be before `this.copy()`.
             // 2. `transformedRefName` should be identical among these extension functions, because
             //    only one implementation would be registered in Interpreter.
-            transformedRefName = "${typeNode.descriptiveName()}/$name/${++functionDefIndex}"
-            previousScope.declareExtensionFunction(position, "${typeNode.name}/$name", this.copy(receiver = receiver.copy(isNullable = false)).also { variantsOfThis += it })
+            transformedRefName = "${receiver.descriptiveName()}/$name/${++functionDefIndex}"
+            previousScope.declareExtensionFunction(position, "${receiver.name}/$name", this.copy(receiver = receiver.copy(isNullable = false)).also { variantsOfThis += it })
 
-            if (typeNode.isNullable) {
-                previousScope.declareExtensionFunction(position, "${typeNode.name}?/$name", this)
+            if (receiver.isNullable) {
+                previousScope.declareExtensionFunction(position, "${receiver.name}?/$name", this)
 //                transformedRefName = "${typeNode.name}?/$name/${++functionDefIndex}"
 
 //                previousScope.declareExtensionFunction("Nothing/$name", this.copy(receiver = typeRegistry["Null"]).also { variantsOfThis += it })
@@ -958,6 +920,88 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         }
 
         evaluateAndRegisterReturnType(this)
+    }
+
+    private fun copyReceiverIntoCurrentScope(position: SourcePosition, receiver: TypeNode) {
+        val typeNode = receiver
+        currentScope.declareProperty(position = position, name = "this", type = typeNode, isMutable = false)
+        currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
+        val clazz = currentScope.findClass(typeNode.name)?.first
+            ?: throw SemanticException(position, "Class `${receiver.descriptiveName()}` not found")
+        if (clazz.superClass != null) {
+            val superClassTypeResolutions = ClassMemberResolver.create(currentScope, clazz, typeNode.arguments)!!
+                .let {
+                    it.genericResolutionsByTypeName[clazz.fullQualifiedName]!!
+                }
+            val superClassType = TypeNode(
+                SourcePosition.NONE,
+                clazz.superClass!!.fullQualifiedName,
+                clazz.superClass!!.typeParameters.map { tp -> superClassTypeResolutions[tp.name]!! }.emptyToNull(),
+                isNullable = false,
+            )
+            currentScope.declareProperty(position = position, name = "super", type = superClassType, isMutable = false)
+            currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "super", "super")
+        }
+        if (!typeNode.isNullable) {
+            clazz.typeParameters.forEachIndexed { index, it ->
+                currentScope.declareTypeAlias(position, it.name, it.typeUpperBound)
+                if ((receiver.arguments?.get(index) ?: throw SemanticException(
+                        position,
+                        "Missing receiver type argument"
+                    )).name != "*"
+                ) {
+                    currentScope.declareTypeAliasResolution(position, it.name, receiver.arguments!![index])
+                }
+            }
+            clazz.getAllMemberPropertiesExcludingCustomAccessors().forEach {
+                currentScope.declareProperty(
+                    position = position,
+                    name = it.key,
+                    type = it.value.type.toTypeNode(),
+                    isMutable = it.value.isMutable
+                )
+                val transformedName = clazz.findMemberPropertyTransformedName(it.key)
+                    ?: throw SemanticException(position, "Cannot find transformed property of `${it.key}`")
+                currentScope.registerTransformedSymbol(
+                    position = position,
+                    identifierClassifier = IdentifierClassifier.Property,
+                    transformedName = transformedName,
+                    originalName = it.key,
+                )
+                currentScope.declarePropertyOwner(
+                    name = transformedName, // "${it.key}/${currentScope.scopeLevel}",
+                    owner = "this/${receiver.descriptiveName()}",
+                )
+            }
+            clazz.getAllMemberFunctions().forEach {
+                currentScope.declareFunction(position = position, name = it.key, node = it.value)
+                currentScope.declareFunctionOwner(
+                    name = it.key,
+                    function = it.value,
+                    owner = "this" /*"this/${receiver.descriptiveName()}"*/
+                )
+            }
+        }
+        currentScope.findExtensionPropertyByReceiver(typeNode.resolveGenericParameterTypeToUpperBound(clazz.typeParameters))
+            .forEach {
+                currentScope.declareProperty(
+                    position = position,
+                    name = it.second.declaredName,
+                    type = it.second.typeNode!!,
+                    isMutable = it.second.setter != null
+                )
+                currentScope.registerTransformedSymbol(
+                    position = position,
+                    identifierClassifier = IdentifierClassifier.Property,
+                    transformedName = it.second.transformedName!!,
+                    originalName = it.second.declaredName,
+                )
+                currentScope.declarePropertyOwner(
+                    name = it.second.transformedName!!, //"${it.second.declaredName}/${currentScope.scopeLevel}",
+                    owner = "this/${receiver.descriptiveName()}",
+                    extensionPropertyRef = it.first,
+                )
+            }
     }
 
     fun FunctionCallNode.visit(modifier: Modifier = Modifier(), isSkipConstructionSecurityCheck: Boolean = false, isSuperClassInvocation: Boolean = false) {
@@ -1126,6 +1170,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         log.v { "functionRefName=$functionRefName; r=${r.descriptiveName()}" }
                     }
                     r
+                }
+
+                if (symbolRecorders.isNotEmpty() && isLocalAndNotCurrentScope(resolution.scope.scopeLevel)) {
+                    val symbols = symbolRecorders.last()
+                    when (resolution.type) {
+                        CallableType.Function, CallableType.Property, CallableType.Constructor, CallableType.ClassMemberFunction -> {}
+
+                        CallableType.ExtensionFunction -> {
+                            symbols.extensionFunctions += resolution.transformedName
+                        }
+                    }
                 }
 
                 FunctionInfo(
@@ -1358,6 +1413,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     it.toTypeNode()
                 }
                 callArgument.value.returnTypeUpperBound = functionArgumentType.returnType.toTypeNode()
+                callArgument.value.receiverType = functionArgumentType.receiverType?.toTypeNode()
             }
         }
 
@@ -2073,6 +2129,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
         }
 
+        if (receiverType != null) {
+            copyReceiverIntoCurrentScope(position = position, receiver = receiverType!!)
+        }
+
         valueParameters.forEach {
             if (it.name != "_") {
                 it.visit(modifier = modifier, null)
@@ -2098,6 +2158,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     } ?: false
                 }
             symbols.functions += this.accessedRefs!!.functions
+                .filter {
+                    currentScope.findTransformedSymbol(IdentifierClassifier.Function, it)?.second?.scopeLevel?.let {
+                        isLocalAndNotCurrentScope(it)
+                    } ?: false
+                }
+            symbols.extensionFunctions += this.accessedRefs!!.extensionFunctions
                 .filter {
                     currentScope.findTransformedSymbol(IdentifierClassifier.Function, it)?.second?.scopeLevel?.let {
                         isLocalAndNotCurrentScope(it)

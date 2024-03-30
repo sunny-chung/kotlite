@@ -52,6 +52,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionCallResult
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
@@ -759,6 +760,40 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                         value = varargListValueArgument,
                     )
                 }
+                if (!isVararg && (it.type as? FunctionTypeNode)?.receiverType != null) {
+                    val type = it.type as FunctionTypeNode
+                    symbolTable.declareExtensionFunction(
+                        position = it.position,
+                        name = type.extensionFunctionRefName!!,
+                        node = object : FunctionDeclarationNode(
+                            position = it.position,
+                            name = "",
+                            receiver = type.receiverType,
+                            declaredReturnType = type.returnType,
+                            valueParameters = (type.parameterTypes ?: emptyList()).map {
+                                FunctionValueParameterNode(
+                                    position = it.position,
+                                    name = "",
+                                    declaredType = it,
+                                    defaultValue = null,
+                                    modifiers = emptySet(),
+                                )
+                            },
+                            body = null,
+                        ) {
+                            override fun execute(
+                                interpreter: Interpreter,
+                                receiver: RuntimeValue?,
+                                lambdaArguments: List<RuntimeValue>,
+                                typeArguments: Map<String, DataType>
+                            ): RuntimeValue {
+                                return ((replaceArguments[index] ?: arguments[index]) as? LambdaValue)
+                                    ?.execute(lambdaArguments.toTypedArray())
+                                    ?: NullValue
+                            }
+                        }
+                    )
+                }
             }
 
             val arguments = if (isVararg) {
@@ -1322,6 +1357,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         }
         refs.functions.forEach {
             runtimeRefs.declareFunction(position, it, currentSymbolTable.findFunction(it)!!.first)
+        }
+        refs.extensionFunctions.forEach {
+            runtimeRefs.declareExtensionFunction(position, it, currentSymbolTable.findExtensionFunction(it)!!)
         }
         refs.classes.forEach {
             runtimeRefs.declareClass(position, currentSymbolTable.findClass(it)!!.first)

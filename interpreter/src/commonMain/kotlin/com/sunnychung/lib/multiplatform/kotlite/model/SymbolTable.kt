@@ -239,6 +239,7 @@ open class SymbolTable(
                 arguments = type.parameterTypes?.map { assertToDataType(it) } ?: listOf(UnresolvedType),
                 returnType = type.returnType?.let { assertToDataType(it) } ?: UnresolvedType,
                 isNullable = type.isNullable,
+                receiverType = type.receiverType?.let { assertToDataType(it) },
             )
         }
         type.toPrimitiveDataType(rootScope)?.let { return it }
@@ -735,6 +736,9 @@ open class SymbolTable(
                 // TODO handle conflicts with existing scope, e.g. generic functions
                 declareTypeAliasResolution(position, it.key, it.value.toTypeNode())
             }
+        other.extensionFunctionDeclarations.forEach {
+            declareExtensionFunction(position, it.key, it.value)
+        }
 //        this.transformedSymbols += other.transformedSymbols
     }
 

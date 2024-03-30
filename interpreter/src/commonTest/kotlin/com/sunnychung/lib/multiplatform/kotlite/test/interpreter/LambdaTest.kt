@@ -804,6 +804,32 @@ class LambdaTest {
     }
 
     @Test
+    fun executeLambdaReferencingClassExtensionFunction() {
+        val interpreter = interpreter("""
+            class A {
+                fun Int.f() = 2 * this
+                
+                fun g(): (Int) -> Int {
+                    return { i: Int ->
+                        i.f()
+                    }
+                }
+            }
+            val o = A().g()
+            val a = o(3)
+            val b = o(10)
+            val c = A().g()(25)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(20, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals(50, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
+    }
+
+    @Test
     fun invokeLambdaDirectly() {
         val interpreter = interpreter("""
             var a: Int = 0
