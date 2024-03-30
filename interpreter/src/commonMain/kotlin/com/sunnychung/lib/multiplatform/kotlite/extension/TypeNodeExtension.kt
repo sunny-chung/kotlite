@@ -23,7 +23,7 @@ fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypePa
         return if (type is FunctionTypeNode) {
             FunctionTypeNode(
                 type.position,
-                type.receiverType,
+                type.receiverType?.let { resolve(it) },
                 type.parameterTypes?.map { resolve(it) },
                 type.returnType?.let { resolve(it) },
                 type.isNullable
