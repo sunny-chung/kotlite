@@ -172,6 +172,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         }
         val libFunctions = executionEnvironment.getBuiltinFunctions(builtinSymbolTable)
         libFunctions.forEach {
+            log.d { "Install lib function ${it.receiver?.let { "$it." } ?: ""}${it.name}" }
             it.visit()
         }
         classes.forEach { // do this again after registering functions to make the post-resolution logic works
@@ -923,7 +924,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     private fun copyReceiverIntoCurrentScope(position: SourcePosition, receiver: TypeNode) {
-        val typeNode = receiver
+        val typeNode = currentScope.findTypeAlias(receiver.nameWithNullable)?.first?.toTypeNode() ?: receiver
         currentScope.declareProperty(position = position, name = "this", type = typeNode, isMutable = false)
         currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
         val clazz = currentScope.findClass(typeNode.name)?.first
@@ -1363,18 +1364,10 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         (function as NavigationNode).subject.type(ResolveTypeModifier(isSkipGenerics = isSkipGenerics))
 
                     var type = argumentType.toDataType() as? ObjectType
-                    val resolver = type?.let { ClassMemberResolver.create(currentScope, it.clazz, it.arguments.map { it.toTypeNode() }) }
-//                    while (type != null && type.name != parameterType.name) {
-////                        type = (type as? ObjectType)?.clazz?.superClass?.let {
-////                            val typeResolutions = resolver!!.genericResolutions[it.index].second
-////                            ObjectType(it, it.typeParameters.map {
-////                                typeResolutions[it.name]!!.toDataType()
-////                            }, superType = null)
-////                        }
-//                        type = type.superType
-//                    }
-                    if (type != null && type.name != parameterType.name) {
-                        type = type.findSuperType(parameterType.name)
+                    if (functionArgumentAndReturnTypeDeclarations.receiverType.name !in tpUpperBounds) { // not the case of `fun <T> T.f()`
+                        if (type != null && type.name != parameterType.name) {
+                            type = type.findSuperType(parameterType.name)
+                        }
                     }
 
                     if (type != null) {
@@ -1605,7 +1598,6 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     fun NavigationNode.visit(modifier: Modifier = Modifier(), lookupType: IdentifierClassifier = IdentifierClassifier.Property, isCheckWriteAccess: Boolean = false) {
         subject.visit(modifier = modifier)
 
-        // at this moment subject must not be a primitive
         member.visit(modifier = modifier)
 
         // find member

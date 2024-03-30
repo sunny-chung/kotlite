@@ -92,6 +92,8 @@ open class TypeNode(override val position: SourcePosition, val name: String, val
         }
     }
 
+    val nameWithNullable: String get() = "$name${if (isNullable) "?" else ""}"
+
     open fun descriptiveName(): String = "$name${arguments?.let { "<${it.joinToString(", ") { it.descriptiveName() }}>" } ?: ""}${if (isNullable) "?" else ""}"
 
     override fun toMermaid(): String {

@@ -1351,7 +1351,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
     fun LambdaLiteralNode.eval(): RuntimeValue {
         val refs = this.accessedRefs!!
         val currentSymbolTable = callStack.currentSymbolTable()
-        val runtimeRefs = SymbolTable(Int.MAX_VALUE, "lambda-symbol-ref", ScopeType.Closure, null)
+        val runtimeRefs = SymbolTable(Int.MAX_VALUE, "lambda-symbol-ref", ScopeType.Closure, currentSymbolTable.rootScope)
         refs.properties.forEach {
             runtimeRefs.putPropertyHolder(it, currentSymbolTable.getPropertyHolder(it))
         }
@@ -1359,7 +1359,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             runtimeRefs.declareFunction(position, it, currentSymbolTable.findFunction(it)!!.first)
         }
         refs.extensionFunctions.forEach {
-            runtimeRefs.declareExtensionFunction(position, it, currentSymbolTable.findExtensionFunction(it)!!)
+            val extensionFunction = currentSymbolTable.findExtensionFunctionWithReceiver(it)!!
+            runtimeRefs.declareExtensionFunction(position, it, extensionFunction.second, extensionFunction.first)
         }
         refs.classes.forEach {
             runtimeRefs.declareClass(position, currentSymbolTable.findClass(it)!!.first)

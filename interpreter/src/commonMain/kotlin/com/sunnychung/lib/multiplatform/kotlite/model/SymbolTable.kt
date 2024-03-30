@@ -40,7 +40,7 @@ open class SymbolTable(
     internal val transformedSymbolsByDeclaredName = mutableMapOf<Pair<IdentifierClassifier, String>, String>() // only use in SemanticAnalyzer. original name -> transformed name
 
     protected val functionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
-    protected val extensionFunctionDeclarations = mutableMapOf<String, FunctionDeclarationNode>()
+    protected val extensionFunctionDeclarations = mutableMapOf<String, Pair<DataType, FunctionDeclarationNode>>()
     protected val extensionProperties = mutableMapOf<String, ExtensionProperty>()
 
     private val classDeclarations = mutableMapOf<String, ClassDefinition>()
@@ -483,22 +483,41 @@ open class SymbolTable(
             ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findFunction(name) }
     }
 
-    fun declareExtensionFunction(position: SourcePosition, name: String, node: FunctionDeclarationNode): String {
+    fun declareExtensionFunction(position: SourcePosition, name: String, node: FunctionDeclarationNode, receiverType: DataType? = null): String {
         val functionSignature = functionNameTransform(name = name, function = node)
         if (extensionFunctionDeclarations.containsKey(functionSignature)) {
             throw DuplicateIdentifierException(position = position, name = name, classifier = IdentifierClassifier.Function)
         }
-        extensionFunctionDeclarations[functionSignature] = node
+        log.v { "declareExtensionFunction($position, $name, ${node.receiver?.let { "$it." } ?: ""}${node.name})" }
+        val receiverType = receiverType ?: run {
+            val dedicatedSymbolTable = if (node.typeParameters.isNotEmpty()) {
+                createTempSymbolTable().also { symbolTable ->
+                    node.typeParameters.forEach {
+                        symbolTable.declareTypeAlias(it.position, it.name, it.typeUpperBound)
+                    }
+                }
+            } else {
+                this
+            }
+            dedicatedSymbolTable.assertToDataType(
+                node.receiverType ?: throw RuntimeException("Extension function `$name` has no receiver")
+            )
+        }
+        extensionFunctionDeclarations[functionSignature] = receiverType to node
         return functionSignature
     }
 
     fun findExtensionFunction(transformedName: String, isThisScopeOnly: Boolean = false): FunctionDeclarationNode? {
+        return findExtensionFunctionWithReceiver(transformedName, isThisScopeOnly)?.let { it.second }
+    }
+
+    fun findExtensionFunctionWithReceiver(transformedName: String, isThisScopeOnly: Boolean = false): Pair<DataType, FunctionDeclarationNode>? {
         return extensionFunctionDeclarations[transformedName]
-            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunction(transformedName) }
+            ?: Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunctionWithReceiver(transformedName) }
     }
 
     fun findExtensionFunctionsByDeclaredName(receiver: TypeNode, declaredName: String, isThisScopeOnly: Boolean = false): Collection<FunctionDeclarationNode> {
-        return extensionFunctionDeclarations.filter { it.value.receiver?.name == receiver.name && it.value.name == declaredName }.values + // TODO handle generics
+        return extensionFunctionDeclarations.filter { it.value.first.name == receiver.name && it.value.second.name == declaredName }.values.map { it.second } + // TODO handle generics
             (Unit.takeIf { !isThisScopeOnly }?.let { parentScope?.findExtensionFunctionsByDeclaredName(receiver, declaredName, isThisScopeOnly) } ?: emptyList())
     }
 
@@ -737,7 +756,7 @@ open class SymbolTable(
                 declareTypeAliasResolution(position, it.key, it.value.toTypeNode())
             }
         other.extensionFunctionDeclarations.forEach {
-            declareExtensionFunction(position, it.key, it.value)
+            declareExtensionFunction(position, it.key, it.value.second)
         }
 //        this.transformedSymbols += other.transformedSymbols
     }
@@ -757,7 +776,7 @@ open class SymbolTable(
             declareProperty(position, it.key, it.value.type.toTypeNode(), it.value.isMutable)
         }
         other.extensionFunctionDeclarations.forEach {
-            declareExtensionFunction(position, it.key, it.value)
+            declareExtensionFunction(position, it.key, it.value.second)
         }
         other.extensionProperties.forEach {
             declareExtensionProperty(position, it.key, it.value)
@@ -774,6 +793,18 @@ open class SymbolTable(
         other.transformedSymbols.forEach {
             registerTransformedSymbol(SourcePosition.NONE, it.key.first, it.key.second, it.value)
         }
+    }
+
+    /**
+     * The returned new symbol table is not added to the Call Stack.
+     */
+    private fun createTempSymbolTable(): SymbolTable {
+        return SymbolTable(
+            scopeLevel = scopeLevel + 1,
+            scopeName = "<temp>",
+            scopeType = ScopeType.ExtraWrap,
+            parentScope = this
+        )
     }
 
     fun printSymbolTableStack() {

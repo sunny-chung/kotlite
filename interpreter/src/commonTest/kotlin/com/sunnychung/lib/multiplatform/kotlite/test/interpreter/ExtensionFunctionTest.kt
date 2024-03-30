@@ -378,4 +378,22 @@ class ExtensionFunctionTest {
         println(symbolTable.propertyValues)
         assertEquals(1000, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
+
+    @Test
+    fun genericExtensionFunctionReceiver() {
+        val interpreter = interpreter("""
+            abstract class Base(val x: Int)
+            class A(x: Int) : Base(x)
+            class B(x: Int) : Base(x)
+            fun <T : Base> T.unwrap(): Int = x
+            val a: Int = A(6).unwrap()
+            val b = B(25).unwrap()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }
