@@ -9,21 +9,19 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 
-class SetValue(value: Set<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable)
-    : DelegatedValue<Set<RuntimeValue>>(value, clazz, listOf(typeArgument), symbolTable) {
+fun SetValue(value: Set<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable)
+    = DelegatedValue<Set<RuntimeValue>>(value, SetClass.clazz, listOf(typeArgument), symbolTable)
 
-    companion object {
-        val clazz = ProvidedClassDefinition(
-            fullQualifiedName = "Set",
-            typeParameters = listOf(
-                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "T", typeUpperBound = null),
-            ),
-            isInstanceCreationAllowed = false,
-            primaryConstructorParameters = emptyList(),
-            constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-            superInterfaceTypeNames = listOf("Collection<T>"),
-//            superInterfaces = listOf(CollectionInterface.collectionClazz),
-            position = SourcePosition("Collections", 1, 1),
-        )
-    }
+object SetClass {
+    val clazz = ProvidedClassDefinition(
+        fullQualifiedName = "Set",
+        typeParameters = listOf(
+            TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "T", typeUpperBound = null),
+        ),
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+        superInterfaceTypeNames = listOf("Collection<T>"),
+        position = SourcePosition("Collections", 1, 1),
+    )
 }

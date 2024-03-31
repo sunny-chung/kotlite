@@ -16,14 +16,17 @@ fun TypeNode.resolveGenericParameterTypeArguments(typeArguments: Map<String, Typ
     })
 }
 
-fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypeParameterNode>, isKeepTypeParameter: Boolean = false): TypeNode {
+fun TypeNode.resolveGenericParameterTypeToUpperBound(typeParameters: List<TypeParameterNode>, isKeepTypeParameter: Boolean = false, isResolveRootOnly: Boolean = false): TypeNode {
     if (typeParameters.isEmpty()) return this
 
     fun resolve(type: TypeNode): TypeNode {
+        if (isResolveRootOnly && type !== this) {
+            return type
+        }
         return if (type is FunctionTypeNode) {
             FunctionTypeNode(
                 type.position,
-                type.receiverType,
+                type.receiverType?.let { resolve(it) },
                 type.parameterTypes?.map { resolve(it) },
                 type.returnType?.let { resolve(it) },
                 type.isNullable

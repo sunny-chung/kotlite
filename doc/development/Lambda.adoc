@@ -1,0 +1,8 @@
+= Lambda
+
+== Scope Persistence
+
+1. Accessing anything local from a lambda will be recorded in Semantic Analyzer.
+2. It is then stored as a `SymbolReferenceSet` in the field `accessedRefs` of `LambdaLiteralNode`.
+3. In Interpreter, while evaluating a `LambdaLiteralNode` to convert to a `LambdaValue`, everything in `accessedRefs` is copied to an empty new Symbol Table and stored in `LambdaValue`.
+4. While executing the lambda, the new symbol table is then merged into current scope.

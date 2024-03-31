@@ -414,7 +414,7 @@ data class TypeParameterType(
     }
 }
 
-data class FunctionType(val arguments: List<DataType>, val returnType: DataType, override val isNullable: Boolean) : DataType {
+data class FunctionType(val arguments: List<DataType>, val returnType: DataType, override val isNullable: Boolean, val receiverType: DataType? = null) : DataType {
     override val name: String = "Function"
 
     override val nameWithNullable: String

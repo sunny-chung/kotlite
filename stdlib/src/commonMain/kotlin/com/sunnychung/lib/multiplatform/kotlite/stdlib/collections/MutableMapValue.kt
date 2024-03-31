@@ -8,22 +8,20 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 
-class MutableMapValue(value: Map<RuntimeValue, RuntimeValue>, keyType: DataType, valueType: DataType, symbolTable: SymbolTable)
-    : DelegatedValue<Map<RuntimeValue, RuntimeValue>>(value, clazz, listOf(keyType, valueType), symbolTable) {
+fun MutableMapValue(value: Map<RuntimeValue, RuntimeValue>, keyType: DataType, valueType: DataType, symbolTable: SymbolTable)
+    = DelegatedValue<Map<RuntimeValue, RuntimeValue>>(value, MutableMapClass.clazz, listOf(keyType, valueType), symbolTable)
 
-    companion object {
-        val clazz = ProvidedClassDefinition(
-            fullQualifiedName = "MutableMap",
-            typeParameters = listOf(
-                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "K", typeUpperBound = null),
-                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "V", typeUpperBound = null)
-            ),
-            isInstanceCreationAllowed = false,
-            primaryConstructorParameters = emptyList(),
-            constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-            superClassInvocationString = "Map<K, V>()",
-//            superClass = MapValue.clazz,
-            position = SourcePosition("Collections", 1, 1),
-        )
-    }
+object MutableMapClass {
+    val clazz = ProvidedClassDefinition(
+        fullQualifiedName = "MutableMap",
+        typeParameters = listOf(
+            TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "K", typeUpperBound = null),
+            TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "V", typeUpperBound = null)
+        ),
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+        superClassInvocationString = "Map<K, V>()",
+        position = SourcePosition("Collections", 1, 1),
+    )
 }

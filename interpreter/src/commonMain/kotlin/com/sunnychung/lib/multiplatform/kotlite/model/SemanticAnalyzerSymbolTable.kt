@@ -402,48 +402,51 @@ class SemanticAnalyzerSymbolTable(
     }
 
     fun findExtensionFunctions(receiverType: DataType, functionName: String, isThisScopeOnly: Boolean = false): List<Pair<FunctionDeclarationNode, SymbolTable>> {
-        return extensionFunctionDeclarations.values.filter { func ->
-            (func.receiver?.let {
-                if (
-                    !(receiverType.name == "Nothing" && receiverType.isNullable && it.isNullable) &&
-                    (it.name != receiverType.name || it.isNullable != receiverType.isNullable)
-                ) return@let false
-                // at here, class name and nullability matched, or receiver is null and nullability matched
-                val objectTypeReceiver = receiverType as? ObjectType
-                if (it.arguments.isNullOrEmpty() && (objectTypeReceiver == null || objectTypeReceiver.arguments.isEmpty())) {
-                    return@let true
+        return extensionFunctionDeclarations.values.filter { (funcReceiverType, func) ->
+            func.name == functionName && (funcReceiverType.let {
+                if (!it.isConvertibleFrom(receiverType)) {
+                    return@let false
                 }
-                // at here, function receiver type has some type parameter, so receiverType can only be class instance
-                if (objectTypeReceiver == null) {
-                    throw RuntimeException("Receiver must be a class instance")
-                }
-                if (it.arguments!!.size != objectTypeReceiver.arguments.size) {
-                    throw RuntimeException("Number of type arguments mismatch")
-                }
-                declareTempTypeAlias(func.typeParameters.map {
-                    it.name to it.typeUpperBoundOrAny()
-                })
-                try {
-                    it.arguments.forEachIndexed { index, argType ->
-                        if (argType.name == "*") return@forEachIndexed
-                        val typeParameter = func.typeParameters.firstOrNull { it.name == argType.name }
-                        val functionTypeParameterType = if (typeParameter != null) {
-                            typeParameter.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-                        } else {
-                            argType
-                        }.let { typeNodeToDataType(it) } // TODO generic type
-                            ?: throw SemanticException(argType.position, "Unknown type ${argType.descriptiveName()}")
-                        if (!functionTypeParameterType.isConvertibleFrom(objectTypeReceiver.arguments[index])) {
-                            return@let false // type mismatch
-                        }
-                    }
-                } finally {
-                    popTempTypeAlias()
-                }
+//                if (
+//                    !(receiverType.name == "Nothing" && receiverType.isNullable && it.isNullable) &&
+//                    (it.name != receiverType.name || it.isNullable != receiverType.isNullable)
+//                ) return@let false
+//                // at here, class name and nullability matched, or receiver is null and nullability matched
+//                val objectTypeReceiver = receiverType as? ObjectType
+//                if (it.arguments.isNullOrEmpty() && (objectTypeReceiver == null || objectTypeReceiver.arguments.isEmpty())) {
+//                    return@let true
+//                }
+//                // at here, function receiver type has some type parameter, so receiverType can only be class instance
+//                if (objectTypeReceiver == null) {
+//                    throw RuntimeException("Receiver must be a class instance")
+//                }
+//                if (it.arguments!!.size != objectTypeReceiver.arguments.size) {
+//                    throw RuntimeException("Number of type arguments mismatch")
+//                }
+//                declareTempTypeAlias(func.typeParameters.map {
+//                    it.name to it.typeUpperBoundOrAny()
+//                })
+//                try {
+//                    it.arguments.forEachIndexed { index, argType ->
+//                        if (argType.name == "*") return@forEachIndexed
+//                        val typeParameter = func.typeParameters.firstOrNull { it.name == argType.name }
+//                        val functionTypeParameterType = if (typeParameter != null) {
+//                            typeParameter.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true)
+//                        } else {
+//                            argType
+//                        }.let { typeNodeToDataType(it) } // TODO generic type
+//                            ?: throw SemanticException(argType.position, "Unknown type ${argType.descriptiveName()}")
+//                        if (!functionTypeParameterType.isConvertibleFrom(objectTypeReceiver.arguments[index])) {
+//                            return@let false // type mismatch
+//                        }
+//                    }
+//                } finally {
+//                    popTempTypeAlias()
+//                }
                 true
-            } ?: false) && func.name == functionName
+            } ?: false)
         }.map {
-            it to this
+            it.second to this
         } + (Unit.takeIf { !isThisScopeOnly }?.let {
             (parentScope as? SemanticAnalyzerSymbolTable)
                 ?.findExtensionFunctions(receiverType, functionName, isThisScopeOnly)

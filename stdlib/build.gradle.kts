@@ -136,7 +136,10 @@ kotliteStdLibHeaderProcessor {
     outputPackage = "com.sunnychung.lib.multiplatform.kotlite.stdlib"
     configs = mapOf(
         "Regex" to KotliteModuleConfig(
-            imports = listOf("com.sunnychung.lib.multiplatform.kotlite.stdlib.regex.RegexValue")
+            imports = listOf(
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.regex.RegexClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.regex.RegexValue",
+            )
         ),
         "KDateTime" to KotliteModuleConfig(
             imports = listOf(
@@ -150,6 +153,15 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KDateTimeFormattableInterface",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KPointOfTimeValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KFixedTimeUnitValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KInstantClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZonedInstantClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZoneOffsetClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KDurationClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KZonedDateTimeClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KDateClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KDateTimeFormatClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KPointOfTimeClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.kdatetime.KFixedTimeUnitClass",
                 "com.sunnychung.lib.multiplatform.kdatetime.KFixedTimeUnit",
                 "com.sunnychung.lib.multiplatform.kdatetime.KInstant",
                 "com.sunnychung.lib.multiplatform.kdatetime.KZonedInstant",
@@ -179,6 +191,12 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableSetValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.wrap",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableSetClass",
             ),
             typeAliases = mapOf(
                 "MapEntry<K, V>" to "Map.Entry<K, V>"

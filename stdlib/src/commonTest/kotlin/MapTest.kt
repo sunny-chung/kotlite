@@ -3,6 +3,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.CoreLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.TextLibModule
 import kotlin.test.Test
@@ -398,6 +399,41 @@ class MapTest {
         val symbolTable = interpreter.symbolTable()
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck1") as BooleanValue).value)
         assertEquals(listOf("101", "102", "103"), console.split("\n").sorted().filter { it.isNotEmpty() })
+    }
+
+    @Test
+    fun mutableMapOnEach() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
+            install(CollectionsLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+        }
+        val interpreter = interpreter("""
+            var counter = 0
+            var typeCheck1: Boolean = false
+            mutableMapOf(
+                "abc" to ++counter,
+                "d" to ++counter,
+                "ef" to ++counter,
+            ).onEach {
+                println("${'$'}{it.key}: ${'$'}{it.value}")
+            }.also { m -> typeCheck1 = m is MutableMap<String, Int> }
+            .apply { this["aa"] = ++counter }
+            .also { m ->
+                for (it in m) {
+                    println("${'$'}{it.key}: ${'$'}{it.value}")
+                }
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck1") as BooleanValue).value)
+        assertEquals(listOf("abc: 1", "d: 2", "ef: 3", "abc: 1", "d: 2", "ef: 3", "aa: 4").sorted(), console.split("\n").sorted().filter { it.isNotEmpty() })
     }
 
     @Test

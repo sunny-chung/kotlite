@@ -8,17 +8,17 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
-class KDateTimeFormatValue(value: KDateTimeFormat, symbolTable: SymbolTable) : DelegatedValue<KDateTimeFormat>(value, clazz, symbolTable = symbolTable) {
-    companion object {
-        val clazz = ProvidedClassDefinition(
-            fullQualifiedName = "KDateTimeFormat",
-            typeParameters = emptyList(),
-            isInstanceCreationAllowed = true,
-            primaryConstructorParameters = listOf(CustomFunctionParameter("pattern", "String")),
-            constructInstance = { interpreter, callArguments, callPosition ->
-                KDateTimeFormatValue(KDateTimeFormat((callArguments[0] as StringValue).value), interpreter.symbolTable())
-            },
-            position = SourcePosition("KDateTime", 1, 1),
-        )
-    }
+fun KDateTimeFormatValue(value: KDateTimeFormat, symbolTable: SymbolTable) : DelegatedValue<KDateTimeFormat>
+    = DelegatedValue<KDateTimeFormat>(value, KDateTimeFormatClass.clazz, symbolTable = symbolTable)
+object KDateTimeFormatClass {
+    val clazz = ProvidedClassDefinition(
+        fullQualifiedName = "KDateTimeFormat",
+        typeParameters = emptyList(),
+        isInstanceCreationAllowed = true,
+        primaryConstructorParameters = listOf(CustomFunctionParameter("pattern", "String")),
+        constructInstance = { interpreter, callArguments, callPosition ->
+            KDateTimeFormatValue(KDateTimeFormat((callArguments[0] as StringValue).value), interpreter.symbolTable())
+        },
+        position = SourcePosition("KDateTime", 1, 1),
+    )
 }

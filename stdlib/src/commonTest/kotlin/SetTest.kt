@@ -2,6 +2,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.CoreLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -209,5 +210,44 @@ class SetTest {
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+    }
+
+    @Test
+    fun toMutableSetOnEachMap() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            setOf(1, 2, 2, 3, 2)
+                .let { it.toMutableSet() }
+                .run {
+                    this += 7
+                    this
+                }
+                .onEach {
+                    println("a${'$'}it")
+                }
+                .apply {
+                    this += 6
+                }
+                .map {
+                    it * 5
+                }
+                .onEach {
+                    println("b${'$'}it")
+                }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals(
+            expected = listOf("a1", "a2", "a3", "a7", "b5", "b10", "b15", "b35", "b30").sorted(),
+            actual = console.split("\n").filter { it.isNotEmpty() }.sorted(),
+        )
     }
 }

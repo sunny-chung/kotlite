@@ -1,0 +1,87 @@
+= Delegated Value Classes
+
+In first design, each Kotlin class has a dedicated class, for example, ListValue, MutableListValue, IteratorValue, IterableValue, MapValue, etc..
+
+[mermaid]
+----
+flowchart LR
+    ListValue --> DelegatedValue --> ClassInstance --> RuntimeValue
+    MutableListValue --> DelegatedValue
+    IteratorValue --> DelegatedValue
+    IterableValue --> DelegatedValue
+    MapValue --> DelegatedValue
+    MutableMapValue --> DelegatedValue
+----
+
+The benefit of this design is type-safe. But the downside is hard casting, especially when the type is generic and not known in compile-time, for example:
+
+[source, kotlin]
+----
+fun <T, C : Iterable<T>> C.onEach(action: (T) -> Unit): C
+----
+
+Using the code generator plugin `StdLibDelegationCodeGenerator`, the generated execution function is:
+
+[source, kotlin]
+----
+executable = { interpreter, receiver, args, typeArgs ->
+    val unwrappedReceiver = (receiver as KotlinValueHolder<*>).value as Iterable<RuntimeValue>
+    val action_ = { arg0: RuntimeValue ->
+        val wa0 = arg0?.let { it as RuntimeValue } ?: NullValue
+
+        val result = (args[0] as LambdaValue).execute(arrayOf(wa0))
+        Unit
+    }
+
+    val result = unwrappedReceiver.onEach(action_)
+    result?.let { IterableValue(it, typeArgs["T"]!!.copyOf(isNullable = false) /* _t = C; t.name = Iterable; t = Iterable<T> */, symbolTable = interpreter.symbolTable()) } ?: NullValue // <1>
+},
+----
+<1> Note the return value is wrapped by `IterableValue`, which is expected.
+
+However, in runtime, `C` can be a `List`, which is backed by the class `ListValue`. On calling `C.onEach()`, `IterableValue` is returned and cannot be casted to `ListValue`. Also, note that there is no reflection in KMP to dynamically construct a `ListValue` in runtime. And, allowing assignment of `IterableValue` into a property with the `List` type does not make sense.
+
+It can be workaround by defining a constructor for each value class manually, and try to cast to it in runtime, but it defeats the type-safe purpose and has no benefit over only using a single `DelegatedValue` class.
+
+During the review, it is also found that value classes of delegated types have no dedicated members and only delegated to the constructor of the `DelegatedValue` class. For example, the implementation of `ListValue` looks like this:
+
+[source, kotlin]
+----
+class ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable) : DelegatedValue<List<RuntimeValue>>(value, clazz, listOf(typeArgument), symbolTable) {
+
+    companion object {
+        val clazz = ProvidedClassDefinition(
+            fullQualifiedName = "List",
+            typeParameters = listOf(TypeParameterNode(SourcePosition.BUILTIN, name = "T", typeUpperBound = null)),
+            isInstanceCreationAllowed = false,
+            primaryConstructorParameters = emptyList(),
+            constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+            superInterfaceTypeNames = listOf("Collection<T>"),
+            position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
+        )
+    }
+}
+----
+
+So, the second design comes out -- `XXXXXValue` is a factory global function creating an instance of `DelegatedValue`. The companion object is extracted out as an object class. There is no `XXXXXValue` classes for delegated types. `DelegatedValue` is no longer an abstract class.
+
+The new design implements like this:
+[source, kotlin]
+----
+fun ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable)
+    = DelegatedValue<List<RuntimeValue>>(value, ListClass.clazz, listOf(typeArgument), symbolTable)
+
+object ListClass {
+    val clazz = ProvidedClassDefinition(
+        fullQualifiedName = "List",
+        typeParameters = listOf(TypeParameterNode(SourcePosition.BUILTIN, name = "T", typeUpperBound = null)),
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+        superInterfaceTypeNames = listOf("Collection<T>"),
+        position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
+    )
+}
+----
+
+

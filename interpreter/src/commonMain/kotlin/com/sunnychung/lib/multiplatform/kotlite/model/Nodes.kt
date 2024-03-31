@@ -92,6 +92,8 @@ open class TypeNode(override val position: SourcePosition, val name: String, val
         }
     }
 
+    val nameWithNullable: String get() = "$name${if (isNullable) "?" else ""}"
+
     open fun descriptiveName(): String = "$name${arguments?.let { "<${it.joinToString(", ") { it.descriptiveName() }}>" } ?: ""}${if (isNullable) "?" else ""}"
 
     override fun toMermaid(): String {
@@ -255,6 +257,7 @@ interface CallableNode {
     val valueParameters: List<FunctionValueParameterNode>
     val typeParameters: List<TypeParameterNode>
     val returnType: TypeNode
+    val receiverType: TypeNode?
     val name: String?
     val labelName: String?
 
@@ -279,6 +282,9 @@ open class FunctionDeclarationNode(
         get() = declaredReturnType ?: inferredReturnType ?: throw CannotInferTypeException(position, "return type of function $name")
     val modifiers: Set<FunctionModifier>
         get() = declaredModifiers + inferredModifiers
+
+    override val receiverType: TypeNode?
+        get() = receiver
 
     override val labelName: String?
         get() = null
@@ -528,6 +534,7 @@ data class LambdaLiteralNode(
     @ModifyByAnalyzer var accessedRefs: SymbolReferenceSet? = null,
     @ModifyByAnalyzer var parameterTypesUpperBound: List<TypeNode>? = null,
     @ModifyByAnalyzer var returnTypeUpperBound: TypeNode? = null,
+    @ModifyByAnalyzer override var receiverType: TypeNode? = null,
 ) : ASTNode, CallableNode {
     @ModifyByAnalyzer var valueParameterIt: FunctionValueParameterNode? = null
 
@@ -570,8 +577,14 @@ data class LambdaLiteralNode(
     }
 }
 
-class FunctionTypeNode(override val position: SourcePosition, val receiverType: TypeNode? = null, val parameterTypes: List<TypeNode>?, val returnType: TypeNode?, isNullable: Boolean)
-    : TypeNode(position, "Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
+class FunctionTypeNode(
+    override val position: SourcePosition,
+    val receiverType: TypeNode? = null,
+    val parameterTypes: List<TypeNode>?,
+    val returnType: TypeNode?,
+    isNullable: Boolean,
+    @ModifyByAnalyzer var extensionFunctionRefName: String? = null,
+) : TypeNode(position, "Function", parameterTypes?.let { p -> returnType?.let { r -> p + r } }, isNullable) {
 
     override fun descriptiveName(): String {
         var s = "(${parameterTypes?.joinToString(", ") { it.descriptiveName() } ?: "?"}) -> ${returnType?.descriptiveName() ?: "?"}"

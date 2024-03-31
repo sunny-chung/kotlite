@@ -22,8 +22,8 @@ class ExecutionEnvironment(
         registerInitClass(AnyClass.clazz)
         registerInitClass(ComparableInterface.interfaze)
 
-        registerClass(PairValue.clazz)
-        PairValue.properties.forEach {
+        registerClass(PairClass.clazz)
+        PairClass.properties.forEach {
             registerExtensionProperty(it)
         }
 
@@ -38,8 +38,8 @@ class ExecutionEnvironment(
         registerClass(NullPointerExceptionValue.clazz)
         registerClass(TypeCastExceptionValue.clazz)
 
-        registerClass(IteratorValue.clazz)
-        IteratorValue.functions.forEach {
+        registerClass(IteratorClass.clazz)
+        IteratorClass.functions.forEach {
             registerFunction(it)
         }
 
@@ -49,7 +49,7 @@ class ExecutionEnvironment(
         }
         
         registerClass(CollectionInterface.collectionClazz)
-        registerClass(ListValue.clazz)
+        registerClass(ListClass.clazz)
     }
 
     fun registerFunction(function: CustomFunctionDefinition) {

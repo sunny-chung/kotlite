@@ -6,19 +6,18 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
-class KPointOfTimeValue(value: KPointOfTime, symbolTable: SymbolTable)
-    : DelegatedValue<KPointOfTime>(value = value, clazz = clazz, symbolTable = symbolTable)
-{
-    companion object {
-        val clazz = ProvidedClassDefinition(
-            fullQualifiedName = "KPointOfTime",
-            typeParameters = emptyList(),
-            isInstanceCreationAllowed = false,
-            primaryConstructorParameters = emptyList(),
-            constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-            superInterfaceTypeNames = listOf("KDateTimeFormattable", "Comparable<KPointOfTime>"),
+fun KPointOfTimeValue(value: KPointOfTime, symbolTable: SymbolTable)
+    = DelegatedValue<KPointOfTime>(value = value, clazz = KPointOfTimeClass.clazz, symbolTable = symbolTable)
+
+object KPointOfTimeClass {
+    val clazz = ProvidedClassDefinition(
+        fullQualifiedName = "KPointOfTime",
+        typeParameters = emptyList(),
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+        superInterfaceTypeNames = listOf("KDateTimeFormattable", "Comparable<KPointOfTime>"),
 //            superInterfaces = listOf(KDateTimeFormattableInterface.interfaze),
-            position = SourcePosition("KDateTime", 1, 1),
-        )
-    }
+        position = SourcePosition("KDateTime", 1, 1),
+    )
 }

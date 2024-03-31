@@ -1501,7 +1501,12 @@ class Parser(protected val lexer: Lexer) {
             eat(TokenType.Operator, ".")
             nameB.append(".")
             repeatedNL()
-            nameB.append(eat(TokenType.Identifier).value as String)
+            if (currentToken.type == TokenType.Identifier) {
+                nameB.append(eat(TokenType.Identifier).value as String)
+            } else {
+                resetTokenToIndex(cursorPosBeforeLastDot)
+                break
+            }
         }
         val name = nameB.toString()
         val argument = if (isCurrentTokenExcludingNL(TokenType.Operator, "<")) {
@@ -1540,6 +1545,9 @@ class Parser(protected val lexer: Lexer) {
      */
     fun functionType(): FunctionTypeNode {
         val typeParameters = mutableListOf<TypeNode>()
+        val receiverType = if (!currentToken.`is`(TokenType.Operator, "(")) {
+            receiverTypeOrIdentifier().first
+        } else null
         val t = eat(TokenType.Operator, "(")
         repeatedNL()
         var hasEatenComma = false
@@ -1573,7 +1581,13 @@ class Parser(protected val lexer: Lexer) {
         repeatedNL()
         val returnType = type()
 
-        return FunctionTypeNode(position = t.position, parameterTypes = typeParameters, returnType = returnType, isNullable = false)
+        return FunctionTypeNode(
+            position = t.position,
+            receiverType = receiverType,
+            parameterTypes = typeParameters,
+            returnType = returnType,
+            isNullable = false,
+        )
     }
 
     /**
@@ -1609,17 +1623,20 @@ class Parser(protected val lexer: Lexer) {
      */
     fun type(isTryParenthesizedType: Boolean = true, isParseDottedIdentifiers: Boolean = false, isIncludeLastIdentifierAsTypeName: Boolean = false): TypeNode {
         val originalTokenIndex = tokenIndex
+        val lastException: Throwable?
+        try {
+            return functionType()
+        } catch (e: ParseException) {
+            resetTokenToIndex(originalTokenIndex)
+            lastException = e
+        }
         return when {
-            isCurrentToken(TokenType.Operator, "(") -> try {
-                functionType()
-            } catch (e: ParseException) {
+            isCurrentToken(TokenType.Operator, "(") ->
                 if (isTryParenthesizedType) {
-                    resetTokenToIndex(originalTokenIndex)
                     nullableParenthesizedType()
                 } else {
-                    throw e
+                    throw lastException!!
                 }
-            }
             else -> typeReference(isParseDottedIdentifiers = isParseDottedIdentifiers, isIncludeLastIdentifierAsTypeName = isIncludeLastIdentifierAsTypeName)
         }
     }
@@ -1906,7 +1923,7 @@ class Parser(protected val lexer: Lexer) {
      *     userType
      *     | 'dynamic'
      */
-    fun receiverTypeAndIdentifier(): Pair<TypeNode?, String> {
+    fun receiverTypeOrIdentifier(): Pair<TypeNode?, String?> {
         // TODO revisit when package is supported
 //        val identifiers = mutableListOf<String>()
 //        var hasEatenQuestionMark = false
@@ -1957,8 +1974,16 @@ class Parser(protected val lexer: Lexer) {
             }
             return null to type.name
         }
+        return type.copy(isNullable = isNullable) to null
+    }
+
+    fun receiverTypeAndIdentifier(): Pair<TypeNode?, String> {
+        val (receiverType, identifier) = receiverTypeOrIdentifier()
+        if (receiverType == null) {
+            return null to identifier!!
+        }
         val name = userDefinedIdentifier()
-        return type.copy(isNullable = isNullable) to name
+        return receiverType to name
     }
 
     fun Set<String>.toFunctionModifiers() = this.map {

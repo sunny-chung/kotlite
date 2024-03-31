@@ -2,12 +2,12 @@ package com.sunnychung.lib.multiplatform.kotlite.stdlib
 
 import com.sunnychung.lib.multiplatform.kotlite.model.CollectionInterface
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
-import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryValue
-import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapValue
-import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListValue
-import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapValue
-import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableSetValue
-import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetValue
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapClass
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MapEntryClass
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableListClass
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableMapClass
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.MutableSetClass
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetClass
 
 class CollectionsLibModule : AbstractCollectionsLibModule() {
     override val classes: List<ProvidedClassDefinition> = listOf(
@@ -17,11 +17,11 @@ class CollectionsLibModule : AbstractCollectionsLibModule() {
 //        ListValue.clazz,
 
         CollectionInterface.mutableCollectionClazz,
-        MutableListValue.clazz,
-        MapValue.clazz,
-        MutableMapValue.clazz,
-        MapEntryValue.clazz,
-        SetValue.clazz,
-        MutableSetValue.clazz,
+        MutableListClass.clazz,
+        MapClass.clazz,
+        MutableMapClass.clazz,
+        MapEntryClass.clazz,
+        SetClass.clazz,
+        MutableSetClass.clazz,
     )
 }
