@@ -37,8 +37,6 @@ class CoreLibModule : LibraryModule("Core") {
             executable = { interpreter, receiver, args, typeArgs ->
                 val block = args[0] as LambdaValue
                 block.execute(arguments = emptyArray(), receiver = receiver!!)
-                log.v { "apply return ${receiver.type().descriptiveName}" }
-                println("apply return 2 ${receiver.type().descriptiveName}")
                 receiver!!
             },
             position = SourcePosition(name, 1, 1),
