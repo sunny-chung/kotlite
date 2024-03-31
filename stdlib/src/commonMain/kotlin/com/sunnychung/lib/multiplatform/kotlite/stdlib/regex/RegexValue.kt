@@ -7,18 +7,18 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 
-class RegexValue(value: Regex, symbolTable: SymbolTable) : DelegatedValue<Regex>(value, "Regex", clazz, symbolTable = symbolTable) {
+fun RegexValue(value: Regex, symbolTable: SymbolTable) : DelegatedValue<Regex>
+    = DelegatedValue<Regex>(value, "Regex", RegexClass.clazz, symbolTable = symbolTable)
 
-    internal companion object {
-         val clazz = ProvidedClassDefinition(
-             fullQualifiedName = "Regex",
-             typeParameters = emptyList(),
-             isInstanceCreationAllowed = true,
-             primaryConstructorParameters = listOf(CustomFunctionParameter("value", "String")),
-             constructInstance = { interpreter, callArguments, callPosition ->
-                 RegexValue(Regex((callArguments[0] as StringValue).value), interpreter.symbolTable())
-             },
-             position = SourcePosition("Regex", 1, 1),
-         )
-    }
+object RegexClass {
+     val clazz = ProvidedClassDefinition(
+         fullQualifiedName = "Regex",
+         typeParameters = emptyList(),
+         isInstanceCreationAllowed = true,
+         primaryConstructorParameters = listOf(CustomFunctionParameter("value", "String")),
+         constructInstance = { interpreter, callArguments, callPosition ->
+             RegexValue(Regex((callArguments[0] as StringValue).value), interpreter.symbolTable())
+         },
+         position = SourcePosition("Regex", 1, 1),
+     )
 }

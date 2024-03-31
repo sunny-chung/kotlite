@@ -142,8 +142,7 @@ operator fun <T> MutableCollection<T>.minusAssign(elements: Iterable<T>)
 fun <T> Iterable<T>.minusElement(element: T): List<T>
 fun <T> Iterable<T>.none(predicate: (T) -> Boolean): Boolean
 fun <T> Iterable<T>.none(): Boolean
-//fun <T, C : Iterable<T>> C.onEach(action: (T) -> Unit): C
-fun <T> List<T>.onEach(action: (T) -> Unit): List<T>
+fun <T, C : Iterable<T>> C.onEach(action: (T) -> Unit): C
 fun <T> List<T>.onEachIndexed(action: (index: Int, T) -> Unit): List<T>
 fun <T> List<T>?.orEmpty(): List<T>
 fun <T> Iterable<T>.partition(predicate: (T) -> Boolean): Pair<List<T>, List<T>>
@@ -313,8 +312,7 @@ operator fun <K, V> MutableMap<K, V>.minusAssign(key: K)
 operator fun <K, V> MutableMap<K, V>.minusAssign(keys: List<K>)
 fun <K, V> Map<K, V>.none(): Boolean
 fun <K, V> Map<K, V>.none(predicate: (MapEntry<K, V>) -> Boolean): Boolean
-fun <K, V> Map<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): Map<K, V>
-fun <K, V> MutableMap<K, V>.onEach(action: (MapEntry<K, V>) -> Unit): MutableMap<K, V>
+fun <K, V, M : Map<K, V>> M.onEach(action: (MapEntry<K, V>) -> Unit): M
 fun <K, V> Map<K, V>.onEachIndexed(action: (index: Int, MapEntry<K, V>) -> Unit): Map<K, V>
 fun <K, V> MutableMap<K, V>.onEachIndexed(action: (index: Int, MapEntry<K, V>) -> Unit): MutableMap<K, V>
 fun <K, V> Map<K, V>?.orEmpty(): Map<K, V>

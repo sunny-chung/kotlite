@@ -8,20 +8,19 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
 
-class MapValue(value: Map<RuntimeValue, RuntimeValue>, keyType: DataType, valueType: DataType, symbolTable: SymbolTable)
-    : DelegatedValue<Map<RuntimeValue, RuntimeValue>>(value, clazz, listOf(keyType, valueType), symbolTable) {
+fun MapValue(value: Map<RuntimeValue, RuntimeValue>, keyType: DataType, valueType: DataType, symbolTable: SymbolTable)
+    = DelegatedValue<Map<RuntimeValue, RuntimeValue>>(value, MapClass.clazz, listOf(keyType, valueType), symbolTable)
 
-    companion object {
-        val clazz = ProvidedClassDefinition(
-            fullQualifiedName = "Map",
-            typeParameters = listOf(
-                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "K", typeUpperBound = null),
-                TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "V", typeUpperBound = null)
-            ),
-            isInstanceCreationAllowed = false,
-            primaryConstructorParameters = emptyList(),
-            constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
-            position = SourcePosition("Collections", 1, 1),
-        )
-    }
+object MapClass {
+    val clazz = ProvidedClassDefinition(
+        fullQualifiedName = "Map",
+        typeParameters = listOf(
+            TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "K", typeUpperBound = null),
+            TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "V", typeUpperBound = null)
+        ),
+        isInstanceCreationAllowed = false,
+        primaryConstructorParameters = emptyList(),
+        constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
+        position = SourcePosition("Collections", 1, 1),
+    )
 }

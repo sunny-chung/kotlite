@@ -2,34 +2,33 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.lexer.BuiltinFilename
 
-class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB: DataType, symbolTable: SymbolTable) :
-    DelegatedValue<Pair<RuntimeValue, RuntimeValue>>(value, clazz, listOf(typeA, typeB), symbolTable) {
+fun PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB: DataType, symbolTable: SymbolTable) : DelegatedValue<Pair<RuntimeValue, RuntimeValue>>
+    = DelegatedValue<Pair<RuntimeValue, RuntimeValue>>(value, PairClass.clazz, listOf(typeA, typeB), symbolTable)
 
-    companion object {
-        val clazz = ProvidedClassDefinition(
-            fullQualifiedName = "Pair",
-            typeParameters = listOf(
-                TypeParameterNode(position = SourcePosition.BUILTIN, name = "A", typeUpperBound = null),
-                TypeParameterNode(position = SourcePosition.BUILTIN, name = "B", typeUpperBound = null)
-            ),
-            isInstanceCreationAllowed = true,
-            primaryConstructorParameters = listOf(
-                CustomFunctionParameter("first", "A"),
-                CustomFunctionParameter("second", "B"),
-            ),
-            constructInstance = { interpreter, callArguments, callPosition ->
-                PairValue(
-                    Pair(callArguments[0], callArguments[1]),
-                    callArguments[0].type(), // TODO
-                    callArguments[1].type(), // TODO
-                    interpreter.symbolTable(),
-                )
-            },
-            position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
-        )
+object PairClass {
+    val clazz = ProvidedClassDefinition(
+        fullQualifiedName = "Pair",
+        typeParameters = listOf(
+            TypeParameterNode(position = SourcePosition.BUILTIN, name = "A", typeUpperBound = null),
+            TypeParameterNode(position = SourcePosition.BUILTIN, name = "B", typeUpperBound = null)
+        ),
+        isInstanceCreationAllowed = true,
+        primaryConstructorParameters = listOf(
+            CustomFunctionParameter("first", "A"),
+            CustomFunctionParameter("second", "B"),
+        ),
+        constructInstance = { interpreter, callArguments, callPosition ->
+            PairValue(
+                Pair(callArguments[0], callArguments[1]),
+                callArguments[0].type(), // TODO
+                callArguments[1].type(), // TODO
+                interpreter.symbolTable(),
+            )
+        },
+        position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1),
+    )
 
-        val properties = listOf(Property.first, Property.second)
-    }
+    val properties = listOf(Property.first, Property.second)
 
     object Property {
         val first = ExtensionProperty(
@@ -41,7 +40,7 @@ class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB:
             "Pair<A, B>",
             "A",
             getter = { interpreter, receiver, typeArgs ->
-                (receiver as PairValue).value.first
+                (receiver as DelegatedValue<Pair<RuntimeValue, RuntimeValue>>).value.first
             },
         )
 
@@ -54,7 +53,7 @@ class PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB:
             "Pair<A, B>",
             "B",
             getter = { interpreter, receiver, typeArgs ->
-                (receiver as PairValue).value.second
+                (receiver as DelegatedValue<Pair<RuntimeValue, RuntimeValue>>).value.second
             },
         )
     }

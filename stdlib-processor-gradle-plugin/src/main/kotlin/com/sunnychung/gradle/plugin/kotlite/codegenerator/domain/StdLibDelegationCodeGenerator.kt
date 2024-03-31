@@ -54,15 +54,19 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.IterableValue
+import com.sunnychung.lib.multiplatform.kotlite.model.IteratorClass
 import com.sunnychung.lib.multiplatform.kotlite.model.IteratorValue
 import com.sunnychung.lib.multiplatform.kotlite.model.KotlinValueHolder
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
+import com.sunnychung.lib.multiplatform.kotlite.model.ListClass
 import com.sunnychung.lib.multiplatform.kotlite.model.ListValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
+import com.sunnychung.lib.multiplatform.kotlite.model.PairClass
 import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
 import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveType
 import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveTypeName
@@ -110,6 +114,8 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         it.name to (it.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true))
     }
 
+    val typeParametersUsedIn = mutableMapOf<String, String>()
+
 //    private fun resolveTypeParameterNodeRetainTypeParameters(node: TypeNode): TypeNode {
 //        if (typeParameters.containsKey(node.name) && node.arguments == null) {
 //            return TypeNode(node.position, node.name, TypeNode(node.position, node.name, null, false))
@@ -135,6 +141,16 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     }
 
     fun FunctionDeclarationNode.generate(position: SourcePosition, indent: String): String {
+        if (receiver != null && receiver!!.name in this@ScopedDelegationCodeGenerator.typeParameters) {
+            // receiver itself is a type parameter
+            typeParametersUsedIn[receiver!!.name] = "receiver"
+        }
+        valueParameters.forEachIndexed { index, it ->
+            if (it.type.name in this@ScopedDelegationCodeGenerator.typeParameters) {
+                typeParametersUsedIn[it.type.name] = "args[$index]"
+            }
+        }
+
         return """CustomFunctionDefinition(
     receiverType = ${receiver?.let { "\"${it.descriptiveName().escape()}\"" } ?: "null"},
     functionName = "${name.escape()}",
@@ -180,6 +196,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
 
     // kotlin value -> Interpreter runtime value
     fun wrap(variableName: String, _type: TypeNode): String {
+        val isTypeATypeParameter = typeParametersUsedIn.containsKey(_type.name)
         val type = resolveForWrap(_type)
 
         fun TypeNode.toDataTypeCode(): String {
@@ -193,19 +210,21 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             } else if (this.isPrimitive()) {
                 "${this.name}Type(isNullable = ${this.isNullable})"
             } else {
-                "ObjectType(${this.name}Value.clazz, listOf<DataType>(${this.arguments?.joinToString(", ") { it.toDataTypeCode() } ?: ""}), superTypes = emptyList())"
+                "ObjectType(${this.name}Class.clazz, listOf<DataType>(${this.arguments?.joinToString(", ") { it.toDataTypeCode() } ?: ""}), superTypes = emptyList())"
             }
         }
 
-        val typeArgs = type.arguments.let { typeArgs ->
-            if (typeArgs.isNullOrEmpty()) {
-                ""
-            } else {
-                ", " + typeArgs.joinToString(", ") {
-                    it.toDataTypeCode()
+        val typeArgs = { hasCommaPrefix: Boolean ->
+            type.arguments.let { typeArgs ->
+                if (typeArgs.isNullOrEmpty()) {
+                    ""
+                } else {
+                    (if (hasCommaPrefix) ", " else "") + typeArgs.joinToString(", ") {
+                        it.toDataTypeCode()
+                    }
                 }
-            }
-        } + " /* _t = ${_type.descriptiveName()}; t.name = ${type.name}; t = ${type.descriptiveName()} */"
+            } + " /* _t = ${_type.descriptiveName()}; t.name = ${type.name}; t = ${type.descriptiveName()} */"
+        }
         val symbolTableArg = if (type.isPrimitiveWithValue() || !type.isPrimitive()) {
             ", symbolTable = interpreter.symbolTable()"
         } else ""
@@ -215,8 +234,10 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         }
         val wrappedValue = if (type.name == "Any" || (typeParameters.containsKey(type.name) && typeParameters[type.name]!!.name == "Any")) {
             "it as RuntimeValue"
+        } else if (isTypeATypeParameter) {
+            "DelegatedValue<${type.name}${if (type.arguments?.isNotEmpty() == true) "<${type.arguments!!.joinToString(", ") { "RuntimeValue" }}>" else ""}>(it, (${typeParametersUsedIn[_type.name]}.type() as ObjectType).clazz, listOf<DataType>(${typeArgs(false)})$symbolTableArg)"
         } else {
-            "$translatedTypeName(it$typeArgs$symbolTableArg)"
+            "$translatedTypeName(it${typeArgs(true)}$symbolTableArg)"
         }
         val preMap = when (type.name) { // TODO change hardcoded conversions to more generic handling
             "Map", "MutableMap" -> {
@@ -309,7 +330,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
 
     fun unwrap(variableName: String, type: TypeNode, isVararg: Boolean = false): String {
         return if (isVararg) {
-            "($variableName as ListValue).value.map { ${unwrapOne("it", type)} }"
+            "($variableName as KotlinValueHolder<List<RuntimeValue>>).value.map { ${unwrapOne("it", type)} }"
         } else if (type.name in setOf("List", "Iterable")) {
             // do not transform MutableList, otherwise no side effect can be performed
             val postUnwrap = if (type.name == "MutableList") ".toMutableList()" else ""

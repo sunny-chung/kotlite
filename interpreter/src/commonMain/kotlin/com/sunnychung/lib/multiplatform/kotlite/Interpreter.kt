@@ -10,6 +10,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnEx
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.fullClassName
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
+import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AssignmentNode
@@ -1020,10 +1021,13 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 symbolTable.declareProperty(position, "this/${subject.type().name}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${subject.type().name}", subject)
             }
-            if (function.receiver != null && !declaredThisClassNames.contains(function.receiver!!.descriptiveName())) {
-                declaredThisClassNames += function.receiver!!.descriptiveName()
-                symbolTable.declareProperty(position, "this/${function.receiver!!.descriptiveName()}", subject.type().toTypeNode(), false)
-                symbolTable.assign("this/${function.receiver!!.descriptiveName()}", subject)
+            if (function.receiver != null) {
+                val receiverIdentifier = function.receiver!!.resolveGenericParameterTypeToUpperBound(function.typeParameters).descriptiveName()
+                if (!declaredThisClassNames.contains(receiverIdentifier)) {
+                    declaredThisClassNames += receiverIdentifier
+                    symbolTable.declareProperty(position, "this/$receiverIdentifier", subject.type().toTypeNode(), false)
+                    symbolTable.assign("this/$receiverIdentifier", subject)
+                }
             }
             symbolTable.declareProperty(position, "this", subject.type().toTypeNode(), false)
             symbolTable.assign("this", subject)
@@ -1702,6 +1706,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         return callStack.currentSymbolTable().assertToDataType(call!!.returnType!!)
     }
 
-    fun eval() = scriptNode.eval()
+    fun eval() {
+        log.d { "=== Interpreter eval() ===" }
+        return scriptNode.eval()
+    }
 
 }

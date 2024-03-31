@@ -150,6 +150,8 @@ open class SymbolTable(
         if (hasProperty(name = name, true)) {
             throw DuplicateIdentifierException(position = position, name = name, classifier = IdentifierClassifier.Property)
         }
+
+        log.d { "declareProperty($position, $name, ${type.descriptiveName()}, $isMutable)" }
         propertyDeclarations[name] = typeNodeToPropertyType(type = type, isMutable = isMutable)
             ?: throw RuntimeException("Unknown type ${type.name}")
     }
@@ -366,6 +368,7 @@ open class SymbolTable(
      * Only use in SemanticAnalyzer
      */
     fun declarePropertyOwner(name: String, owner: String, extensionPropertyRef: String? = null) {
+        log.d { "declarePropertyOwner($name, $owner, $extensionPropertyRef)" }
         propertyOwners[name] = PropertyOwnerInfo(ownerRefName = owner, extensionPropertyRef = extensionPropertyRef)
     }
 

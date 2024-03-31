@@ -210,4 +210,35 @@ class SetTest {
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
     }
+
+    @Test
+    fun toMutableSetOnEachMap() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val set = setOf(1, 2, 2, 3, 2).toMutableSet()
+            set += 7
+            val set2 = set.onEach {
+                println("a${'$'}it")
+            }
+            set2 += 6
+            set2.map {
+                it * 5
+            }.onEach {
+                println("b${'$'}it")
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals(
+            expected = listOf("a1", "a2", "a3", "a7", "b5", "b10", "b15", "b35", "b30").sorted(),
+            actual = console.split("\n").filter { it.isNotEmpty() }.sorted(),
+        )
+    }
 }
