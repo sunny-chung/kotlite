@@ -2,6 +2,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.CoreLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -215,6 +216,7 @@ class SetTest {
     fun toMutableSetOnEachMap() {
         val console = StringBuilder()
         val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
             install(object : IOLibModule() {
                 override fun outputToConsole(output: String) {
                     console.append(output)
@@ -223,17 +225,24 @@ class SetTest {
             install(CollectionsLibModule())
         }
         val interpreter = interpreter("""
-            val set = setOf(1, 2, 2, 3, 2).toMutableSet()
-            set += 7
-            val set2 = set.onEach {
-                println("a${'$'}it")
-            }
-            set2 += 6
-            set2.map {
-                it * 5
-            }.onEach {
-                println("b${'$'}it")
-            }
+            setOf(1, 2, 2, 3, 2)
+                .let { it.toMutableSet() }
+                .run {
+                    this += 7
+                    this
+                }
+                .onEach {
+                    println("a${'$'}it")
+                }
+                .apply {
+                    this += 6
+                }
+                .map {
+                    it * 5
+                }
+                .onEach {
+                    println("b${'$'}it")
+                }
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
         assertEquals(

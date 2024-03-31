@@ -97,6 +97,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
+import com.sunnychung.lib.multiplatform.kotlite.model.toTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassSemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.util.FunctionAndTypes
@@ -1158,6 +1159,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     val subjectType = function.subject.type().toDataType()
                     log.v { "functionRefName=$functionRefName; subjectType=${subjectType::class.simpleName} ${subjectType.descriptiveName}" }
                     if (subjectType is ObjectType) {
+                        // use the subject value to resolve type parameters of the subject type
                         val classTypeParameters = subjectType.clazz.typeParameters
                         log.v {
                             "functionRefName=$functionRefName; subjectType=${subjectType.descriptiveName}; subjectType.clazz.typeParameters=${
@@ -1168,7 +1170,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         }
                         val namedTypeArguments = classTypeParameters.mapIndexed { index, it ->
                             it.name to subjectType.arguments[index].toTypeNode()
-                        }.toMap()
+                        }.toMap().toMutableMap()
+
+                        // the subject value itself can be a type argument as well. it has a higher priority. try to resolve it.
+                        resolution.typeParameters.forEach {
+                            if (it.name == resolution.receiverType?.name) {
+                                namedTypeArguments[it.name] = subjectType.toTypeNode().let {
+                                    if (resolution.receiverType.isNullable) {
+                                        it.copy(isNullable = false)
+                                    } else {
+                                        it
+                                    }
+                                }
+                            }
+                        }
+
                         if (namedTypeArguments.isNotEmpty()) {
                             extraTypeResolutions = namedTypeArguments
                             r = r.resolveGenericParameterTypeArguments(namedTypeArguments)
@@ -1466,6 +1482,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 TypeNode(returnType.position, returnType.name, typeArguments.emptyToNull(), false)
             }
         }
+
+        log.d { "Function call $functionRefName returns ${returnType!!.descriptiveName()}" }
 
         popScope()
 

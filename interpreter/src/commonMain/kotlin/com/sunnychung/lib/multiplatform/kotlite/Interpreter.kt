@@ -103,6 +103,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
+import com.sunnychung.lib.multiplatform.kotlite.model.toTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
 class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: ExecutionEnvironment) {
@@ -1004,7 +1005,34 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 //    }
 
     fun FunctionCallNode.evalClassMemberAnyFunctionCall(subject: RuntimeValue, function: FunctionDeclarationNode, replaceArguments: Map<Int, RuntimeValue> = emptyMap()): RuntimeValue {
-        callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = this.position)
+        return evalClassMemberAnyFunctionCall(position, subject, function.receiver, function) { typeResolutions ->
+            evalFunctionCall(
+                callNode = this.copy(function = function),
+                functionNode = function,
+                extraScopeParameters = emptyMap(),
+                extraTypeResolutions = typeResolutions /* type arguments */,
+                replaceArguments = replaceArguments,
+                subject = subject,
+            )
+        }
+    }
+
+    fun evalClassMemberAnyFunctionCall(position: SourcePosition, subject: RuntimeValue, function: CallableNode, arguments: Array<RuntimeValue?>, typeArguments: Array<TypeNode> = emptyArray()): RuntimeValue {
+        return evalClassMemberAnyFunctionCall(position, subject, subject.type().toTypeNode(), function) { typeResolutions ->
+            evalFunctionCall(
+                arguments = arguments,
+                typeArguments = typeArguments,
+                callPosition = position,
+                functionNode = function,
+                extraScopeParameters = emptyMap(),
+                extraTypeResolutions = typeResolutions,
+                subject = subject,
+            )
+        }
+    }
+
+    private fun evalClassMemberAnyFunctionCall(position: SourcePosition, subject: RuntimeValue, receiverType: TypeNode?, function: CallableNode, callOperation: (typeResolutions: List<TypeParameterNode>) -> FunctionCallResult): RuntimeValue {
+        callStack.push(functionFullQualifiedName = "class", scopeType = ScopeType.ClassMemberFunction, callPosition = position)
         try {
             val symbolTable = callStack.currentSymbolTable()
             val declaredThisClassNames = mutableSetOf<String>()
@@ -1021,8 +1049,8 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 symbolTable.declareProperty(position, "this/${subject.type().name}", subject.type().toTypeNode(), false)
                 symbolTable.assign("this/${subject.type().name}", subject)
             }
-            if (function.receiver != null) {
-                val receiverIdentifier = function.receiver!!.resolveGenericParameterTypeToUpperBound(function.typeParameters).descriptiveName()
+            if (receiverType != null) {
+                val receiverIdentifier = receiverType.resolveGenericParameterTypeToUpperBound(function.typeParameters).descriptiveName()
                 if (!declaredThisClassNames.contains(receiverIdentifier)) {
                     declaredThisClassNames += receiverIdentifier
                     symbolTable.declareProperty(position, "this/$receiverIdentifier", subject.type().toTypeNode(), false)
@@ -1055,14 +1083,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 }
             } else emptyList()
 
-            val result = evalFunctionCall(
-                callNode = this.copy(function = function),
-                functionNode = function,
-                extraScopeParameters = emptyMap(),
-                extraTypeResolutions = instanceGenericTypeResolutions /* type arguments */,
-                replaceArguments = replaceArguments,
-                subject = subject,
-            )
+            val result = callOperation(instanceGenericTypeResolutions)
 
             return result.result
         } finally {

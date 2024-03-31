@@ -3,6 +3,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.CoreLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.TextLibModule
 import kotlin.test.Test
@@ -404,6 +405,7 @@ class MapTest {
     fun mutableMapOnEach() {
         val console = StringBuilder()
         val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
             install(CollectionsLibModule())
             install(object : IOLibModule() {
                 override fun outputToConsole(output: String) {
@@ -413,20 +415,19 @@ class MapTest {
         }
         val interpreter = interpreter("""
             var counter = 0
-            val m = mutableMapOf(
+            var typeCheck1: Boolean = false
+            mutableMapOf(
                 "abc" to ++counter,
                 "d" to ++counter,
                 "ef" to ++counter,
             ).onEach {
                 println("${'$'}{it.key}: ${'$'}{it.value}")
-            }
-            
-            val typeCheck1: Boolean = m is MutableMap<String, Int>
-            
-            m["aa"] = ++counter
-            
-            for (it in m) {
-                println("${'$'}{it.key}: ${'$'}{it.value}")
+            }.also { m -> typeCheck1 = m is MutableMap<String, Int> }
+            .apply { this["aa"] = ++counter }
+            .also { m ->
+                for (it in m) {
+                    println("${'$'}{it.key}: ${'$'}{it.value}")
+                }
             }
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()
