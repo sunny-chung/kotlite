@@ -1213,7 +1213,8 @@ class Parser(protected val lexer: Lexer) {
      */
     fun elvisExpression(): ASTNode {
         var n = infixFunctionCall()
-        while (currentToken.type == TokenType.Operator && currentToken.value == "?:") {
+        while (isCurrentTokenExcludingNL(TokenType.Operator, "?:")) {
+            repeatedNL()
             val t = eat(TokenType.Operator, "?:")
             repeatedNL()
             val n2 = infixFunctionCall()
