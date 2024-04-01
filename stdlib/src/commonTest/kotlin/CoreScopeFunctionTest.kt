@@ -221,4 +221,78 @@ class CoreScopeFunctionTest {
         assertEquals(29, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
         assertEquals(31, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
     }
+
+    @Test
+    fun nullableObjectAlsoLet1() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+        }
+        val interpreter = interpreter("""
+            class A(val x: Int)
+            fun f(x: Int) = if (x > 0) {
+                A(x)
+            } else {
+                null
+            }
+            fun g(x: Int) = f(x)
+                ?.also { println(it.x) }
+                ?.let { A(it.x * 2) }
+                ?.also { println(it.x) }
+                ?.let { A(it.x + 1) }
+                ?.let { A(it.x * 10) }
+                ?.let { it.x }
+                ?.also { println(it) }
+                ?: -1
+            val a = g(29)
+            val b = g(-20)
+        """.trimIndent(), executionEnvironment = env)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(590, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(-1, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals("29\n58\n590\n", console.toString())
+    }
+
+    @Test
+    fun nullableObjectAlsoLet2() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+        }
+        val interpreter = interpreter("""
+            class A(val x: Int)
+            fun f(x: Int) = if (x > 0) {
+                A(x)
+            } else {
+                null
+            }
+            fun g(x: Int) = f(x)
+                .also { println(it?.x) }
+                .let { it?.let { A(it.x * 2) } }
+                .also { println(it?.x) }
+                .let { it?.let { A(it.x + 1) } }
+                .let { it?.let { A(it.x * 10) } }
+                .let { it?.x }
+                ?.also { println(it) }
+                ?: -1
+            val a = g(29)
+            val b = g(-20)
+        """.trimIndent(), executionEnvironment = env)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(590, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(-1, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+        assertEquals("29\n58\n590\nnull\nnull\n", console.toString())
+    }
 }

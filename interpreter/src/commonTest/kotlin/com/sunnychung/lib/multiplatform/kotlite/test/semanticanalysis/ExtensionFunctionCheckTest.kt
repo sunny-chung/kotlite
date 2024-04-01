@@ -39,4 +39,16 @@ class ExtensionFunctionCheckTest {
             fun A<String>.duplicated(): Int = 20
         """.trimIndent())
     }
+
+    @Test
+    fun safeCallNullabilityMismatch() {
+        assertSemanticFail("""
+            abstract class Base(val x: Int)
+            class A(x: Int, val a: Int) : Base(x)
+            class B(x: Int, val b: Int) : Base(x)
+            fun <T : Base> T.unwrap(f: T.() -> Int): Int = this.f()
+            fun f(x: Int) = if (x > 0) A(6, 20) else null
+            val a: Int = f(1)?.unwrap { x + a } // the type of `a` should be `Int?`
+        """.trimIndent())
+    }
 }

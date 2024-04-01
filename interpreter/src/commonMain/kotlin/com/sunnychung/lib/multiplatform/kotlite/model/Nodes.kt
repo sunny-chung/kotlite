@@ -272,6 +272,7 @@ open class FunctionDeclarationNode(
     override val valueParameters: List<FunctionValueParameterNode>,
     val body: BlockNode?,
     override val typeParameters: List<TypeParameterNode> = emptyList(),
+    val extraTypeParameters: List<TypeParameterNode> = emptyList(), // for ad-hoc extension functions only. these type parameters have no type argument to resolve.
     val declaredModifiers: Set<FunctionModifier> = emptySet(),
     @ModifyByAnalyzer var transformedRefName: String? = null,
     @ModifyByAnalyzer var inferredReturnType: TypeNode? = null,

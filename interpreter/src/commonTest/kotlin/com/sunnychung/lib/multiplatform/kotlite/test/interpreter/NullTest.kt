@@ -6,6 +6,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
+import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertTypeCheckFail
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -329,5 +331,23 @@ class NullTest {
             return
         }
         throw AssertionError("It should fail with EvaluateNullPointerException")
+    }
+
+    @Test
+    fun incorrectNullableMemberType() {
+        assertTypeCheckFail("""
+            class A(val x: Int)
+            fun f(x: Int) = if (x > 0) A(x) else null
+            val a: Int = f(1)?.x
+        """.trimIndent())
+    }
+
+    @Test
+    fun illegalAccessNullableMemberUsingDot() {
+        assertSemanticFail("""
+            class A(val x: Int)
+            fun f(x: Int) = if (x > 0) A(x) else null
+            val a = f(1).x
+        """.trimIndent())
     }
 }

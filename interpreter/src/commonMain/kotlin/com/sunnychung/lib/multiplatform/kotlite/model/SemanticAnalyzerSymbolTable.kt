@@ -376,7 +376,8 @@ class SemanticAnalyzerSymbolTable(
 //        val resolver = (type as? ObjectType)?.let { ClassMemberResolver(this, it.clazz, it.arguments.map { it.toTypeNode() }) }
 //        var classTreeIndex = (type as? ObjectType)?.clazz?.index ?: 0
 
-        (listOf(receiverType) + ((receiverType as? ObjectType)?.superTypes ?: emptyList())).forEach { type ->
+        val type = receiverType
+//        (listOf(receiverType) + ((receiverType as? ObjectType)?.superTypes ?: emptyList())).forEach { type ->
             findExtensionFunctions(type, functionName, isThisScopeOnly)
                 .let { lookups ->
                     result.addAll(lookups.map {
@@ -387,16 +388,7 @@ class SemanticAnalyzerSymbolTable(
                         )
                     })
                 }
-
-//            type = (type as? ObjectType)?.clazz?.superClass?.let {
-//                val typeResolutions = resolver!!.genericResolutions[it.index].second
-//                ObjectType(it, it.typeParameters.map {
-//                    assertToDataType(typeResolutions[it.name]!!)
-//                })
-//            }
-
-//            type = (type as? ObjectType)?.superType
-        }
+//        }
 
         return result
     }

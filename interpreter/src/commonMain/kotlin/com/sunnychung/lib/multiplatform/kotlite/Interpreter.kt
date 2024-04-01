@@ -582,7 +582,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                     CallableType.ExtensionFunction -> {
                         val function = callStack.currentSymbolTable().findExtensionFunction(functionRefName!!)
                             ?: throw RuntimeException("Analysed function $functionRefName not found")
-                        if (subject === NullValue && !function.receiver!!.isNullable) {
+                        if (subject === NullValue
+                            && !function.receiver!!.resolveGenericParameterTypeToUpperBound(function.extraTypeParameters + function.typeParameters, isResolveRootOnly = true).isNullable
+                        ) {
                             throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
                         return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function, replaceArguments = replaceArguments)
@@ -764,12 +766,26 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 }
                 if (!isVararg && (it.type as? FunctionTypeNode)?.receiverType != null) {
                     val type = it.type as FunctionTypeNode
+
+                    fun findTypeParameters(typeNode: TypeNode, result: MutableSet<String>) {
+                        result += typeNode.name
+                        typeNode.arguments?.forEach {
+                            findTypeParameters(it, result)
+                        }
+                    }
+                    val allPossibleTypeParameters = mutableSetOf<String>()
+                    (setOfNotNull(type.receiverType, type.returnType) + (type.parameterTypes ?: emptyList()))
+                        .forEach { findTypeParameters(it, allPossibleTypeParameters) }
+
                     symbolTable.declareExtensionFunction(
                         position = it.position,
                         name = type.extensionFunctionRefName!!,
                         node = object : FunctionDeclarationNode(
                             position = it.position,
                             name = "",
+                            extraTypeParameters = functionNode.typeParameters.filter {
+                                it.name in allPossibleTypeParameters
+                            },
                             receiver = type.receiverType,
                             declaredReturnType = type.returnType,
                             valueParameters = (type.parameterTypes ?: emptyList()).map {
@@ -830,7 +846,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
             if (!returnType.isConvertibleFrom(returnValue.type())) {
-                throw RuntimeException("Return value's type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName} in function `${functionNode.name}`")
+                throw RuntimeException("Return value's type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName} in function `${functionNode.name}` at ${functionNode.position}")
             }
 
             return FunctionCallResult(returnValue, symbolTable)
@@ -1337,7 +1353,12 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                 ?: throw RuntimeException("No such enum `${member.name}` in class `$originalClassName`")
         }
 
-        if (obj === NullValue) throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
+        if (obj === NullValue) {
+            if (operator == "?.") {
+                return NullValue
+            }
+            throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
+        }
         obj as? ClassInstance ?: throw RuntimeException("Cannot access member `${member.name}` for type `${obj.type().nameWithNullable}`")
         // before type resolution is implemented in SemanticAnalyzer, reflect from clazz as a slower alternative
         return when (val r = obj.read(interpreter = this@Interpreter, name = obj.clazz!!.findMemberPropertyTransformedName(member.name)!!)) {

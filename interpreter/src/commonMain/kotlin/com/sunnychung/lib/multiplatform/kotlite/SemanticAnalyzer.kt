@@ -1109,7 +1109,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
 
             is NavigationNode -> {
-                function.visit(modifier = modifier, IdentifierClassifier.Function)
+                /*val receiverType =*/ function.visit(modifier = modifier, IdentifierClassifier.Function)
+//                val lookupReceiverTypes = listOf(receiverType)
                 val receiverType = function.subject.type().unboxClassTypeAsCompanion().toDataType()
                 val lookupReceiverTypes = if (!receiverType.isNullable || function.operator == ".") {
                     listOf(receiverType)
@@ -1128,6 +1129,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         arguments = arguments.map { FunctionCallArgumentInfo(it.name, it.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()) },
                         modifierFilter = modifierFilter!!,
                     )
+                }.distinctBy { // distinct again because results of searching non-nullable and nullable types may duplicate
+                    if (it.type == CallableType.ExtensionFunction) {
+                        it.transformedName
+                    } else {
+                        it.signature
+                    }
                 }
                 if (resolutions.size > 1) {
                     throw SemanticException(position, "Ambiguous function call for `${function.member.name}`. ${resolutions.size} candidates match:\n${resolutions.joinToString("") { "- ${it.toDisplayableSignature()}\n" }}")
@@ -1157,17 +1164,17 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         it
                     }
                     val subjectType = function.subject.type().toDataType()
-                    log.v { "functionRefName=$functionRefName; subjectType=${subjectType::class.simpleName} ${subjectType.descriptiveName}" }
+                    log.v { "functionRefName=$functionRefName; subjectType=${subjectType::class.simpleName} ${subjectType.descriptiveName}; receiverType = ${receiverType.descriptiveName}" }
                     if (subjectType is ObjectType) {
                         // use the subject value to resolve type parameters of the subject type
                         val classTypeParameters = subjectType.clazz.typeParameters
-                        log.v {
-                            "functionRefName=$functionRefName; subjectType=${subjectType.descriptiveName}; subjectType.clazz.typeParameters=${
-                                subjectType.clazz.typeParameters.joinToString(
-                                    ","
-                                ) { it.name }
-                            }; subjectType.arguments=${subjectType.arguments.joinToString(",") { it.descriptiveName }}; before r=${r.descriptiveName()}"
-                        }
+//                        log.v {
+//                            "functionRefName=$functionRefName; subjectType=${subjectType.descriptiveName}; subjectType.clazz.typeParameters=${
+//                                subjectType.clazz.typeParameters.joinToString(
+//                                    ","
+//                                ) { it.name }
+//                            }; subjectType.arguments=${subjectType.arguments.joinToString(",") { it.descriptiveName }}; before r=${r.descriptiveName()}"
+//                        }
                         val namedTypeArguments = classTypeParameters.mapIndexed { index, it ->
                             it.name to subjectType.arguments[index].toTypeNode()
                         }.toMap().toMutableMap()
@@ -1176,7 +1183,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         resolution.typeParameters.forEach {
                             if (it.name == resolution.receiverType?.name) {
                                 namedTypeArguments[it.name] = subjectType.toTypeNode().let {
-                                    if (resolution.receiverType.isNullable) {
+                                    if (resolution.receiverType.isNullable || function.operator == "?.") {
                                         it.copy(isNullable = false)
                                     } else {
                                         it
@@ -1187,7 +1194,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
                         if (namedTypeArguments.isNotEmpty()) {
                             extraTypeResolutions = namedTypeArguments
-                            r = r.resolveGenericParameterTypeArguments(namedTypeArguments)
+                            r = it.resolveGenericParameterTypeArguments(namedTypeArguments).let {
+                                // TODO refactor this duplicate code
+                                // to make sure the return type of this expression is nullable if it should
+                                if (receiverType.isNullable && function.operator == "?.") {
+                                    it.copy(isNullable = true)
+                                } else {
+                                    it
+                                }
+                            }
                         }
                         log.v { "functionRefName=$functionRefName; r=${r.descriptiveName()}" }
                     }
@@ -1383,6 +1398,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     val parameterType = functionArgumentAndReturnTypeDeclarations.receiverType
                     val argumentType =
                         (function as NavigationNode).subject.type(ResolveTypeModifier(isSkipGenerics = isSkipGenerics))
+                            .let {
+                                if (function.operator == "?.") {
+                                    it.copy(isNullable = false)
+                                } else {
+                                    it
+                                }
+                            }
 
                     var type = argumentType.toDataType() as? ObjectType
                     if (functionArgumentAndReturnTypeDeclarations.receiverType.name !in tpUpperBounds) { // not the case of `fun <T> T.f()`
@@ -1459,6 +1481,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 throw SemanticException(position, "Provided value arguments type ${tpResolutions[it.key]!!.toDataType().descriptiveName} are out of upper bound ${it.value.descriptiveName} of type parameter ${it.key}")
             }
         }
+        log.v { "$functionRefName tpResolutions = ${tpResolutions.entries.joinToString(", ") { "${it.key} = ${it.value.descriptiveName()}" }}" }
+
 
         returnType = functionArgumentAndReturnTypeDeclarations.returnType!!.let { returnType ->
             if (callableType == CallableType.Constructor &&
@@ -1618,7 +1642,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         body?.visit(modifier = modifier)
     }
 
-    fun NavigationNode.visit(modifier: Modifier = Modifier(), lookupType: IdentifierClassifier = IdentifierClassifier.Property, isCheckWriteAccess: Boolean = false) {
+    fun NavigationNode.visit(modifier: Modifier = Modifier(), lookupType: IdentifierClassifier = IdentifierClassifier.Property, isCheckWriteAccess: Boolean = false): DataType {
         subject.visit(modifier = modifier)
 
         member.visit(modifier = modifier)
@@ -1626,7 +1650,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         // find member
         val subjectType = subject.type().unboxClassTypeAsCompanion().toDataType()
         val subjectTypesToSearch = if (operator == "?." && subjectType.isNullable) {
-            listOf(subjectType, subjectType.copyOf(isNullable = false))
+            listOf(subjectType.copyOf(isNullable = false), subjectType)
         } else {
             listOf(subjectType)
         }
@@ -1646,7 +1670,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         throw SemanticException(position, "val `$memberName` cannot be reassigned")
                     }
                     memberType = NavigationNode.MemberType.Direct
-                    return
+                    return subjectType
                 }
                 clazz.findMemberPropertyCustomAccessor(memberName)?.let { accessor ->
                     if (isCheckWriteAccess) {
@@ -1657,7 +1681,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         throw SemanticException(position, "Getter for `$memberName` is not declared")
                     }
                     memberType = NavigationNode.MemberType.Direct
-                    return
+                    return subjectType
                 }
                 if (clazz.fullQualifiedName.endsWith(".Companion") && !subjectType.isNullable) {
                     val originalClassName = clazz.fullQualifiedName.removeSuffix(".Companion")
@@ -1666,7 +1690,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
                     if (ClassModifier.enum in originalClass.modifiers && originalClass.enumValues.containsKey(memberName)) {
                         memberType = NavigationNode.MemberType.Enum
-                        return
+                        return subjectType
                     }
                 }
                 val resolvedSubjectType = subjectType.toTypeNode()
@@ -1686,16 +1710,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         }
                         transformedRefName = it.first
                         memberType = NavigationNode.MemberType.Extension
-                        return
+                        return subjectType
                     }
             } else {
                 if (clazz.findMemberFunctionsByDeclaredName(memberName).isNotEmpty()) {
                     memberType = NavigationNode.MemberType.Direct
-                    return
+                    return subjectType
                 }
                 if (currentScope.findExtensionFunctionsIncludingSuperClasses(subjectType, memberName).isNotEmpty()) {
                     memberType = NavigationNode.MemberType.Extension
-                    return
+                    return subjectType
                 }
             }
         }
@@ -2613,76 +2637,99 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is ClassTypeNode -> type.unboxClassTypeAsCompanion()
             else -> type
         } ?: return typeRegistry["Any"]!!
-        val clazz = currentScope.findClass(subjectType.toDataType().resolveTypeParameterAsUpperBound().name)?.first
+        var isNullCastNeeded: Boolean = false
+        val clazz = currentScope.findClass(
+            subjectType.toDataType().resolveTypeParameterAsUpperBound()
+                .let {
+                    if (operator == "?." && subjectType.isNullable) {
+                        isNullCastNeeded = true
+                        it.copyOf(isNullable = false)
+                    } else {
+                        it
+                    }
+                }
+                .nameWithNullable
+        )?.first
             ?: throw SemanticException(position, "Unknown type `${subjectType.name}`")
         val memberName = member.name
 
-        fun TypeNode.resolveMemberType(): TypeNode {
-            if (subjectType.arguments.isNullOrEmpty()) { // within class declaration
-                return this
-            }
-            return this.resolveGenericParameterTypeArguments(clazz.typeParameters.mapIndexed { index, it ->
-                it.name to subjectType.arguments!![index]
-            }.toMap())
-            // TODO find alias by class name
-            // TODO resolve nested type parameters
+        fun resolve(): TypeNode {
+            fun TypeNode.resolveMemberType(): TypeNode {
+                if (subjectType.arguments.isNullOrEmpty()) { // within class declaration
+                    return this
+                }
+                return this.resolveGenericParameterTypeArguments(clazz.typeParameters.mapIndexed { index, it ->
+                    it.name to subjectType.arguments!![index]
+                }.toMap())
+                // TODO find alias by class name
+                // TODO resolve nested type parameters
 //            val typeParameterType = currentScope.findTypeAlias(this.name) ?: return this
 //            val typeParameterIndex = clazz.typeParameters.indexOfFirst { it.name == this.name }
 //            if (typeParameterIndex < 0) throw RuntimeException("Cannot find type parameter $name")
 //            val subjectArguments = subjectType.arguments ?: return this //throw RuntimeException("Missing type arguments")
 //            return subjectArguments[typeParameterIndex]
-        }
-
-        val resolver = ClassMemberResolver.create(currentScope, clazz, subjectType.arguments)
-        if (lookupType == IdentifierClassifier.Property) {
-            /**
-             * As of Kotlin 1.9, resolution order is Companion Property > Enum Entry
-             */
-            resolver?.findMemberPropertyCustomAccessorWithType(memberName)?.let {
-                return it.second.also { type = it }
             }
-            resolver?.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
-                return it.second.also { type = it }
-            }
-            if (clazz.fullQualifiedName.endsWith(".Companion") && !subjectType.isNullable) {
-                val originalClassName = clazz.fullQualifiedName.removeSuffix(".Companion")
-                val originalClass = currentScope.findClass(originalClassName)?.first
-                    ?: throw RuntimeException("Cannot find class $originalClassName")
 
-                if (ClassModifier.enum in originalClass.modifiers && originalClass.enumValues.containsKey(memberName)) {
-                    return TypeNode(
-                        position = SourcePosition.NONE,
-                        name = originalClass.fullQualifiedName,
-                        arguments = null,
-                        isNullable = false,
-                    ).also { type = it }
+            val resolver = ClassMemberResolver.create(currentScope, clazz, subjectType.arguments)
+            if (lookupType == IdentifierClassifier.Property) {
+                /**
+                 * As of Kotlin 1.9, resolution order is Companion Property > Enum Entry
+                 */
+                resolver?.findMemberPropertyCustomAccessorWithType(memberName)?.let {
+                    return it.second
+                }
+                resolver?.findMemberPropertyWithoutAccessorWithType(memberName)?.let {
+                    return it.second
+                }
+                if (clazz.fullQualifiedName.endsWith(".Companion") && !subjectType.isNullable) {
+                    val originalClassName = clazz.fullQualifiedName.removeSuffix(".Companion")
+                    val originalClass = currentScope.findClass(originalClassName)?.first
+                        ?: throw RuntimeException("Cannot find class $originalClassName")
+
+                    if (ClassModifier.enum in originalClass.modifiers && originalClass.enumValues.containsKey(memberName)) {
+                        return TypeNode(
+                            position = SourcePosition.NONE,
+                            name = originalClass.fullQualifiedName,
+                            arguments = null,
+                            isNullable = false,
+                        )
+                    }
+                }
+                transformedRefName?.let {
+                    currentScope.findExtensionProperty(it)
+                }?.let {
+                    return it.typeNode!!.resolveMemberType()
+                }
+            } else {
+                resolver?.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
+                    return FunctionTypeNode(
+                        position = it.function.position,
+                        parameterTypes = emptyList(),
+                        returnType = it.resolvedReturnType,
+                        isNullable = false
+                    )
+                }
+                findExtensionFunction(subjectType.toDataType(), memberName)?.let {
+                    return FunctionTypeNode(
+                        position = it.position,
+                        parameterTypes = emptyList(),
+                        returnType = it.returnType,
+                        isNullable = false
+                    ).resolveMemberType()
                 }
             }
-            transformedRefName?.let {
-                currentScope.findExtensionProperty(it)
-            }?.let {
-                return it.typeNode!!.resolveMemberType()
-            }
-        } else {
-            resolver?.findMemberFunctionWithTypeByTransformedName(memberName)?.let {
-                return FunctionTypeNode(
-                    position = it.function.position,
-                    parameterTypes = emptyList(),
-                    returnType = it.resolvedReturnType,
-                    isNullable = false
-                ).also { type = it }
-            }
-            findExtensionFunction(subjectType.toDataType(), memberName)?.let {
-                return FunctionTypeNode(
-                    position = it.position,
-                    parameterTypes = emptyList(),
-                    returnType = it.returnType,
-                    isNullable = false
-                ).resolveMemberType().also { type = it }
-            }
+            throw SemanticException(position, "Could not find member `$memberName` for type ${clazz.fullQualifiedName}")
         }
 
-        throw SemanticException(position, "Could not find member `$memberName` for type ${clazz.fullQualifiedName}")
+        return resolve().let {
+            val r = if (isNullCastNeeded) {
+                it.copy(isNullable = true)
+            } else {
+                it
+            }
+            type = r
+            r
+        }
     }
 
     fun FunctionCallArgumentNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {

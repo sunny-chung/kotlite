@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
 import kotlin.test.Ignore
@@ -413,5 +414,43 @@ class ExtensionFunctionTest {
         println(symbolTable.propertyValues)
         assertEquals(26, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(25 * 29, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun safeCallGenericExtensionFunctionReceiverWithGenericFunctionReceiverAsValueParameter() {
+        val interpreter = interpreter("""
+            abstract class Base(val x: Int)
+            class A(x: Int, val a: Int) : Base(x)
+            class B(x: Int, val b: Int) : Base(x)
+            fun <T : Base> T.unwrap(f: T.() -> Int): Int = this.f()
+            fun f(x: Int) = if (x > 0) A(6, 20) else null
+            val a: Int? = f(1)?.unwrap { x + a }
+            val b = f(-1)?.unwrap { x * a }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(26, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
+    }
+
+    @Test
+    fun callNullableGenericExtensionFunctionReceiver() {
+        val interpreter = interpreter("""
+            abstract class Base(val x: Int)
+            class A(x: Int, val a: Int) : Base(x)
+            class B(x: Int, val b: Int) : Base(x)
+            fun <T : Base?> T.unwrap(f: T.() -> Int): Int = this.f()
+            fun f(x: Int) = if (x > 0) A(6, 20) else null
+            val a: Int = f(1).unwrap { (this?.x ?: 0) + (this?.a ?: 0) }
+            val b = f(-1).unwrap { (this?.x ?: 0) * (this?.a ?: 0) }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(26, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(0, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
 }

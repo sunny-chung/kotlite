@@ -1050,4 +1050,23 @@ class TypeInferenceTest {
         assertEquals("abc", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
         assertEquals(123, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun callNullableGenericExtensionFunctionReceiverWithGenericReturnType() {
+        val interpreter = interpreter("""
+            abstract class Base(val x: Int)
+            class A(x: Int, val a: Int) : Base(x)
+            class B(x: Int, val b: Int) : Base(x)
+            fun <T : Base?, R> T.unwrap(f: T.() -> R): R = this.f()
+            fun f(x: Int) = if (x > 0) A(6, 20) else null
+            val a: Int? = f(1).unwrap { this?.x }
+            val b = f(-1).unwrap { this?.x }
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("b"))
+    }
 }
