@@ -138,7 +138,7 @@ class MapTest {
             val a: Int? = m["ab"]?.size
             val b: Int? = m["bcd"]?.size
             val c: Int? = m["e"]?.size
-            val d: Int? = m["fghi"]!!.size
+            val d: Int = m["fghi"]!!.size
             val e: Int = m["notexist"]?.size ?: -1
         """.trimIndent(), executionEnvironment = env, isDebug = true)
         interpreter.eval()

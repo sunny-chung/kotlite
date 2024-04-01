@@ -257,4 +257,24 @@ class GenericFunctionTest {
         assertEquals("abc,def,bcd,123,45,", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
         assertEquals("123,45,", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
     }
+
+    @Test
+    fun anyTypeUpperBoundWithNullableValueParameter() {
+        val interpreter = interpreter("""
+            fun f(x: Int) = if (x > 0) x else null
+            fun <T : Any> notNullOf(value: T?): T {
+                return if (value != null) {
+                    value as T
+                } else {
+                    throw Exception("${'$'}value is null")
+                }
+            }
+            val a = notNullOf(f(10))
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(1, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
 }

@@ -1363,6 +1363,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
                 fun inferTypeArgumentFromOtherArgument(parameterType: TypeNode, argumentType: TypeNode) {
                     if (tpUpperBounds.containsKey(parameterType.name)) {
+                        val argumentType = if (parameterType.isNullable && argumentType.isNullable) {
+                            argumentType.copy(isNullable = false)
+                        } else {
+                            argumentType
+                        }
                         tpResolutions[parameterType.name] =
                             superTypeOf(tpResolutions.getOrElse(parameterType.name) { argumentType }, argumentType)
                         inferNestedTypeArgument(parameterType.name)
