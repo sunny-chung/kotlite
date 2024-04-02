@@ -58,6 +58,10 @@ sealed interface DataType {
     infix fun isPrimitiveTypeOf(type: PrimitiveTypeName): Boolean {
         return this is PrimitiveType && this.name == type.name
     }
+
+    infix fun isAnyPrimitiveTypeOf(types: Set<PrimitiveTypeName>): Boolean {
+        return this is PrimitiveType && this.name in types.map { it.name } // TODO optimize
+    }
 }
 
 data class UnitType(override val isNullable: Boolean = false) : DataType {

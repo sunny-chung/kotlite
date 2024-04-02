@@ -9,6 +9,7 @@ import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParamete
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.extension.unboxRepeatedType
+import com.sunnychung.lib.multiplatform.kotlite.extension.unboxTypeParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
 import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
 import com.sunnychung.lib.multiplatform.kotlite.model.AsOpNode
@@ -58,8 +59,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.LabelNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LambdaLiteralNode
 import com.sunnychung.lib.multiplatform.kotlite.model.LongNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NavigationNode
-import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.NothingType
+import com.sunnychung.lib.multiplatform.kotlite.model.NullNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveTypeName
 import com.sunnychung.lib.multiplatform.kotlite.model.PropertyAccessorsNode
@@ -97,7 +98,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
-import com.sunnychung.lib.multiplatform.kotlite.model.toTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.typeUpperBoundOrAny
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassSemanticAnalyzer
@@ -2610,16 +2610,24 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     fun BinaryOpNode.type(modifier: ResolveTypeModifier = ResolveTypeModifier()): TypeNode {
-        return type
-            ?: when (operator) {
+        type?.let { return it }
+
+        val ot1 = node1.type(modifier = modifier).toDataType()
+        val ot2 = node2.type(modifier = modifier).toDataType()
+        val t1 = ot1.unboxTypeParameterType().unboxRepeatedType(currentScope)
+        val t2 = ot2.unboxTypeParameterType().unboxRepeatedType(currentScope)
+
+        fun throwError(): Nothing = throw SemanticException(
+            position,
+            "Types ${ot1.descriptiveName} and ${ot2.descriptiveName} cannot be applied with operator `$operator`"
+        )
+
+        return when (operator) {
                 "+", "-", "*", "/", "%" -> {
                     call?.type(modifier = modifier)?.also {
                         type = it
                         return it
                     }
-
-                    val t1 = node1.type(modifier = modifier).toDataType()
-                    val t2 = node2.type(modifier = modifier).toDataType()
                     if (t1 isPrimitiveTypeOf PrimitiveTypeName.String || t1 is NothingType || t2 isPrimitiveTypeOf PrimitiveTypeName.String || t2 is NothingType) {
                         typeRegistry["String"]!!
                     } else if ((t1.`is`(PrimitiveTypeName.Double, isNullable = false) && t2.isNonNullNumberType())
@@ -2639,14 +2647,46 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     } else if (operator == "-" && t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Char) {
                         typeRegistry["Int"]!!
                     } else {
-                        throw SemanticException(
-                            position,
-                            "Types ${t1.descriptiveName} and ${t2.descriptiveName} cannot be applied with operator `$operator`"
-                        )
+                        throwError()
                     }
                 }
 
-                "<", "<=", ">", ">=", "==", "!=", "||", "&&" -> typeRegistry["Boolean"]!!
+                "<", "<=", ">", ">=" -> {
+                    if (
+                        hasFunctionCall == true
+                        || (t1.isNonNullNumberType() && t2.isNonNullNumberType())
+                        || (t1 isPrimitiveTypeOf PrimitiveTypeName.String && t2 isPrimitiveTypeOf PrimitiveTypeName.String)
+                        || (t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Char)
+                        || (t1 isPrimitiveTypeOf PrimitiveTypeName.Byte && t2 isPrimitiveTypeOf PrimitiveTypeName.Byte)
+                    ) {
+                        typeRegistry["Boolean"]!!
+                    } else if (!t1.isNullable && t1 is ObjectType) {
+                        val comparableType = if (t1.name == "Comparable") {
+                            t1
+                        } else {
+                            t1.findSuperType("Comparable") ?: throwError()
+                        }
+                        val comparableOtherType = comparableType.arguments.first().unboxRepeatedType(currentScope)
+                        if (
+                            comparableOtherType.isAssignableFrom(ot2)
+                            || comparableOtherType.isAssignableFrom(t2)
+                        ) {
+                            typeRegistry["Boolean"]!!
+                        } else {
+                            throwError()
+                        }
+                    } else {
+                        throwError()
+                    }
+                }
+                "||", "&&" -> {
+                    if (t1 isPrimitiveTypeOf PrimitiveTypeName.Boolean && t2 isPrimitiveTypeOf PrimitiveTypeName.Boolean) {
+                        typeRegistry["Boolean"]!!
+                    } else {
+                        throwError()
+                    }
+                }
+                "==", "!=" -> typeRegistry["Boolean"]!!
 
                 else -> throw UnsupportedOperationException()
             }.also {

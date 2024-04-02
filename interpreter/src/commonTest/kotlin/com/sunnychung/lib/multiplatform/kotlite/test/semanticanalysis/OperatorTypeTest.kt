@@ -166,4 +166,20 @@ class OperatorTypeTest {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun nonComparableClass() {
+        assertSemanticFail("""
+            class A
+            val b = A() > 10
+        """.trimIndent())
+    }
+
+    @Test
+    fun nonAdditiveClass() {
+        assertSemanticFail("""
+            class A
+            val b = A() + A()
+        """.trimIndent())
+    }
 }
