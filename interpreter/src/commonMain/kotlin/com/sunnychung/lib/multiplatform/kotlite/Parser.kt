@@ -22,6 +22,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DoWhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
@@ -2473,6 +2474,31 @@ class Parser(protected val lexer: Lexer) {
     }
 
     /**
+     * doWhileStatement:
+     *     'do'
+     *     {NL}
+     *     [controlStructureBody]
+     *     {NL}
+     *     'while'
+     *     {NL}
+     *     '('
+     *     expression
+     *     ')'
+     */
+    fun doWhileStatement(): DoWhileNode {
+        val t = eat(TokenType.Identifier, "do")
+        repeatedNL()
+        val body = controlStructureBody(ScopeType.DoWhile)
+        repeatedNL()
+        eat(TokenType.Identifier, "while")
+        repeatedNL()
+        eat(TokenType.Operator, "(")
+        val condition = expression()
+        eat(TokenType.Operator, ")")
+        return DoWhileNode(position = t.position, condition = condition, body = body)
+    }
+
+    /**
      * forStatement:
      *     'for'
      *     {NL}
@@ -2515,6 +2541,7 @@ class Parser(protected val lexer: Lexer) {
         return when (currentToken.value) {
             "for" -> forStatement()
             "while" -> whileStatement()
+            "do" -> doWhileStatement()
             else -> TODO()
         }
     }

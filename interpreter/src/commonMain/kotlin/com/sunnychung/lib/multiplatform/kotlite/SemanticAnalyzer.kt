@@ -35,6 +35,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDeclarationN
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
+import com.sunnychung.lib.multiplatform.kotlite.model.DoWhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
@@ -310,6 +311,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is ContinueNode -> this.visit(modifier = modifier)
             is IfNode -> this.visit(modifier = modifier)
             is WhileNode -> this.visit(modifier = modifier)
+            is DoWhileNode -> this.visit(modifier = modifier)
             is ClassDeclarationNode -> this.visit(modifier = modifier)
             is ClassInstanceInitializerNode -> this.visit(modifier = modifier)
             is ClassMemberReferenceNode -> { /* TODO */ }
@@ -1698,6 +1700,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         body?.visit(modifier = modifier)
     }
 
+    fun DoWhileNode.visit(modifier: Modifier = Modifier()) {
+        condition.visit(modifier = modifier)
+        body?.visit(modifier = modifier)
+    }
+
     fun NavigationNode.visit(modifier: Modifier = Modifier(), lookupType: IdentifierClassifier = IdentifierClassifier.Property, isCheckWriteAccess: Boolean = false): DataType {
         subject.visit(modifier = modifier)
 
@@ -2595,6 +2602,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             is ValueNode -> TODO()
             is VariableReferenceNode -> this.type(modifier = modifier)
             is WhileNode -> typeRegistry["Unit"]!!
+            is DoWhileNode -> typeRegistry["Unit"]!!
 
             is IntegerNode -> typeRegistry["Int"]!!
             is LongNode -> typeRegistry["Long"]!!

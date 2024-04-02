@@ -407,7 +407,15 @@ data class WhileNode(override val position: SourcePosition, val condition: ASTNo
     override fun toMermaid(): String {
         val self = "${generateId()}[\"While Node\"]"
         return "$self-- condition -->${condition.toMermaid()}\n" +
-                "$self-- loop -->${body?.toMermaid() ?: self}\n"
+                "$self-- body -->${body?.toMermaid() ?: self}\n"
+    }
+}
+
+data class DoWhileNode(override val position: SourcePosition, val condition: ASTNode, val body: BlockNode?) : ASTNode {
+    override fun toMermaid(): String {
+        val self = "${generateId()}[\"Do-While Node\"]"
+        return "$self-- condition -->${condition.toMermaid()}\n" +
+                "$self-- body -->${body?.toMermaid() ?: self}\n"
     }
 }
 

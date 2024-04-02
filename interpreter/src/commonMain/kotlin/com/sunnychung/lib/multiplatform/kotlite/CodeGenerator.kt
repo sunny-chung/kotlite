@@ -16,6 +16,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassMemberReferenceNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassParameterNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ClassPrimaryConstructorNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ContinueNode
+import com.sunnychung.lib.multiplatform.kotlite.model.DoWhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.EnumEntryNode
@@ -102,6 +103,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
             is UnaryOpNode -> this.generate()
             is VariableReferenceNode -> this.generate()
             is WhileNode -> this.generate()
+            is DoWhileNode -> this.generate()
             is PropertyAccessorsNode -> TODO()
             is ValueNode -> TODO()
             is StringLiteralNode -> this.generate()
@@ -227,6 +229,9 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
 
     protected fun WhileNode.generate()
         = "while (${condition.generate()})${body?.let { " ${it.generate()}" } ?: ";"}"
+
+    protected fun DoWhileNode.generate()
+        = "do ${body?.generate() ?: ""} while (${condition.generate()})"
 
     protected fun StringNode.generate()
         = "\"${nodes.joinToString("") {

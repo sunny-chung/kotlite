@@ -40,6 +40,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDeclarationN
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.DataType
+import com.sunnychung.lib.multiplatform.kotlite.model.DoWhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleNode
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ElvisOpNode
@@ -159,6 +160,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             is ReturnNode -> this.eval()
             is IfNode -> this.eval()
             is WhileNode -> this.eval()
+            is DoWhileNode -> this.eval()
             is BreakNode -> this.eval()
             is ContinueNode -> this.eval()
             is ClassDeclarationNode -> this.eval()
@@ -1158,6 +1160,16 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
                     body?.eval()
                 } catch (_: NormalContinueException) {}
             }
+        } catch (_: NormalBreakException) {}
+    }
+
+    fun DoWhileNode.eval() {
+        try {
+            do {
+                try {
+                    body?.eval()
+                } catch (_: NormalContinueException) {}
+            } while ((condition.eval() as BooleanValue).value)
         } catch (_: NormalBreakException) {}
     }
 

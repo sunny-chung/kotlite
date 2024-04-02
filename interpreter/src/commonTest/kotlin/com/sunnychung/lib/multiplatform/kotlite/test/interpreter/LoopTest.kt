@@ -129,4 +129,54 @@ class LoopTest {
         assertEquals(8, (symbolTable.findPropertyByDeclaredName("sum") as IntValue).value)
         assertEquals(1, (symbolTable.findPropertyByDeclaredName("numCreate") as IntValue).value)
     }
+
+    @Test
+    fun doWhileExecuteAtLeastOnce() {
+        val interpreter = interpreter("""
+            var x: Int = 0
+            do {
+                ++x
+            } while (false)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(1, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun doWhileLoop() {
+        val interpreter = interpreter("""
+            var x: Int = 0
+            do {
+                ++x
+            } while (x <= 10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(11, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun doWhileLoopWithContinueBreak() {
+        val interpreter = interpreter("""
+            var x: Int = 0
+            var i: Int = 0
+            do {
+                ++x
+                if (x == 3 || x == 4) continue
+                ++i
+                if (i == 7) break
+            } while (i <= 10)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(9, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(7, (symbolTable.findPropertyByDeclaredName("i") as IntValue).value)
+    }
 }
