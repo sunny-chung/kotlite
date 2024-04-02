@@ -203,5 +203,8 @@ kotliteStdLibHeaderProcessor {
             ),
         ),
         "Core" to KotliteModuleConfig(),
+        "Math" to KotliteModuleConfig(
+            imports = listOf("kotlin.math.*")
+        ),
     )
 }
