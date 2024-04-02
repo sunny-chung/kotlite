@@ -7,11 +7,13 @@ package com.sunnychung.lib.multiplatform.kotlite.model
 class ExecutionEnvironment(
 //    private val registrationFilter: BuiltinFunctionRegistrationFilter = BuiltinFunctionRegistrationFilter { _ -> true }
     private val functionRegistrationFilter: (CustomFunctionDefinition) -> Boolean = { true },
-    private val propertyRegistrationFilter: (ExtensionProperty) -> Boolean = { true },
+    private val extensionPropertyRegistrationFilter: (ExtensionProperty) -> Boolean = { true },
+    private val globalPropertyRegistrationFilter: (GlobalProperty) -> Boolean = { true },
     private val classRegistrationFilter: (String) -> Boolean = { true },
 ) {
     private val builtinFunctions: MutableList<CustomFunctionDeclarationNode> = mutableListOf()
     private val extensionProperties: MutableList<ExtensionProperty> = mutableListOf()
+    private val globalProperties: MutableList<GlobalProperty> = mutableListOf()
     private val providedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
     private val initiallyProvidedClasses: MutableList<ProvidedClassDefinition> = mutableListOf()
 
@@ -61,8 +63,14 @@ class ExecutionEnvironment(
     }
 
     fun registerExtensionProperty(property: ExtensionProperty) {
-        if (propertyRegistrationFilter(property)) {
+        if (extensionPropertyRegistrationFilter(property)) {
             extensionProperties += property
+        }
+    }
+
+    fun registerGlobalProperty(property: GlobalProperty) {
+        if (globalPropertyRegistrationFilter(property)) {
+            globalProperties += property
         }
     }
 
@@ -84,6 +92,10 @@ class ExecutionEnvironment(
 
     internal fun getExtensionProperties(topmostSymbolTable: SymbolTable): List<ExtensionProperty> {
         return extensionProperties.toList()
+    }
+
+    internal fun getGlobalProperties(topmostSymbolTable: SymbolTable): List<GlobalProperty> {
+        return globalProperties.toList()
     }
 
     internal fun getBuiltinClasses(topmostSymbolTable: SymbolTable): List<ClassDefinition> {
@@ -235,6 +247,9 @@ class ExecutionEnvironment(
         }
         module.properties.forEach {
             registerExtensionProperty(it)
+        }
+        module.globalProperties.forEach {
+            registerGlobalProperty(it)
         }
         module.functions.forEach {
             registerFunction(it)

@@ -51,6 +51,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
+import com.sunnychung.lib.multiplatform.kotlite.model.GlobalProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.IfNode
 import com.sunnychung.lib.multiplatform.kotlite.model.IndexOpNode
 import com.sunnychung.lib.multiplatform.kotlite.model.InfixFunctionCallNode
@@ -159,6 +160,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         this.transformedName = "EP//${this.receiver}/${this.declaredName}/${++functionDefIndex}"
     }
 
+    fun GlobalProperty.generateTransformedName() {
+        // the format needs to be friendly to `SymbolTable.findTransformedNameByDeclaredName`
+        this.transformedName = "${this.declaredName}/-${++functionDefIndex}"
+    }
+
     init {
         val classes = mutableListOf<ClassDefinition>()
         executionEnvironment.getBuiltinClasses(builtinSymbolTable).forEach {
@@ -167,6 +173,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             classes += it
         }
         builtinSymbolTable.init()
+
+        executionEnvironment.getGlobalProperties(builtinSymbolTable).forEach {
+            it.attachToSemanticAnalyzer(this)
+            builtinSymbolTable.putPropertyHolder(it.declaredName, it.isMutable, it.accessor)
+        }
 
         executionEnvironment.getExtensionProperties(builtinSymbolTable).forEach {
             it.generateTransformedName()

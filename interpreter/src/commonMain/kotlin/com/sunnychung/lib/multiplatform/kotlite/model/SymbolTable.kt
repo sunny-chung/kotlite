@@ -451,11 +451,11 @@ open class SymbolTable(
             ?: throw RuntimeException("The variable `$name` has not been declared")
     }
 
-    fun putPropertyHolder(name: String, holder: RuntimeValueAccessor) {
+    fun putPropertyHolder(name: String, isMutable: Boolean, holder: RuntimeValueAccessor) {
         if (propertyValues.containsKey(name)) {
             throw RuntimeException("Property `$name` has already been defined")
         }
-        propertyDeclarations[name] = PropertyType(holder.type, false)
+        propertyDeclarations[name] = PropertyType(holder.type, isMutable)
         propertyValues[name] = holder
     }
 
@@ -740,7 +740,7 @@ open class SymbolTable(
     fun mergeFrom(position: SourcePosition, other: SymbolTable) { // this is only involved in runtime
         log.d { "Merge from other SymbolTable" }
         other.propertyValues.forEach {
-            putPropertyHolder(it.key, it.value)
+            putPropertyHolder(it.key, false /* TODO review */, it.value)
         }
         other.functionDeclarations.forEach {
             declareFunction(position, it.key, it.value)

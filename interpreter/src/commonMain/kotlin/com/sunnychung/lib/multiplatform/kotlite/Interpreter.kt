@@ -119,6 +119,10 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
             classes += it
         }
         callStack.builtinScope().init()
+        executionEnvironment.getGlobalProperties(globalScope).forEach {
+            it.attachToInterpreter(this)
+            globalScope.putPropertyHolder(it.transformedName!!, it.isMutable, it.accessor)
+        }
         executionEnvironment.getBuiltinFunctions(globalScope).forEach {
             callStack.provideBuiltinFunction(it)
         }
@@ -1399,7 +1403,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         val currentSymbolTable = callStack.currentSymbolTable()
         val runtimeRefs = SymbolTable(Int.MAX_VALUE, "lambda-symbol-ref", ScopeType.Closure, currentSymbolTable.rootScope)
         refs.properties.forEach {
-            runtimeRefs.putPropertyHolder(it, currentSymbolTable.getPropertyHolder(it))
+            runtimeRefs.putPropertyHolder(it, false /* TODO review */, currentSymbolTable.getPropertyHolder(it))
         }
         refs.functions.forEach {
             runtimeRefs.declareFunction(position, it, currentSymbolTable.findFunction(it)!!.first)

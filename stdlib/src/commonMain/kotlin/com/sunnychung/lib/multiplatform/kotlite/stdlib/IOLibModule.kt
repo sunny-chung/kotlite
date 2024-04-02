@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.stdlib
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
+import com.sunnychung.lib.multiplatform.kotlite.model.GlobalProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
@@ -12,6 +13,8 @@ open class IOLibModule : LibraryModule("IO") {
     override val classes: List<ProvidedClassDefinition> = emptyList()
 
     override val properties: List<ExtensionProperty> = emptyList()
+
+    override val globalProperties: List<GlobalProperty> = emptyList()
 
     override val functions: List<CustomFunctionDefinition> = listOf(
         CustomFunctionDefinition(

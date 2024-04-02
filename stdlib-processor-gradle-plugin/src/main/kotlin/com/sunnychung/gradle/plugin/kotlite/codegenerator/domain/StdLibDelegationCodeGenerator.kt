@@ -54,6 +54,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionType
+import com.sunnychung.lib.multiplatform.kotlite.model.GlobalProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IterableValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IteratorClass
@@ -89,6 +90,8 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
 
     override val properties = listOf<ExtensionProperty>(${extensionProperties.joinToString("") { "\n${it.generate(SourcePosition(name, it.position.lineNum, it.position.col), indent(8))},\n" }}
     )
+    
+    override val globalProperties = emptyList<GlobalProperty>()
     
     override val functions = listOf<CustomFunctionDefinition>(${functionInterfaces.joinToString("") { "\n${it.generate(SourcePosition(name, it.position.lineNum, it.position.col), indent(8))},\n" }}
     )
