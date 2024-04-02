@@ -102,7 +102,7 @@ open class ClassInstance(
 //            throw RuntimeException("val cannot be reassigned")
 //        }
         if (!propertyDefinition.type.resolveTypeParameter().isAssignableFrom(value.type())) {
-            throw RuntimeException("Type ${value.type().name} cannot be casted to ${propertyDefinition.type.name}")
+            throw RuntimeException("Type ${value.type().name} cannot be casted to ${propertyDefinition.type.descriptiveName}")
         }
 
         memberPropertyValues[name]!!.assign(interpreter, value)
@@ -154,7 +154,9 @@ open class ClassInstance(
      */
     private fun DataType.resolveTypeParameter(): DataType {
         if (this !is TypeParameterType) return this
-        return typeArgumentByName[name]?.copyOf(isNullable = isNullable) ?: TODO()
+        return typeArgumentByName[name]?.let {
+            it.copyOf(isNullable = it.isNullable || isNullable)
+        } ?: TODO()
     }
 
     override fun compareTo(other: ComparableRuntimeValue<Comparable<Any>>): Int {

@@ -350,4 +350,52 @@ class NullTest {
             val a = f(1).x
         """.trimIndent())
     }
+
+    @Test
+    fun resolveNullableTypeToNonNull1() {
+        val interpreter = interpreter("""
+            class A<T>(val x: T)
+            fun <T : Any> f(o: A<T?>, alternative: T): T = if (o.x != null) o.x!! else alternative
+            val x: Int = f(A(30), 20)
+            val y: Int = f(A<Int?>(null), 25)
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun resolveNullableTypeToNonNull2() {
+        val interpreter = interpreter("""
+            class A<T>(val x: T)
+            fun <T : Any> f(o: A<T?>) = if (o.x != null) A(o.x) else null
+            val x: Int? = f(A(30))?.x
+            val y: Int? = f(A<Int?>(null))?.x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("y"))
+    }
+
+    @Test
+    fun resolveNullableTypeToNonNull3() {
+        val interpreter = interpreter("""
+            class A<T>(val x: T)
+            fun <T : Any> f(o: A<T?>, alternative: T): A<T> = if (o.x != null) A(o.x!!) else A(alternative)
+            val x: Int = f(A(30), 20).x
+            val y: Int = f(A<Int?>(null), 25).x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
 }

@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionDeclarationNode
+import com.sunnychung.lib.multiplatform.kotlite.model.FunctionModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterModifier
 import com.sunnychung.lib.multiplatform.kotlite.model.FunctionValueParameterNode
@@ -96,19 +97,22 @@ abstract class Abstract${name}LibModule : LibraryModule("$name") {
     }
 
     fun FunctionDeclarationNode.generate(position: SourcePosition, indent: String): String {
-        with (ScopedDelegationCodeGenerator(typeParameters)) {
+        with (ScopedDelegationCodeGenerator(
+            typeParameterNodes = typeParameters,
+            isNullAware = modifiers.contains(FunctionModifier.nullaware),
+        )) {
             return generate(position, indent)
         }
     }
 
     fun PropertyDeclarationNode.generate(position: SourcePosition, indent: String): String {
-        with (ScopedDelegationCodeGenerator(typeParameters)) {
+        with (ScopedDelegationCodeGenerator(typeParameterNodes = typeParameters, isNullAware = false)) {
             return generate(position, indent)
         }
     }
 }
 
-internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: List<TypeParameterNode>) {
+internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: List<TypeParameterNode>, private val isNullAware: Boolean) {
 
     val typeParameters = typeParameterNodes.associate {
         it.name to (it.typeUpperBound ?: TypeNode(SourcePosition.NONE, "Any", null, true))
@@ -159,7 +163,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     typeParameters = ${if (typeParameters.isEmpty()) "emptyList()" else "listOf(${typeParameters.joinToString("") {
         "\n${it.generate(indent(8))}," }
     }\n${indent(4)})"},
-    modifiers = setOf<FunctionModifier>(${modifiers.joinToString(", ") {
+    modifiers = setOf<FunctionModifier>(${modifiers.filter { it != FunctionModifier.nullaware }.joinToString(", ") {
         "FunctionModifier.${it.name}" }
     }),
     executable = { interpreter, receiver, args, typeArgs ->
@@ -215,6 +219,11 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         }
 
         val typeArgs = { hasCommaPrefix: Boolean ->
+            val type = if (isTypeATypeParameter) {
+                type
+            } else {
+                _type
+            }
             type.arguments.let { typeArgs ->
                 if (typeArgs.isNullOrEmpty()) {
                     ""
@@ -234,6 +243,8 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         }
         val wrappedValue = if (type.name == "Any" || (typeParameters.containsKey(type.name) && typeParameters[type.name]!!.name == "Any")) {
             "it as RuntimeValue"
+        } else if (type.name == "Nothing") {
+            "it"
         } else if (isTypeATypeParameter) {
             "DelegatedValue<${type.name}${if (type.arguments?.isNotEmpty() == true) "<${type.arguments!!.joinToString(", ") { "RuntimeValue" }}>" else ""}>(it, (${typeParametersUsedIn[_type.name]}.type() as ObjectType).clazz, listOf<DataType>(${typeArgs(false)})$symbolTableArg)"
         } else {
@@ -246,7 +257,17 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                     else -> ""
                 }
             }
-            "List", "Iterable" -> {
+            "MapEntry" -> {
+                if (isNullAware) {
+                    "?.toRuntimeValue()"
+                } else {
+                    ""
+                }
+            }
+            "List", "MutableList", "Set", "MutableSet", "Iterable" -> {
+                (if (isNullAware) {
+                    "?.map { it.toRuntimeValue() }"
+                } else "") +
                 when (val subtypeName = type.arguments?.get(0)?.name) {
                     "Pair" -> "?.map { PairValue(it, ${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
 //                    "String" -> "?.map { StringValue(it$symbolTableArg) }"
@@ -258,6 +279,12 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                     } else {
                         ""
                     }
+                } + when (type.name) {
+                    "List" -> ""
+                    "MutableList" -> "?.toMutableList()"
+                    "Set" -> "?.toSet()"
+                    "MutableSet" -> "?.toMutableSet()"
+                    else -> ""
                 }
             }
             "Pair" -> {
@@ -296,14 +323,27 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     fun unwrapOne(variableName: String, _type: TypeNode): String {
         val type = resolve(_type)
         val question = if (type.isNullable) "?" else ""
+        val unwrapNullable = if (type.isNullable) {
+            ".toNullable()"
+        } else {
+            ""
+        }
         return if (type is FunctionTypeNode) {
             generateLambda(variableName, _type as FunctionTypeNode, 4)
         } else if (type.name == "Unit") {
             "Unit"
         } else if (type.name == "Any") {
-            "$variableName as RuntimeValue"
+            "$variableName as RuntimeValue".let {
+                if (isNullAware && type.isNullable) {
+                    "($it)$unwrapNullable"
+                } else it
+            }
         } else if (type.name == "Comparable") {
-            "$variableName as ComparableRuntimeValue<Comparable<Any>>"
+            "$variableName as ComparableRuntimeValue<Comparable<Any>>".let {
+                if (isNullAware && type.isNullable) {
+                    "($it)$unwrapNullable"
+                } else it
+            }
         } else {
             if (type.isPrimitive()) {
                 "($variableName as$question ${type.name}Value)$question.value"
@@ -317,7 +357,12 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                                     "ComparableRuntimeValue<Comparable<Any>>"
                                 } else {
                                     "RuntimeValue"
-                                }
+                                } +
+                                    if (isNullAware && it.isNullable) {
+                                        "?"
+                                    } else {
+                                        ""
+                                    }
                             }}>"
                         } ?: ""
                     }$question"
@@ -344,7 +389,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
         fun replace(type: TypeNode): TypeNode {
             // TODO don't hardcode
             if (type.name == "Any") {
-                return TypeNode(SourcePosition.NONE, "RuntimeValue", null, false)
+                return TypeNode(SourcePosition.NONE, "RuntimeValue", null, isNullAware && type.isNullable)
             } else if (type.name in typeParameters.keys) {
                 return replace(typeParameters[type.name]!!)
             }

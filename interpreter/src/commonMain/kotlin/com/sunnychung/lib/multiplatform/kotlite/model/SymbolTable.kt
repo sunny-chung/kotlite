@@ -182,6 +182,7 @@ open class SymbolTable(
         if (typeAliasResolution.containsKey(name) || typeAliasResolution.containsKey("$name?")) {
             throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeResolution)
         }
+        log.d { "declareTypeAliasResolution1($position, $name, ${type.descriptiveName()})" }
         typeAliasResolution[name] = referenceSymbolTable.assertToDataType(type)
         typeAliasResolution["$name?"] = referenceSymbolTable.assertToDataType(type.copy(isNullable = true))
     }
@@ -193,6 +194,7 @@ open class SymbolTable(
         if (typeAliasResolution.containsKey(name) || typeAliasResolution.containsKey("$name?")) {
             throw DuplicateIdentifierException(position, name, IdentifierClassifier.TypeResolution)
         }
+        log.d { "declareTypeAliasResolution2($position, $name, ${type.descriptiveName})" }
         typeAliasResolution[name] = type
         typeAliasResolution["$name?"] = type.copyOf(isNullable = true)
     }
@@ -202,11 +204,6 @@ open class SymbolTable(
     }
 
     fun assertToDataType(type: TypeNode, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): DataType {
-        if (type.name == "<Repeated>") {
-//            return assertToDataType(type.arguments!!.first(), visitCache)
-            return RepeatedType(type.arguments!!.first().name, type.arguments!!.first().name.endsWith("?"))
-        }
-
         val isCacheCreator = visitCache.isEmpty
 
         return typeNodeToDataType(type, visitCache)
@@ -221,6 +218,11 @@ open class SymbolTable(
     fun typeNodeToDataType(type: TypeNode, visitCache: SymbolTableTypeVisitCache = SymbolTableTypeVisitCache()): DataType? {
         if (type.name == "*") {
             return StarType // TODO: additional validations of use of type *?
+        }
+
+        if (type.name == "<Repeated>") {
+//            return assertToDataType(type.arguments!!.first(), visitCache)
+            return RepeatedType(type.arguments!!.first().name, type.arguments!!.first().name.endsWith("?"))
         }
 
         if (visitCache.isVisited(type)) {
@@ -260,7 +262,7 @@ open class SymbolTable(
 
             // TODO refactor this repeated logic
             val upperBound = clazz.typeParameters[index].typeUpperBound?.resolveGenericParameterTypeArguments(typeArgumentMap) ?: TypeNode(SourcePosition.NONE, "Any", null, true)
-            if (!assertToDataType(upperBound, visitCache.copy()).isAssignableFrom(assertToDataType(it, visitCache.copy()))) {
+            if (!(typeNodeToDataType(upperBound, visitCache.copy()) ?: return null).isAssignableFrom(typeNodeToDataType(it, visitCache.copy()) ?: return null)) {
                 throw RuntimeException("Type argument ${it.descriptiveName()} is out of bound (${upperBound.descriptiveName()})")
             }
         }

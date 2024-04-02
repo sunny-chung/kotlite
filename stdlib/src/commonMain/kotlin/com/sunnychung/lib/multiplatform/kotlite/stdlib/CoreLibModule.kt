@@ -9,10 +9,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
 
-class CoreLibModule : LibraryModule("Core") {
-    override val classes: List<ProvidedClassDefinition> = emptyList()
+class CoreLibModule : AbstractCoreLibModule() {
+//    override val classes: List<ProvidedClassDefinition> = emptyList()
 
-    override val properties: List<ExtensionProperty> = emptyList()
+//    override val properties: List<ExtensionProperty> = emptyList()
 
     override val functions: List<CustomFunctionDefinition> = listOf(
         CustomFunctionDefinition(
@@ -104,6 +104,6 @@ class CoreLibModule : LibraryModule("Core") {
             },
             position = SourcePosition(name, 1, 1),
         ),
-    )
+    ) + super.functions
 
 }

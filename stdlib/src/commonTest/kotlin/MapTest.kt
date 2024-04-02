@@ -504,4 +504,41 @@ class MapTest {
         assertEquals(2000, (symbolTable.findPropertyByDeclaredName("f") as IntValue).value)
         assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("g"))
     }
+
+    @Test
+    fun mapNotNull() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+        }
+        val interpreter = interpreter("""
+            val m1: Map<String, Int> = mapOf(
+                "a" to 3,
+                "abc" to 1590,
+                "d" to -26,
+                "ba" to 456,
+                "ef" to 891,
+            )
+            val l = m1.mapNotNull { entry ->
+                if (entry.value > 500) {
+                    entry.key
+                } else {
+                    null
+                }
+            }.sorted()
+            val a = l.size
+            l.forEach { e ->
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(2, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("abc\nef\n", console.toString())
+    }
 }

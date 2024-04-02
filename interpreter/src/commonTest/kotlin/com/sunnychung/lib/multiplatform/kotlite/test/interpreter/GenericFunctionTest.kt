@@ -4,6 +4,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ClassInstance
 import com.sunnychung.lib.multiplatform.kotlite.model.DoubleValue
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.LongValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -276,5 +277,22 @@ class GenericFunctionTest {
         assertEquals(1, symbolTable.propertyValues.size)
         println(symbolTable.propertyValues)
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+    }
+
+    @Test
+    @Ignore
+    fun castSuperTypeToTypeParameter() {
+        val interpreter = interpreter("""
+            class A<T>(val x: T)
+            fun <T : Any> f(o: A<T?>): T = if (o.x != null) o.x!! else (Any() as T)
+            val x: Any = f(A(30))
+            val y: Any = f(A<Int?>(null))
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("y"))
     }
 }

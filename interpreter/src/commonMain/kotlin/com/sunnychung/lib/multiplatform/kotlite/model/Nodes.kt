@@ -210,7 +210,7 @@ open class VariableReferenceNode(override val position: SourcePosition, val vari
  * Member names are the exact identifiers in Kotlin code
  */
 enum class FunctionModifier {
-    operator, open, override, abstract, infix
+    operator, open, override, abstract, infix, nullaware
 }
 
 enum class FunctionValueParameterModifier {

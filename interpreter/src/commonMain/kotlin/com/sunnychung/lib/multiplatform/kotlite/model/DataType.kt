@@ -403,7 +403,7 @@ data class TypeParameterType(
     }
 
     override fun isAssignableFrom(other: DataType): Boolean {
-        if (other is NothingType && isNullable) return true
+        if (other is NothingType && (isNullable || upperBound.isNullable)) return true
         if (other is RepeatedType) {
             return other.realTypeDescriptiveName == "$name${if (isNullable) "?" else ""}"
         }

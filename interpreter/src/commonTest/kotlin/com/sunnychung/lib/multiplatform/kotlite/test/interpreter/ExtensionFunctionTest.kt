@@ -453,4 +453,40 @@ class ExtensionFunctionTest {
         assertEquals(26, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(0, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
     }
+
+    @Test
+    fun resolveNullableTypeToNonNull() {
+        val interpreter = interpreter("""
+            class A<Z>(val x: Z)
+            fun <T : Any> A<T?>.f(alternative: T): A<T> = if (this.x != null) A(x!!) else A(alternative)
+            val a: A<Int> = A(30).f(20)
+            val x: Int = a.x
+            val b: A<Int> = A<Int?>(null).f(25)
+            val y: Int = b.x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun resolveNullableTypeToNonNullAndSameTypeParameterName() {
+        val interpreter = interpreter("""
+            class A<T>(val x: T)
+            fun <T : Any> A<T?>.f(alternative: T): A<T> = if (this.x != null) A(x!!) else A(alternative)
+            val a: A<Int> = A(30).f(20)
+            val x: Int = a.x
+            val b: A<Int> = A<Int?>(null).f(25)
+            val y: Int = b.x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+        assertEquals(25, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
 }

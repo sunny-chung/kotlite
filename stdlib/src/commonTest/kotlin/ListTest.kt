@@ -1,8 +1,10 @@
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.CoreLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -438,5 +440,93 @@ class ListTest {
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
         assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+    }
+
+    @Test
+    fun filterNotNull() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int)
+            val list1 = listOf(V("A", 7), V("B", 29), null, V("C", 6), null, null, null, V("D", 14), V("E", 27))
+            val list: List<V> = list1.filterNotNull()
+            for (e in list) {
+                println(e.name)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("A\nB\nC\nD\nE\n", console.toString())
+    }
+
+    @Test
+    fun listOfNotNull() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int)
+            val list = listOfNotNull(8, null, null, 3, 5, null, 1, 0, 9, null)
+            val size = list.size
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(6, (symbolTable.findPropertyByDeclaredName("size") as IntValue).value)
+    }
+
+    @Test
+    fun mapIndexedNotNull() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int)
+            val list = listOf(V("A", 7), V("B", 29), null, V("C", 6), null, null, null, V("D", 14), V("E", 27))
+                .mapIndexedNotNull { index, it ->
+                    it?.let {
+                        if (index % 2 != 0 && it.num > 10) {
+                            it.num
+                        } else null
+                    }
+                }
+            for (e in list) {
+                println(e)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("29\n14\n", console.toString())
+    }
+
+    @Test
+    fun firstNotNullOfOrNull() {
+        val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int)
+            val list = listOf(V("A", 7), V("B", 29), null, V("C", 6), null, null, null, V("D", 14), V("E", 27))
+            val a: String = list.firstNotNullOf { it?.let { e -> e.name.takeIf { e.num >= 10 } } }
+            val b: String? = list.firstNotNullOfOrNull { it?.let { e -> e.name.takeIf { e.num >= 10 } } }
+            val c: String? = list.firstNotNullOfOrNull { it?.let { e -> e.name.takeIf { e.num >= 100 } } }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals("B", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("B", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+        assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("c"))
     }
 }

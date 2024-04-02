@@ -9,7 +9,7 @@ val <T> List<T>.lastIndex: Int
 fun <T> listOf(vararg elements: T): List<T>
 fun <T> mutableListOf(vararg elements: T): MutableList<T>
 //fun <T> emptyList(): List<T>
-fun <T : Any> listOfNotNull(vararg elements: T?): List<T>
+nullaware fun <T : Any> listOfNotNull(vararg elements: T?): List<T>
 fun <T> List(size: Int, init: (index: Int) -> T): List<T>
 fun <T> MutableList(size: Int, init: (index: Int) -> T): MutableList<T>
 
@@ -55,15 +55,15 @@ fun <T> Iterable<T>.filter(predicate: (T) -> Boolean): List<T>
 fun <T> Iterable<T>.filterIndexed(predicate: (index: Int, T) -> Boolean): List<T>
 //fun <R> Iterable<*>.filterIsInstance(): List<R>
 fun <T> Iterable<T>.filterNot(predicate: (T) -> Boolean): List<T>
-fun <T : Any> Iterable<T?>.filterNotNull(): List<T>
+nullaware fun <T : Any> Iterable<T?>.filterNotNull(): List<T>
 fun <T> Iterable<T>.find(predicate: (T) -> Boolean): T?
 fun <T> Iterable<T>.findLast(predicate: (T) -> Boolean): T?
 fun <T> Iterable<T>.first(): T
 fun <T> Iterable<T>.first(predicate: (T) -> Boolean): T
-fun <T, R : Any> Iterable<T>.firstNotNullOf(
+nullaware fun <T, R : Any> Iterable<T>.firstNotNullOf(
     transform: (T) -> R?
 ): R
-fun <T, R : Any> Iterable<T>.firstNotNullOfOrNull(
+nullaware fun <T, R : Any> Iterable<T>.firstNotNullOfOrNull(
     transform: (T) -> R?
 ): R?
 fun <T> Iterable<T>.firstOrNull(): T?
@@ -121,8 +121,8 @@ fun <T> Iterable<T>.lastOrNull(): T?
 fun <T> Iterable<T>.lastOrNull(predicate: (T) -> Boolean): T?
 fun <T, R> Iterable<T>.map(transform: (T) -> R): List<R>
 fun <T, R> Iterable<T>.mapIndexed(transform: (index: Int, T) -> R): List<R>
-fun <T, R : Any> Iterable<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
-fun <T, R : Any> Iterable<T>.mapNotNull(transform: (T) -> R?): List<R>
+nullaware fun <T, R : Any> Iterable<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
+nullaware fun <T, R : Any> Iterable<T>.mapNotNull(transform: (T) -> R?): List<R>
 fun <T : Comparable<T>> Iterable<T>.max(): T
 fun <T, R : Comparable<R>> Iterable<T>.maxBy(selector: (T) -> R): T
 fun <T, R : Comparable<R>> Iterable<T>.maxByOrNull(selector: (T) -> R): T?
@@ -271,10 +271,10 @@ fun <K, V> Map<K, V>.filter(predicate: (MapEntry<K, V>) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterKeys(predicate: (K) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterNot(predicate: (MapEntry<K, V>) -> Boolean): Map<K, V>
 fun <K, V> Map<K, V>.filterValues(predicate: (V) -> Boolean): Map<K, V>
-fun <K, V, R : Any> Map<K, V>.firstNotNullOf(
+nullaware fun <K, V, R : Any> Map<K, V>.firstNotNullOf(
     transform: (MapEntry<K, V>) -> R?
 ): R
-fun <K, V, R : Any> Map<K, V>.firstNotNullOfOrNull(
+nullaware fun <K, V, R : Any> Map<K, V>.firstNotNullOfOrNull(
     transform: (MapEntry<K, V>) -> R?
 ): R?
 fun <K, V, R> Map<K, V>.flatMap(
@@ -296,7 +296,7 @@ fun <K, V> Map<K, V>.isNotEmpty(): Boolean
 fun <K, V> Map<K, V>?.isNullOrEmpty(): Boolean
 fun <K, V, R> Map<K, V>.map(transform: (MapEntry<K, V>) -> R): List<R>
 fun <K, V, R> Map<K, V>.mapKeys(transform: (MapEntry<K, V>) -> R): Map<R, V>
-fun <K, V, R : Any> Map<K, V>.mapNotNull(transform: (MapEntry<K, V>) -> R?): List<R>
+nullaware fun <K, V, R : Any> Map<K, V>.mapNotNull(transform: (MapEntry<K, V>) -> R?): List<R>
 fun <K, V, R> Map<K, V>.mapValues(transform: (MapEntry<K, V>) -> R): Map<K, R>
 fun <K, V, R : Comparable<R>> Map<K, V>.maxBy(selector: (MapEntry<K, V>) -> R): MapEntry<K, V>
 fun <K, V, R : Comparable<R>> Map<K, V>.maxByOrNull(selector: (MapEntry<K, V>) -> R): MapEntry<K, V>?
@@ -367,5 +367,5 @@ fun <T> MutableSet<T>.retainAll(elements: Collection<T>): Boolean
 fun <T> mutableSetOf(vararg elements: T): MutableSet<T>
 //fun <T> setOf(): Set<T>
 fun <T> setOf(vararg elements: T): Set<T>
-fun <T : Any> setOfNotNull(vararg elements: T?): Set<T>
+nullaware fun <T : Any> setOfNotNull(vararg elements: T?): Set<T>
 

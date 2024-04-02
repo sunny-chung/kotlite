@@ -202,5 +202,6 @@ kotliteStdLibHeaderProcessor {
                 "MapEntry<K, V>" to "Map.Entry<K, V>"
             ),
         ),
+        "Core" to KotliteModuleConfig(),
     )
 }

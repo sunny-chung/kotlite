@@ -250,4 +250,28 @@ class SetTest {
             actual = console.split("\n").filter { it.isNotEmpty() }.sorted(),
         )
     }
+
+    @Test
+    fun setOfNotNull() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            val set: Set<Int> = setOfNotNull(1, null, 2, 2, null, 3, 2, null, null, null)
+            val a = set.size
+            set.forEach {
+                println(it)
+            }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(listOf("1", "2", "3"), console.split("\n").sorted().filter { it.isNotEmpty() })
+    }
 }

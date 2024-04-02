@@ -98,6 +98,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
 import com.sunnychung.lib.multiplatform.kotlite.model.toTypeNode
+import com.sunnychung.lib.multiplatform.kotlite.model.typeUpperBoundOrAny
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassSemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.util.FunctionAndTypes
@@ -743,6 +744,11 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         val previousScope = currentScope
         var additionalScopeCount = 0
         var variantsOfThis = mutableListOf<FunctionDeclarationNode>()
+
+        if (FunctionModifier.nullaware in modifiers) {
+            throw UnsupportedOperationException("The modifier `nullaware` is not for runtime use")
+        }
+
         val isVararg = valueParameters.isNotEmpty() &&
             valueParameters.first().modifiers.contains(FunctionValueParameterModifier.vararg)
 
@@ -886,6 +892,21 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
             pushScope("$name(valueParameters)", ScopeType.FunctionParameters)
             ++additionalScopeCount
+
+            // overwrite receiver's type parameters with same name
+            typeParameters.forEach {
+                currentScope.declareTypeAlias(position, it.name, it.typeUpperBound)
+                currentScope.declareTypeAliasResolution(
+                    position,
+                    it.name,
+                    TypeParameterType(
+                        name = it.name,
+                        isNullable = false,
+                        upperBound = previousScope.typeNodeToDataType(it.typeUpperBoundOrAny())
+                            ?: currentScope.assertToDataType(it.typeUpperBoundOrAny()),
+                    )
+                )
+            }
 
             visitValueParameters()
 
@@ -1180,15 +1201,34 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         }.toMap().toMutableMap()
 
                         // the subject value itself can be a type argument as well. it has a higher priority. try to resolve it.
+                        fun resolve(typeParameterName: String, declaredReceiverType: TypeNode, actualReceiverType: TypeNode) {
+                            if (typeParameterName == declaredReceiverType.name) {
+                                namedTypeArguments[typeParameterName] = if (declaredReceiverType.isNullable && actualReceiverType.isNullable) {
+                                    actualReceiverType.copy(isNullable = false)
+                                } else {
+                                    actualReceiverType
+                                }
+                                return
+                            }
+                            if (declaredReceiverType.arguments?.size == actualReceiverType.arguments?.size) {
+                                declaredReceiverType.arguments?.forEachIndexed { index, it ->
+                                    resolve(typeParameterName, it, actualReceiverType.arguments!![index])
+                                }
+                            }
+                        }
+                        val subjectTypeNode = subjectType.toTypeNode()
                         resolution.typeParameters.forEach {
                             if (it.name == resolution.receiverType?.name) {
-                                namedTypeArguments[it.name] = subjectType.toTypeNode().let {
+                                namedTypeArguments[it.name] = subjectTypeNode.let {
                                     if (resolution.receiverType.isNullable || function.operator == "?.") {
                                         it.copy(isNullable = false)
                                     } else {
                                         it
                                     }
                                 }
+                            }
+                            resolution.receiverType?.let { declaredReceiverType ->
+                                resolve(it.name, declaredReceiverType, subjectTypeNode)
                             }
                         }
 

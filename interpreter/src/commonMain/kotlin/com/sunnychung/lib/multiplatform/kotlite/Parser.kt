@@ -68,7 +68,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
 val ACCEPTED_MODIFIERS = setOf(
-    "open", "override", "operator", "vararg", "enum", "abstract", "infix"
+    "open", "override", "operator", "vararg", "enum", "abstract", "infix", "nullaware"
 )
 
 /**
@@ -1994,6 +1994,7 @@ class Parser(protected val lexer: Lexer) {
             "override" -> FunctionModifier.override
             "abstract" -> FunctionModifier.abstract
             "infix" -> FunctionModifier.infix
+            "nullaware" -> FunctionModifier.nullaware
             else -> throw ParseException("Modifier `$it` cannot be applied to function")
         }
     }.toSet()
