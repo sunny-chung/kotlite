@@ -71,4 +71,21 @@ class MathTest {
         compareNumber(-25.0, symbolTable.findPropertyByDeclaredName("l") as DoubleValue)
         compareNumber(-4.0, symbolTable.findPropertyByDeclaredName("m") as DoubleValue)
     }
+
+    @Test
+    fun piSinCosTan() {
+        val env = ExecutionEnvironment().apply {
+            install(MathLibModule())
+        }
+        val interpreter = interpreter("""
+            val a: Double = sin(PI / 6)
+            val b: Double = cos(2 * PI / 3)
+            val c: Double = tan(PI / 4)
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        compareNumber(0.5, symbolTable.findPropertyByDeclaredName("a") as DoubleValue)
+        compareNumber(-0.5, symbolTable.findPropertyByDeclaredName("b") as DoubleValue)
+        compareNumber(1.0, symbolTable.findPropertyByDeclaredName("c") as DoubleValue)
+    }
 }
