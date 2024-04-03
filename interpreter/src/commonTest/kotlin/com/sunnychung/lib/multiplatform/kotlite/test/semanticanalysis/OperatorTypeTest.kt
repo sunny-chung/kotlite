@@ -182,4 +182,22 @@ class OperatorTypeTest {
             val b = A() + A()
         """.trimIndent())
     }
+
+    @Test
+    fun compareByteEqualityWithOtherType1() {
+        assertSemanticFail("""
+            val x: Byte = 10
+            val y: Int = 10
+            val b = x == y
+        """.trimIndent())
+    }
+
+    @Test
+    fun compareByteEqualityWithOtherType2() {
+        assertSemanticFail("""
+            val x: Byte = 10
+            val y: Int = 10
+            val b = y == x
+        """.trimIndent())
+    }
 }

@@ -9,6 +9,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalContinue
 import com.sunnychung.lib.multiplatform.kotlite.error.controlflow.NormalReturnException
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
 import com.sunnychung.lib.multiplatform.kotlite.extension.fullClassName
+import com.sunnychung.lib.multiplatform.kotlite.extension.isValidIntegerLiteralAssignToByte
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.model.ASTNode
@@ -19,6 +20,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BlockNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanNode
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.BreakNode
+import com.sunnychung.lib.multiplatform.kotlite.model.ByteValue
 import com.sunnychung.lib.multiplatform.kotlite.model.CallStack
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableNode
 import com.sunnychung.lib.multiplatform.kotlite.model.CallableType
@@ -247,13 +249,13 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
 //                val r1 = node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>
 //                val r2 = node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>
 //                BooleanValue(r1 < r2)
-                BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> < node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
+                BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>> < node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>>)
 //                if (r1 is )
 //                castType<NumberValue<*>, BooleanValue>(node1.eval(), node2.eval()) { a, b -> BooleanValue(a < b) }
             }
-            "<=" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> <= node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
-            ">" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> > node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
-            ">=" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>> >= node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>>)
+            "<=" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>> <= node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>>)
+            ">" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>> > node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>>)
+            ">=" -> BooleanValue(node1.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>> >= node2.eval() as ComparableRuntimeValue<Comparable<Comparable<*>>, Comparable<Comparable<*>>>)
             "==" -> {
                 val r1 = node1.eval() as RuntimeValue
                 val r2 = node2.eval() as RuntimeValue
@@ -346,8 +348,11 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         val symbolTable = callStack.currentSymbolTable()
         val name = transformedRefName!!
         if (initialValue != null) {
-            val value = initialValue.eval()
+            var value = initialValue.eval()
             symbolTable.declareProperty(position, name, type, isMutable)
+            if (isValidIntegerLiteralAssignToByte(initialValue, symbolTable().assertToDataType(type))) {
+                value = ByteValue((value as IntValue).value.toByte(), symbolTable())
+            }
             symbolTable.assign(name, value as RuntimeValue)
         } else {
             symbolTable.declareProperty(position, name, type, isMutable)
@@ -443,7 +448,15 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         }
 
         val finalResult = if (operator == "=") {
-            result as RuntimeValue
+            if (subject.declaredType() isPrimitiveTypeOf PrimitiveTypeName.Byte) {
+                if (isValidIntegerLiteralAssignToByte(value, subject.declaredType())) {
+                    ByteValue((result as IntValue).value.toByte(), symbolTable())
+                } else {
+                    throw RuntimeException("The integer value cannot be assigned to a Byte due to out of range")
+                }
+            } else {
+                result as RuntimeValue
+            }
         } else {
             val existing = read()
             preAssignFunctionCall?.let { func ->

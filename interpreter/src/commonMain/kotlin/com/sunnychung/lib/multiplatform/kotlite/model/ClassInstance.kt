@@ -17,7 +17,7 @@ open class ClassInstance(
      * It can be flattened in the future.
      */
     val parentInstance: ClassInstance? = null,
-) : RuntimeValue, ComparableRuntimeValue<Comparable<Any>> {
+) : RuntimeValue, ComparableRuntimeValue<Comparable<Any>, Any> {
     internal var clazz: ClassDefinition? = null
     internal var hasInitialized: Boolean = false
     internal var typeArgumentByName: Map<String, DataType> = emptyMap()
@@ -159,7 +159,7 @@ open class ClassInstance(
         } ?: TODO()
     }
 
-    override fun compareTo(other: ComparableRuntimeValue<Comparable<Any>>): Int {
+    override fun compareTo(other: ComparableRuntimeValue<Comparable<Any>, Any>): Int {
         clazz?.compareToExec?.let { executable ->
             return executable(this, other)
         }

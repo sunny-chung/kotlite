@@ -14,9 +14,9 @@ class ComparableInterface {
                 modifiers = setOf(/*FunctionModifier.operator,*/ FunctionModifier.open),
                 parameterTypes = listOf(CustomFunctionParameter(name = "other", type = "T")),
                 executable = exe@ { interpreter, receiver, args, typeArgs ->
-                    if (receiver is ComparableRuntimeValue<*> && args[0] is ComparableRuntimeValue<*>) {
+                    if (receiver is ComparableRuntimeValue<*, *> && args[0] is ComparableRuntimeValue<*, *>) {
                         return@exe IntValue(
-                            (receiver as ComparableRuntimeValue<Comparable<Any>>).compareTo(args[0] as ComparableRuntimeValue<Comparable<Any>>),
+                            (receiver as ComparableRuntimeValue<Comparable<Any>, Any>).compareTo(args[0] as ComparableRuntimeValue<Comparable<Any>, Any>),
                             interpreter.symbolTable(),
                         )
                     }

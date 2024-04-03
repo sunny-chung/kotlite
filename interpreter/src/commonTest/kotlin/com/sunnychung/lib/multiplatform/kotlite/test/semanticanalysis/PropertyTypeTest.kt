@@ -436,4 +436,46 @@ class PropertyTypeTest {
             val x: Int? = 2 ?: null
         """.trimIndent())
     }
+
+    @Test
+    fun assignIntToByteOutOfRange1() {
+        assertTypeCheckFail("""
+            val x: Byte = 300
+        """.trimIndent())
+    }
+
+    @Test
+    fun assignIntToByteOutOfRange2() {
+        assertTypeCheckFail("""
+            val x: Byte = -129
+        """.trimIndent())
+    }
+
+    @Test
+    fun assignOtherTypeToByteShouldFail1() {
+        assertTypeCheckFail("""
+            val x: Byte = 1L
+        """.trimIndent())
+    }
+
+    @Test
+    fun assignOtherTypeToByteShouldFail2() {
+        assertTypeCheckFail("""
+            val x: Byte = 1.23
+        """.trimIndent())
+    }
+
+    @Test
+    fun assignOtherTypeToByteShouldFail3() {
+        assertTypeCheckFail("""
+            val x: Byte = "5"
+        """.trimIndent())
+    }
+
+    @Test
+    fun assignOtherTypeToByteShouldFail4() {
+        assertTypeCheckFail("""
+            val x: Byte = false
+        """.trimIndent())
+    }
 }

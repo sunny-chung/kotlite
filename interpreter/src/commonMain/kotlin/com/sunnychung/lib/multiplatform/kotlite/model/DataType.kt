@@ -501,6 +501,11 @@ fun DataType.isNonNullNumberType() = when ((this as? PrimitiveType)?.typeName) {
     else -> false
 }
 
+fun DataType.isNonNullNumberTypeOrByte() = when ((this as? PrimitiveType)?.typeName) {
+    PrimitiveTypeName.Double, PrimitiveTypeName.Int, PrimitiveTypeName.Long, PrimitiveTypeName.Byte -> !isNullable
+    else -> false
+}
+
 fun DataType.isNonNullIntegralType() = when ((this as? PrimitiveType)?.typeName) {
     PrimitiveTypeName.Int, PrimitiveTypeName.Long -> !isNullable
     else -> false

@@ -5,6 +5,7 @@ import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.error.TypeMismatchException
 import com.sunnychung.lib.multiplatform.kotlite.extension.emptyToNull
+import com.sunnychung.lib.multiplatform.kotlite.extension.isValidIntegerLiteralAssignToByte
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterType
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeArguments
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
@@ -100,6 +101,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullIntegralType
 import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberType
+import com.sunnychung.lib.multiplatform.kotlite.model.isNonNullNumberTypeOrByte
 import com.sunnychung.lib.multiplatform.kotlite.model.typeUpperBoundOrAny
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassSemanticAnalyzer
@@ -625,6 +627,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
             }
         }
 
+        if (subjectType isPrimitiveTypeOf PrimitiveTypeName.Byte && value is IntegerNode) {
+            if (value.value in Byte.MIN_VALUE .. Byte.MAX_VALUE) {
+                return // ok to assign Int to Byte if it is within acceptable range of bytes
+            }
+        }
+
         if (!subjectType.isAssignableFrom(valueType)) {
             throw TypeMismatchException(position, subjectType.nameWithNullable, valueType.nameWithNullable)
         }
@@ -687,7 +695,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 inferredType = initialValue.type()
             }
             val subjectType = type.toDataType()
-            if (!subjectType.isAssignableFrom(valueType) && subjectType != valueType) {
+            if (isValidIntegerLiteralAssignToByte(initialValue, subjectType)) {
+                // ok
+            } else if (!subjectType.isAssignableFrom(valueType) && subjectType != valueType) {
                 throw TypeMismatchException(position, subjectType.descriptiveName, valueType.descriptiveName)
             }
         } else if (declaredType == null) {
@@ -2673,10 +2683,9 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                 "<", "<=", ">", ">=" -> {
                     if (
                         hasFunctionCall == true
-                        || (t1.isNonNullNumberType() && t2.isNonNullNumberType())
+                        || (t1.isNonNullNumberTypeOrByte() && t2.isNonNullNumberTypeOrByte())
                         || (t1 isPrimitiveTypeOf PrimitiveTypeName.String && t2 isPrimitiveTypeOf PrimitiveTypeName.String)
                         || (t1 isPrimitiveTypeOf PrimitiveTypeName.Char && t2 isPrimitiveTypeOf PrimitiveTypeName.Char)
-                        || (t1 isPrimitiveTypeOf PrimitiveTypeName.Byte && t2 isPrimitiveTypeOf PrimitiveTypeName.Byte)
                     ) {
                         typeRegistry["Boolean"]!!
                     } else if (!t1.isNullable && t1 is ObjectType) {
@@ -2705,7 +2714,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         throwError()
                     }
                 }
-                "==", "!=" -> typeRegistry["Boolean"]!!
+                "==", "!=" -> {
+                    if (
+                        (t1 isPrimitiveTypeOf PrimitiveTypeName.Byte && !(t2 isPrimitiveTypeOf PrimitiveTypeName.Byte))
+                        || (!(t1 isPrimitiveTypeOf PrimitiveTypeName.Byte) && t2 isPrimitiveTypeOf PrimitiveTypeName.Byte)
+                    ) {
+                        throwError()
+                    }
+                    typeRegistry["Boolean"]!!
+                }
 
                 else -> throw UnsupportedOperationException()
             }.also {

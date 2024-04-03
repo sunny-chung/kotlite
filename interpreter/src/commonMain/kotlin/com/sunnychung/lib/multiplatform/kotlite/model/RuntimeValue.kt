@@ -59,7 +59,26 @@ class LongValue(override val value: Long, symbolTable: SymbolTable) : NumberValu
     }
 }
 
-class StringValue(override val value: String, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<String>, PrimitiveValue(symbolTable) {
+class ByteValue(override val value: Byte, symbolTable: SymbolTable) : NumberValue<Byte>, PrimitiveValue(symbolTable) {
+
+    override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.ByteType
+    override fun convertToString() = value.toString()
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ByteValue) return false
+
+        if (value != other.value) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return value.hashCode()
+    }
+}
+
+class StringValue(override val value: String, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<String, String>, PrimitiveValue(symbolTable) {
 
     override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.StringType
     override fun convertToString() = value
@@ -77,7 +96,7 @@ class StringValue(override val value: String, symbolTable: SymbolTable) : Compar
     }
 }
 
-class CharValue(override val value: Char, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<Char>, PrimitiveValue(symbolTable) {
+class CharValue(override val value: Char, symbolTable: SymbolTable) : ComparableRuntimeValueHolder<Char, Char>, PrimitiveValue(symbolTable) {
 
     override fun primitiveType(rootSymbolTable: SymbolTable) = rootSymbolTable.CharType
     override fun convertToString() = value.toString()

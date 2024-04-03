@@ -1,6 +1,8 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
-sealed interface NumberValue<T> : ComparableRuntimeValueHolder<T>, RuntimeValue/*, Comparable<NumberValue<*>>*/ where T : Number, T : Comparable<T> {
+import com.sunnychung.lib.multiplatform.kotlite.extension.fullClassName
+
+sealed interface NumberValue<T> : ComparableRuntimeValueHolder<T, Number>, RuntimeValue/*, Comparable<NumberValue<*>>*/ where T : Number {
 //    val value: T
 
     private fun longOp(num1: NumberValue<*>, num2: NumberValue<*>, operation: (Long, Long) -> Long): LongValue? {
@@ -73,6 +75,21 @@ sealed interface NumberValue<T> : ComparableRuntimeValueHolder<T>, RuntimeValue/
 //        }
 //        return (value.toDouble()).compareTo(other.value.toDouble())
 //    }
+
+    override fun compareTo(other: ComparableRuntimeValue<T, Number>): Int {
+        if (other !is ComparableRuntimeValueHolder<T, Number>) {
+            throw RuntimeException("Compare target is not a ComparableRuntimeValueHolder but ${other::class.fullClassName}")
+        }
+        return if (this !is DoubleValue) {
+            val thisValue = value.toLong()
+            val otherValue = other.value.toLong()
+            thisValue.compareTo(otherValue)
+        } else {
+            val thisValue = value.toDouble()
+            val otherValue = other.value.toDouble()
+            thisValue.compareTo(otherValue)
+        }
+    }
 
     override fun convertToString() = (value as Number).toString()
 }
