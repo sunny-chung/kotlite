@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
+import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -488,5 +489,55 @@ class ExtensionFunctionTest {
         assertEquals(4, symbolTable.propertyValues.size)
         assertEquals(30, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
         assertEquals(25, (symbolTable.findPropertyByDeclaredName("y") as IntValue).value)
+    }
+
+    @Test
+    fun returnThis1() {
+        val interpreter = interpreter("""
+            class A<T>(val x: T)
+            fun <T> T.f(): T = this
+            val a: Int = 12345.f()
+            val b: Any = A(30).f().x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(12345, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun returnThis2() {
+        val interpreter = interpreter("""
+            class A<T>(val x: T)
+            fun <T> T.f() = this
+            val a: Int = 12345.f()
+            val b: Any = A(30).f().x
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(2, symbolTable.propertyValues.size)
+        assertEquals(12345, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(30, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun nestedGenericExtensionFunctionReceiver() {
+        val interpreter = interpreter("""
+            abstract class Base<T>(val x: T)
+            class A<T>(x: T) : Base<T>(x)
+            class B<T>(x: T) : Base<T>(x)
+            fun <T, S : Base<T>> S.value(): T = this.x
+            val a: Int = A(26).value()
+            val b: String = B("abc").value()
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        assertEquals(2, symbolTable.propertyValues.size)
+        println(symbolTable.propertyValues)
+        assertEquals(26, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals("abc", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
     }
 }

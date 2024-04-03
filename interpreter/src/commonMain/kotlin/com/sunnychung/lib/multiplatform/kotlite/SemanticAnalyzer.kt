@@ -909,7 +909,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         } else {
             copyReceiverIntoCurrentScope(
                 position = position,
-                receiver = receiver.resolveGenericParameterTypeToUpperBound(typeParameters, isResolveRootOnly = true),
+                receiver = receiver,
                 typeParameters = typeParameters,
             )
 
@@ -973,12 +973,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
     }
 
     private fun copyReceiverIntoCurrentScope(position: SourcePosition, receiver: TypeNode, typeParameters: List<TypeParameterNode>) {
-        val typeNode = currentScope.findTypeAlias(receiver.nameWithNullable)?.first?.toTypeNode() ?: receiver
-        currentScope.declareProperty(position = position, name = "this", type = typeNode, isMutable = false)
+        val resolvedReceiver = receiver.resolveGenericParameterTypeToUpperBound(typeParameters, isResolveRootOnly = true)
+        val typeNode = resolvedReceiver.let {
+            currentScope.findTypeAlias(it.nameWithNullable)?.first?.toTypeNode() ?: it
+        }
+        currentScope.declareProperty(position = position, name = "this", type = receiver, isMutable = false)
         currentScope.registerTransformedSymbol(position, IdentifierClassifier.Property, "this", "this")
         val clazz = currentScope.findClass(typeNode.name)?.first
-            ?: throw SemanticException(position, "Class `${receiver.descriptiveName()}` not found")
-        val receiverIdentifier = receiver.resolveGenericParameterTypeToUpperBound(typeParameters).descriptiveName()
+            ?: throw SemanticException(position, "Class `${typeNode.descriptiveName()}` not found")
+        val receiverIdentifier = typeNode.resolveGenericParameterTypeToUpperBound(typeParameters).descriptiveName()
         if (clazz.superClass != null) {
             val superClassTypeResolutions = ClassMemberResolver.create(currentScope, clazz, typeNode.arguments)!!
                 .let {
@@ -996,12 +999,12 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         if (!typeNode.isNullable) {
             clazz.typeParameters.forEachIndexed { index, it ->
                 currentScope.declareTypeAlias(position, it.name, it.typeUpperBound)
-                if ((receiver.arguments?.get(index) ?: throw SemanticException(
+                if ((typeNode.arguments?.get(index) ?: throw SemanticException(
                         position,
                         "Missing receiver type argument $index"
                     )).name != "*"
                 ) {
-                    currentScope.declareTypeAliasResolution(position, it.name, receiver.arguments!![index])
+                    currentScope.declareTypeAliasResolution(position, it.name, typeNode.arguments!![index])
                 }
             }
             clazz.getAllMemberPropertiesExcludingCustomAccessors().forEach {
