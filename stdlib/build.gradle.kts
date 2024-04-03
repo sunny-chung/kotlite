@@ -206,5 +206,12 @@ kotliteStdLibHeaderProcessor {
         "Math" to KotliteModuleConfig(
             imports = listOf("kotlin.math.*")
         ),
+        "Byte" to KotliteModuleConfig(
+            imports = listOf(
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.byte.ByteArrayValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.byte.wrap",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetValue",
+            )
+        )
     )
 }

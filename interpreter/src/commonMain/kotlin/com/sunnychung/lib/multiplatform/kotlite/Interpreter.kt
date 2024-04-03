@@ -448,7 +448,7 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         }
 
         val finalResult = if (operator == "=") {
-            if (subject.declaredType() isPrimitiveTypeOf PrimitiveTypeName.Byte) {
+            if (subject.declaredType() isPrimitiveTypeOf PrimitiveTypeName.Byte && result !is ByteValue) {
                 if (isValidIntegerLiteralAssignToByte(value, subject.declaredType())) {
                     ByteValue((result as IntValue).value.toByte(), symbolTable())
                 } else {

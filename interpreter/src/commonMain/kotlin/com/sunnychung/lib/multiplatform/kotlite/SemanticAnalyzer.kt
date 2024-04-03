@@ -2738,7 +2738,13 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         return if (operator == "!!") {
             node!!.type(modifier = modifier).copy(isNullable = false)
         } else {
-            node!!.type(modifier = modifier)
+            node!!.type(modifier = modifier).let {
+                if (it.name == "Byte" && operator in setOf("+", "-")) {
+                    TypeNode(it.position, "Int", it.arguments, it.isNullable)
+                } else {
+                    it
+                }
+            }
         }.also { type = it }
     }
 

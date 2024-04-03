@@ -19,18 +19,28 @@ sealed interface NumberValue<T> : ComparableRuntimeValueHolder<T, Number>, Runti
     operator fun plus(other: NumberValue<*>): NumberValue<*> {
         if (type() isPrimitiveTypeOf PrimitiveTypeName.Int && other.type() isPrimitiveTypeOf PrimitiveTypeName.Int) {
             this as IntValue
-            other as IntValue
-            return IntValue(value + other.value, rootSymbolTable)
+            if (other.type() isPrimitiveTypeOf PrimitiveTypeName.Int) {
+                other as IntValue
+                return IntValue(value + other.value, rootSymbolTable)
+            } else if (other.type() isPrimitiveTypeOf PrimitiveTypeName.Byte) {
+                other as ByteValue
+                return IntValue(value + other.value, rootSymbolTable)
+            }
         }
         longOp(this, other) { a, b -> a + b }?.let { return it }
         val result = value.toDouble() + other.value.toDouble()
         return DoubleValue(result, (this as PrimitiveValue).rootSymbolTable)
     }
     operator fun minus(other: NumberValue<*>): NumberValue<*> {
-        if (type() isPrimitiveTypeOf PrimitiveTypeName.Int && other.type() isPrimitiveTypeOf PrimitiveTypeName.Int) {
+        if (type() isPrimitiveTypeOf PrimitiveTypeName.Int) {
             this as IntValue
-            other as IntValue
-            return IntValue(value - other.value, rootSymbolTable)
+            if (other.type() isPrimitiveTypeOf PrimitiveTypeName.Int) {
+                other as IntValue
+                return IntValue(value - other.value, rootSymbolTable)
+            } else if (other.type() isPrimitiveTypeOf PrimitiveTypeName.Byte) {
+                other as ByteValue
+                return IntValue(value - other.value, rootSymbolTable)
+            }
         }
         longOp(this, other) { a, b -> a - b }?.let { return it }
         val result = value.toDouble() - other.value.toDouble()

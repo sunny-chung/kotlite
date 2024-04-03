@@ -528,7 +528,7 @@ fun DataType.toTypeNode(): TypeNode = when (this) {
 }
 
 fun TypeNode.isPrimitiveWithValue() =
-    name in setOf("Int", "Double", "Long", "Boolean", "String", "Char")
+    name in setOf("Int", "Double", "Long", "Boolean", "String", "Char", "Byte")
 
 fun TypeNode.isPrimitive() =
-    name in setOf("Int", "Double", "Long", "Boolean", "String", "Char", "Unit", "Nothing", "Any")
+    name in setOf("Int", "Double", "Long", "Boolean", "String", "Char", "Byte", "Unit", "Nothing", "Any")

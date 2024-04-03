@@ -44,6 +44,7 @@ package $outputPackage
 
 import com.sunnychung.lib.multiplatform.kotlite.model.AnyType
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
+import com.sunnychung.lib.multiplatform.kotlite.model.ByteValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ComparableRuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
@@ -190,7 +191,13 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
             } else ""
         }$name(${
             if (valueParameters.size == 1 && valueParameters.first().modifiers.contains(FunctionValueParameterModifier.vararg)) {
-                "*${valueParameters.first().name}_.toTypedArray()"
+                "*${valueParameters.first().name}_.${
+                    if (valueParameters.first().type.name == "Byte") {
+                        "toByteArray()"
+                    } else {
+                        "toTypedArray()"
+                    }
+                }"
             } else {
                 valueParameters.joinToString(", ") { it.name + "_" }
             }
@@ -307,6 +314,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                 debug { "Iterator wrap -> ${_type.descriptiveName()}" }
                 when (_type.arguments!!.get(0)!!.name) {
                     "MapEntry" -> ".let { it.wrap(${_type.arguments!!.get(0)!!.arguments!!.get(0)!!.toDataTypeCode()}, ${_type.arguments!!.get(0)!!.arguments!!.get(1)!!.toDataTypeCode()}$symbolTableArg) }"
+                    "Byte" -> ".let { it.wrap(${symbolTableArg.removePrefix(", ")}) }"
                     else -> ""
                 }
             }
@@ -342,7 +350,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                 } else it
             }
         } else if (type.name == "Comparable") {
-            "$variableName as ComparableRuntimeValue<Comparable<Any>>".let {
+            "$variableName as ComparableRuntimeValue<Comparable<Any>, Any>".let {
                 if (isNullAware && type.isNullable) {
                     "($it)$unwrapNullable"
                 } else it
@@ -357,7 +365,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                         type.arguments?.let {
                             "<${it.joinToString(", ") {
                                 if (it.name == "Comparable") {
-                                    "ComparableRuntimeValue<Comparable<Any>>"
+                                    "ComparableRuntimeValue<Comparable<Any>, Any>"
                                 } else {
                                     "RuntimeValue"
                                 } +
@@ -379,7 +387,7 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     fun unwrap(variableName: String, type: TypeNode, isVararg: Boolean = false): String {
         return if (isVararg) {
             "($variableName as KotlinValueHolder<List<RuntimeValue>>).value.map { ${unwrapOne("it", type)} }"
-        } else if (type.name in setOf("List", "Iterable")) {
+        } else if (type.name in setOf("List", "Iterable", "Collection")) {
             // do not transform MutableList, otherwise no side effect can be performed
             val postUnwrap = if (type.name == "MutableList") ".toMutableList()" else ""
             "($variableName as KotlinValueHolder<${type.name}<*>>).value.map { ${unwrapOne("it", type.arguments!!.first())} }$postUnwrap"
