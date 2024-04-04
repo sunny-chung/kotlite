@@ -1229,22 +1229,36 @@ class Parser(protected val lexer: Lexer) {
      *     rangeExpression {simpleIdentifier {NL} rangeExpression}
      */
     fun infixFunctionCall(): ASTNode {
-        var n = additiveExpression()
+        var n = rangeExpression()
         while (currentToken.type == TokenType.Identifier && currentToken.value !in setOf("else", "is", "!is", "in", "!in", "val", "var", "fun", "class", "for", "while", "do")) {
             val t = eat(TokenType.Identifier)
             repeatedNL()
-            val n2 = additiveExpression()
+            val n2 = rangeExpression()
             n = InfixFunctionCallNode(position = t.position, node1 = n, node2 = n2, functionName = t.value as String)
         }
         return n
     }
 
     /**
+     * rangeExpression:
+     *     additiveExpression {('..' | '..<') {NL} additiveExpression}
      *
+     */
+    fun rangeExpression(): ASTNode {
+        var n = additiveExpression()
+        while (currentToken.type == TokenType.Operator && currentToken.value in setOf("..", "..<")) {
+            val t = eat(TokenType.Operator)
+            repeatedNL()
+            val n2 = additiveExpression()
+            n = BinaryOpNode(position = t.position, node1 = n, node2 = n2, operator = t.value as String)
+        }
+        return n
+    }
+
+    /**
      *
      * additiveExpression:
      *     multiplicativeExpression {additiveOperator {NL} multiplicativeExpression}
-     *
      *
      */
     fun additiveExpression(): ASTNode {

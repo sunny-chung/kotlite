@@ -212,6 +212,12 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.byte.wrap",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.collections.SetValue",
             )
-        )
+        ),
+        "Range" to KotliteModuleConfig(
+            imports = listOf(
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.ClosedRangeValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.OpenEndRangeValue",
+            )
+        ),
     )
 }

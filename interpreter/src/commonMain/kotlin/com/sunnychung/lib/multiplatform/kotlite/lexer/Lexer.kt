@@ -273,6 +273,15 @@ class Lexer(val filename: String, val code: String) {
                                     advanceChar()
                                     return Token(TokenType.Operator, withNextChar, position)
                                 }
+                                ".." -> {
+                                    var op = withNextChar
+                                    advanceChar()
+                                    if (nextChar() == '<') {
+                                        advanceChar()
+                                        op += "<"
+                                    }
+                                    return Token(TokenType.Operator, op, position)
+                                }
                             }
                             if (c == '.') {
                                 return Token(TokenType.Operator, c.toString(), position)

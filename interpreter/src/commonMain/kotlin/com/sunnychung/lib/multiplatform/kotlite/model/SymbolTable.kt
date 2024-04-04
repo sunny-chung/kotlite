@@ -240,10 +240,10 @@ open class SymbolTable(
         }
         if (type is FunctionTypeNode) {
             return FunctionType(
-                arguments = type.parameterTypes?.map { assertToDataType(it) } ?: listOf(UnresolvedType),
-                returnType = type.returnType?.let { assertToDataType(it) } ?: UnresolvedType,
+                arguments = type.parameterTypes?.map { typeNodeToDataType(it) ?: UnresolvedType } ?: listOf(UnresolvedType),
+                returnType = type.returnType?.let { typeNodeToDataType(it) } ?: UnresolvedType,
                 isNullable = type.isNullable,
-                receiverType = type.receiverType?.let { assertToDataType(it) },
+                receiverType = type.receiverType?.let { typeNodeToDataType(it) ?: UnresolvedType },
             )
         }
         type.toPrimitiveDataType(rootScope)?.let { return it }

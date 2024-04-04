@@ -200,4 +200,20 @@ class OperatorTypeTest {
             val b = y == x
         """.trimIndent())
     }
+
+    @Test
+    fun rangeToOperatorWithoutImplementation() {
+        assertSemanticFail("""
+            class A
+            A() .. A()
+        """.trimIndent())
+    }
+
+    @Test
+    fun rangeUntilOperatorWithoutImplementation() {
+        assertSemanticFail("""
+            class A
+            A() ..< A()
+        """.trimIndent())
+    }
 }
