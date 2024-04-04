@@ -49,6 +49,16 @@ class ExecutionEnvironment(
         IterableInterface.functions.forEach {
             registerFunction(it)
         }
+
+        registerClass(PrimitiveIteratorClass.clazz)
+        PrimitiveIteratorClass.functions.forEach {
+            registerFunction(it)
+        }
+
+        registerClass(PrimitiveIterableInterface.clazz)
+        PrimitiveIterableInterface.functions.forEach {
+            registerFunction(it)
+        }
         
         registerClass(CollectionInterface.collectionClazz)
         registerClass(ListClass.clazz)

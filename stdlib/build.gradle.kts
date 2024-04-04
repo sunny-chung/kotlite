@@ -217,6 +217,8 @@ kotliteStdLibHeaderProcessor {
             imports = listOf(
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.ClosedRangeValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.OpenEndRangeValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.IntProgressionValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.IntRangeValue",
             )
         ),
     )
