@@ -5,5 +5,5 @@ import co.touchlab.kermit.Severity
 
 internal val log = Logger.apply {
     setTag("kotlite-stdlib")
-    setMinSeverity(Severity.Verbose)
+    setMinSeverity(Severity.Info)
 }

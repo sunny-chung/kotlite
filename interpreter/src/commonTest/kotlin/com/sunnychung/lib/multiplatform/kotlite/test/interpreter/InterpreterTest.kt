@@ -17,7 +17,7 @@ fun interpreter(
 ) = Parser(Lexer(filename = "<Test>", code = code)).let { parser ->
     val it = parser.script()
     if (isDebug) {
-        println("Tokens: ${parser.allTokens}")
+//        println("Tokens: ${parser.allTokens}")
         println("AST:\n---\nflowchart TD\n${it.toMermaid()}\n---")
     }
     SemanticAnalyzer(it, executionEnvironment).analyze()
