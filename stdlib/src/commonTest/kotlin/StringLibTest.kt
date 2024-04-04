@@ -1,8 +1,3 @@
-import com.sunnychung.lib.multiplatform.kotlite.CodeGenerator
-import com.sunnychung.lib.multiplatform.kotlite.Interpreter
-import com.sunnychung.lib.multiplatform.kotlite.Parser
-import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
-import com.sunnychung.lib.multiplatform.kotlite.lexer.Lexer
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
@@ -10,20 +5,6 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.TextLibModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
-
-fun interpreter(code: String, isDebug: Boolean = false, executionEnvironment: ExecutionEnvironment = ExecutionEnvironment()) = Parser(
-    Lexer("<Test>", code)
-).let { parser ->
-    val it = parser.script()
-    if (isDebug) {
-        println("AST:\n---\nflowchart TD\n${it.toMermaid()}\n---")
-    }
-    SemanticAnalyzer(it, executionEnvironment).analyze()
-    if (isDebug) {
-        println(CodeGenerator(it, isPrintDebugInfo = true).generateCode())
-    }
-    Interpreter(it, executionEnvironment)
-}
 
 class StringLibTest {
     @Test
