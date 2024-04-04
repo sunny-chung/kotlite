@@ -219,6 +219,8 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.OpenEndRangeValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.IntProgressionValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.IntRangeValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.LongProgressionValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.LongRangeValue",
             )
         ),
     )

@@ -1,6 +1,7 @@
 import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.RangeLibModule
@@ -126,177 +127,224 @@ class RangeTest {
     }
 
     @Test
-    fun intClosedRangeContainsOperatorFirstLastProperty() {
-        val env = ExecutionEnvironment().apply {
-            install(RangeLibModule())
-        }
-        val interpreter = interpreter("""
-            val r = 3..15
-            val typeCheck: Boolean = r is IntRange
-            val a: Boolean = 2 in r
-            val b: Boolean = 3 in r
-            val c: Boolean = 4 in r
-            val d: Boolean = 12 in r
-            val e: Boolean = 14 in r
-            val f: Boolean = 15 in r
-            val g: Boolean = 16 in r
-            val h: Boolean = 500 in r
-            val start: Int = r.first
-            val end: Int = r.last
-        """.trimIndent(), executionEnvironment = env, isDebug = true)
-        interpreter.eval()
-        val symbolTable = interpreter.symbolTable()
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck") as BooleanValue).value)
-        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
-        assertEquals(false, (symbolTable.findPropertyByDeclaredName("g") as BooleanValue).value)
-        assertEquals(false, (symbolTable.findPropertyByDeclaredName("h") as BooleanValue).value)
-        assertEquals(3, (symbolTable.findPropertyByDeclaredName("start") as IntValue).value)
-        assertEquals(15, (symbolTable.findPropertyByDeclaredName("end") as IntValue).value)
-    }
-
-    @Test
-    fun intOpenEndRangeContainsOperatorFirstLastProperty() {
-        val env = ExecutionEnvironment().apply {
-            install(RangeLibModule())
-        }
-        val interpreter = interpreter("""
-            val r = 3..<15
-            val typeCheck: Boolean = r is IntRange
-            val a: Boolean = 2 in r
-            val b: Boolean = 3 in r
-            val c: Boolean = 4 in r
-            val d: Boolean = 12 in r
-            val e: Boolean = 14 in r
-            val f: Boolean = 15 in r
-            val g: Boolean = 16 in r
-            val h: Boolean = 500 in r
-            val start: Int = r.first
-            val end: Int = r.last
-        """.trimIndent(), executionEnvironment = env, isDebug = true)
-        interpreter.eval()
-        val symbolTable = interpreter.symbolTable()
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck") as BooleanValue).value)
-        assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
-        assertEquals(true, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
-        assertEquals(false, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
-        assertEquals(false, (symbolTable.findPropertyByDeclaredName("g") as BooleanValue).value)
-        assertEquals(false, (symbolTable.findPropertyByDeclaredName("h") as BooleanValue).value)
-        assertEquals(3, (symbolTable.findPropertyByDeclaredName("start") as IntValue).value)
-        assertEquals(14, (symbolTable.findPropertyByDeclaredName("end") as IntValue).value)
-    }
-
-    @Test
-    fun intClosedRangeForLoop() {
-        val console = StringBuilder()
-        val env = ExecutionEnvironment().apply {
-            install(object : IOLibModule() {
-                override fun outputToConsole(output: String) {
-                    console.append(output)
-                }
-            })
-            install(RangeLibModule())
-        }
-        val interpreter = interpreter("""
-            for (e in 3..15) {
-                println(e)
-                println(e * 2)
+    fun intLongClosedRangeContainsOperatorFirstLastProperty() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val cast: Int.() -> Number = { if (type == "Long") toLong() else this }
+            val env = ExecutionEnvironment().apply {
+                install(RangeLibModule())
             }
-        """.trimIndent(), executionEnvironment = env, isDebug = true)
-        interpreter.eval()
-        assertEquals((3..15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+            val interpreter = interpreter("""
+                val r = 3$l..15$l
+                val typeCheck: Boolean = r is ${type}Range
+                val a: Boolean = 2$l in r
+                val b: Boolean = 3$l in r
+                val c: Boolean = 4$l in r
+                val d: Boolean = 12$l in r
+                val e: Boolean = 14$l in r
+                val f: Boolean = 15$l in r
+                val g: Boolean = 16$l in r
+                val h: Boolean = 500$l in r
+                val start: $type = r.first
+                val end: $type = r.last
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            val symbolTable = interpreter.symbolTable()
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck") as BooleanValue).value)
+            assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
+            assertEquals(false, (symbolTable.findPropertyByDeclaredName("g") as BooleanValue).value)
+            assertEquals(false, (symbolTable.findPropertyByDeclaredName("h") as BooleanValue).value)
+            assertEquals(3.cast(), (symbolTable.findPropertyByDeclaredName("start") as NumberValue<*>).value)
+            assertEquals(15.cast(), (symbolTable.findPropertyByDeclaredName("end") as NumberValue<*>).value)
+        }
     }
 
     @Test
-    fun intClosedRangeForEach() {
-        val console = StringBuilder()
-        val env = ExecutionEnvironment().apply {
-            install(object : IOLibModule() {
-                override fun outputToConsole(output: String) {
-                    console.append(output)
-                }
-            })
-            install(CollectionsLibModule())
-            install(RangeLibModule())
-        }
-        val interpreter = interpreter("""
-            (3..15).forEach { e ->
-                println(e)
-                println(e * 2)
+    fun intLongOpenEndRangeContainsOperatorFirstLastProperty() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val cast: Int.() -> Number = { if (type == "Long") toLong() else this }
+            val env = ExecutionEnvironment().apply {
+                install(RangeLibModule())
             }
-        """.trimIndent(), executionEnvironment = env, isDebug = true)
-        interpreter.eval()
-        assertEquals((3..15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+            val interpreter = interpreter("""
+                val r = 3$l..<15$l
+                val typeCheck: Boolean = r is ${type}Range
+                val a: Boolean = 2$l in r
+                val b: Boolean = 3$l in r
+                val c: Boolean = 4$l in r
+                val d: Boolean = 12$l in r
+                val e: Boolean = 14$l in r
+                val f: Boolean = 15$l in r
+                val g: Boolean = 16$l in r
+                val h: Boolean = 500$l in r
+                val start: $type = r.first
+                val end: $type = r.last
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            val symbolTable = interpreter.symbolTable()
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck") as BooleanValue).value)
+            assertEquals(false, (symbolTable.findPropertyByDeclaredName("a") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("b") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("c") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("d") as BooleanValue).value)
+            assertEquals(true, (symbolTable.findPropertyByDeclaredName("e") as BooleanValue).value)
+            assertEquals(false, (symbolTable.findPropertyByDeclaredName("f") as BooleanValue).value)
+            assertEquals(false, (symbolTable.findPropertyByDeclaredName("g") as BooleanValue).value)
+            assertEquals(false, (symbolTable.findPropertyByDeclaredName("h") as BooleanValue).value)
+            assertEquals(3.cast(), (symbolTable.findPropertyByDeclaredName("start") as NumberValue<*>).value)
+            assertEquals(14.cast(), (symbolTable.findPropertyByDeclaredName("end") as NumberValue<*>).value)
+        }
     }
 
     @Test
-    fun intOpenEndRangeForLoop() {
-        val console = StringBuilder()
-        val env = ExecutionEnvironment().apply {
-            install(object : IOLibModule() {
-                override fun outputToConsole(output: String) {
-                    console.append(output)
-                }
-            })
-            install(RangeLibModule())
-        }
-        val interpreter = interpreter("""
-            for (e in 3..<15) {
-                println(e)
-                println(e * 2)
+    fun intLongClosedRangeForLoop() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val console = StringBuilder()
+            val env = ExecutionEnvironment().apply {
+                install(object : IOLibModule() {
+                    override fun outputToConsole(output: String) {
+                        console.append(output)
+                    }
+                })
+                install(RangeLibModule())
             }
-        """.trimIndent(), executionEnvironment = env, isDebug = true)
-        interpreter.eval()
-        assertEquals((3..<15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+            val interpreter = interpreter("""
+                for (e in 3$l..15$l) {
+                    println(e)
+                    println(e * 2)
+                }
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            assertEquals((3..15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+        }
     }
 
     @Test
-    fun intOpenEndRangeForEach() {
-        val console = StringBuilder()
-        val env = ExecutionEnvironment().apply {
-            install(object : IOLibModule() {
-                override fun outputToConsole(output: String) {
-                    console.append(output)
-                }
-            })
-            install(CollectionsLibModule())
-            install(RangeLibModule())
-        }
-        val interpreter = interpreter("""
-            (3..<15).forEach { e ->
-                println(e)
-                println(e * 2)
+    fun intLongClosedRangeForEach() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val console = StringBuilder()
+            val env = ExecutionEnvironment().apply {
+                install(object : IOLibModule() {
+                    override fun outputToConsole(output: String) {
+                        console.append(output)
+                    }
+                })
+                install(CollectionsLibModule())
+                install(RangeLibModule())
             }
-        """.trimIndent(), executionEnvironment = env, isDebug = true)
-        interpreter.eval()
-        assertEquals((3..<15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+            val interpreter = interpreter("""
+                (3$l..15$l).forEach { e ->
+                    println(e)
+                    println(e * 2$l)
+                }
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            assertEquals((3..15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+        }
     }
 
     @Test
-    fun intProgressionForLoopDownToStep() {
-        val console = StringBuilder()
-        val env = ExecutionEnvironment().apply {
-            install(object : IOLibModule() {
-                override fun outputToConsole(output: String) {
-                    console.append(output)
-                }
-            })
-            install(RangeLibModule())
-        }
-        val interpreter = interpreter("""
-            for (e in 12 downTo -6 step 3) {
-                println(e)
-                println(e + 1)
+    fun intLongOpenEndRangeForLoop() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val console = StringBuilder()
+            val env = ExecutionEnvironment().apply {
+                install(object : IOLibModule() {
+                    override fun outputToConsole(output: String) {
+                        console.append(output)
+                    }
+                })
+                install(RangeLibModule())
             }
-        """.trimIndent(), executionEnvironment = env, isDebug = true)
-        interpreter.eval()
-        assertEquals("12\n13\n9\n10\n6\n7\n3\n4\n0\n1\n-3\n-2\n-6\n-5\n", console.toString())
+            val interpreter = interpreter("""
+                for (e in 3$l..<15$l) {
+                    println(e)
+                    println(e * 2)
+                }
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            assertEquals((3..<15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+        }
+    }
+
+    @Test
+    fun intLongOpenEndRangeForEach() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val console = StringBuilder()
+            val env = ExecutionEnvironment().apply {
+                install(object : IOLibModule() {
+                    override fun outputToConsole(output: String) {
+                        console.append(output)
+                    }
+                })
+                install(CollectionsLibModule())
+                install(RangeLibModule())
+            }
+            val interpreter = interpreter("""
+                (3$l..<15$l).forEach { e ->
+                    println(e)
+                    println(e * 2$l)
+                }
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            assertEquals((3..<15).joinToString("") { "$it\n${it * 2}\n" }, console.toString())
+        }
+    }
+
+    @Test
+    fun intLongProgressionForLoopDownToStep() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val console = StringBuilder()
+            val env = ExecutionEnvironment().apply {
+                install(object : IOLibModule() {
+                    override fun outputToConsole(output: String) {
+                        console.append(output)
+                    }
+                })
+                install(RangeLibModule())
+            }
+            val interpreter = interpreter("""
+                for (e in 12$l downTo -6$l step 3$l) {
+                    println(e)
+                    println(e + 1)
+                }
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            assertEquals("12\n13\n9\n10\n6\n7\n3\n4\n0\n1\n-3\n-2\n-6\n-5\n", console.toString())
+        }
+    }
+
+    @Test
+    fun intLongProgressionForLoopUntil() {
+        listOf("Int", "Long").forEach { type ->
+            val l = if (type == "Long") "L" else ""
+            val console = StringBuilder()
+            val env = ExecutionEnvironment().apply {
+                install(object : IOLibModule() {
+                    override fun outputToConsole(output: String) {
+                        console.append(output)
+                    }
+                })
+                install(RangeLibModule())
+            }
+            val interpreter = interpreter("""
+                for (e in 12$l until 16$l) {
+                    println(e)
+                    println(e * 2$l)
+                }
+            """.trimIndent(), executionEnvironment = env, isDebug = true)
+            interpreter.eval()
+            assertEquals("12\n24\n13\n26\n14\n28\n15\n30\n", console.toString())
+        }
     }
 }
