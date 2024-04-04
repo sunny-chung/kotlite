@@ -369,3 +369,155 @@ fun <T> mutableSetOf(vararg elements: T): MutableSet<T>
 fun <T> setOf(vararg elements: T): Set<T>
 nullaware fun <T : Any> setOfNotNull(vararg elements: T?): Set<T>
 
+///////////////////////
+// PrimitiveIterable
+
+fun <T> PrimitiveIterable<T>.all(predicate: (T) -> Boolean): Boolean
+fun <T> PrimitiveIterable<T>.any(predicate: (T) -> Boolean): Boolean
+//fun <T> PrimitiveIterable<T>.chunked(size: Int): List<List<T>>
+fun <T, R> PrimitiveIterable<T>.chunked(size: Int, transform: (List<T>) -> R): List<R>
+operator fun <T> PrimitiveIterable<T>.contains(element: T): Boolean
+fun <T> PrimitiveIterable<T>.count(predicate: (T) -> Boolean): Int
+fun <T> PrimitiveIterable<T>.count(): Int
+fun <T> PrimitiveIterable<T>.distinct(): List<T>
+fun <T, K> PrimitiveIterable<T>.distinctBy(selector: (T) -> K): List<T>
+fun <T> PrimitiveIterable<T>.drop(n: Int): List<T>
+fun <T> PrimitiveIterable<T>.dropWhile(predicate: (T) -> Boolean): List<T>
+fun <T> PrimitiveIterable<T>.elementAt(index: Int): T
+fun <T> PrimitiveIterable<T>.elementAtOrElse(index: Int, defaultValue: (Int) -> T): T
+fun <T> PrimitiveIterable<T>.elementAtOrNull(index: Int): T?
+fun <T> PrimitiveIterable<T>.filter(predicate: (T) -> Boolean): List<T>
+fun <T> PrimitiveIterable<T>.filterIndexed(predicate: (index: Int, T) -> Boolean): List<T>
+fun <T> PrimitiveIterable<T>.filterNot(predicate: (T) -> Boolean): List<T>
+fun <T> PrimitiveIterable<T>.find(predicate: (T) -> Boolean): T?
+fun <T> PrimitiveIterable<T>.findLast(predicate: (T) -> Boolean): T?
+fun <T> PrimitiveIterable<T>.first(): T
+fun <T> PrimitiveIterable<T>.first(predicate: (T) -> Boolean): T
+nullaware fun <T, R : Any> PrimitiveIterable<T>.firstNotNullOf(
+    transform: (T) -> R?
+): R
+nullaware fun <T, R : Any> PrimitiveIterable<T>.firstNotNullOfOrNull(
+    transform: (T) -> R?
+): R?
+fun <T> PrimitiveIterable<T>.firstOrNull(): T?
+fun <T> PrimitiveIterable<T>.firstOrNull(predicate: (T) -> Boolean): T?
+fun <T, R> PrimitiveIterable<T>.flatMap(
+    transform: (T) -> Iterable<R>
+): List<R>
+fun <T, R> PrimitiveIterable<T>.flatMapIndexed(
+    transform: (index: Int, T) -> Iterable<R>
+): List<R>
+fun <T, R> PrimitiveIterable<T>.fold(
+    initial: R,
+    operation: (acc: R, T) -> R
+): R
+fun <T, R> PrimitiveIterable<T>.foldIndexed(
+    initial: R,
+    operation: (index: Int, acc: R, T) -> R
+): R
+fun <T> PrimitiveIterable<T>.forEach(action: (T) -> Unit)
+fun <T> PrimitiveIterable<T>.forEachIndexed(action: (index: Int, T) -> Unit)
+fun <T> PrimitiveIterable<T>.indexOf(element: T): Int
+fun <T> PrimitiveIterable<T>.indexOfFirst(predicate: (T) -> Boolean): Int
+fun <T> PrimitiveIterable<T>.indexOfLast(predicate: (T) -> Boolean): Int
+fun <T> PrimitiveIterable<T>.joinToString(
+    separator: String = ", ",
+    prefix: String = "",
+    postfix: String = "",
+    limit: Int = -1,
+    truncated: String = "...",
+    transform: ((T) -> String)? = null
+): String
+fun <T> PrimitiveIterable<T>.last(): T
+fun <T> PrimitiveIterable<T>.last(predicate: (T) -> Boolean): T
+fun <T> PrimitiveIterable<T>.lastIndexOf(element: T): Int
+fun <T> PrimitiveIterable<T>.lastOrNull(): T?
+fun <T> PrimitiveIterable<T>.lastOrNull(predicate: (T) -> Boolean): T?
+fun <T, R> PrimitiveIterable<T>.map(transform: (T) -> R): List<R>
+fun <T, R> PrimitiveIterable<T>.mapIndexed(transform: (index: Int, T) -> R): List<R>
+nullaware fun <T, R : Any> PrimitiveIterable<T>.mapIndexedNotNull(transform: (index: Int, T) -> R?): List<R>
+nullaware fun <T, R : Any> PrimitiveIterable<T>.mapNotNull(transform: (T) -> R?): List<R>
+fun <T : Comparable<T>> PrimitiveIterable<T>.max(): T
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.maxBy(selector: (T) -> R): T
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.maxByOrNull(selector: (T) -> R): T?
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.maxOf(selector: (T) -> R): R
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.maxOfOrNull(selector: (T) -> R): R?
+fun <T : Comparable<T>> PrimitiveIterable<T>.maxOrNull(): T?
+fun <T : Comparable<T>> PrimitiveIterable<T>.min(): T
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.minBy(selector: (T) -> R): T
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.minByOrNull(selector: (T) -> R): T?
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.minOf(selector: (T) -> R): R
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.minOfOrNull(selector: (T) -> R): R?
+fun <T : Comparable<T>> PrimitiveIterable<T>.minOrNull(): T?
+operator fun <T> PrimitiveIterable<T>.minus(element: T): List<T>
+operator fun <T> PrimitiveIterable<T>.minus(elements: PrimitiveIterable<T>): List<T>
+fun <T> PrimitiveIterable<T>.minusElement(element: T): List<T>
+fun <T> PrimitiveIterable<T>.none(predicate: (T) -> Boolean): Boolean
+fun <T> PrimitiveIterable<T>.none(): Boolean
+fun <T> PrimitiveIterable<T>.partition(predicate: (T) -> Boolean): Pair<List<T>, List<T>>
+operator fun <T> PrimitiveIterable<T>.plus(element: T): List<T>
+operator fun <T> PrimitiveIterable<T>.plus(elements: List<T>): List<T>
+fun <T> PrimitiveIterable<T>.plusElement(element: T): List<T>
+fun <T> PrimitiveIterable<T>.reversed(): List<T>
+fun <T, R> PrimitiveIterable<T>.scan(initial: R, operation: (acc: R, T) -> R): List<R>
+fun <T, R> PrimitiveIterable<T>.scanIndexed(initial: R, operation: (index: Int, acc: R, T) -> R): List<R>
+fun <T> PrimitiveIterable<T>.shuffled(): List<T>
+fun <T> PrimitiveIterable<T>.single(): T
+fun <T> PrimitiveIterable<T>.single(predicate: (T) -> Boolean): T
+fun <T> PrimitiveIterable<T>.singleOrNull(): T?
+fun <T> PrimitiveIterable<T>.singleOrNull(predicate: (T) -> Boolean): T?
+fun <T : Comparable<T>> PrimitiveIterable<T>.sorted(): List<T>
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.sortedBy(selector: (T) -> R?): List<T>
+fun <T, R : Comparable<R>> PrimitiveIterable<T>.sortedByDescending(selector: (T) -> R?): List<T>
+fun <T : Comparable<T>> PrimitiveIterable<T>.sortedDescending(): List<T>
+fun <T> PrimitiveIterable<T>.take(n: Int): List<T>
+fun <T> PrimitiveIterable<T>.takeWhile(predicate: (T) -> Boolean): List<T>
+fun <T> PrimitiveIterable<T>.toList(): List<T>
+fun <T> PrimitiveIterable<T>.toMutableList(): MutableList<T>
+//fun <T> PrimitiveIterable<T>.windowed(
+//    size: Int,
+//    step: Int = 1,
+//    partialWindows: Boolean = false
+//): List<List<T>>
+fun <T, R> PrimitiveIterable<T>.windowed(
+    size: Int,
+    step: Int = 1,
+    partialWindows: Boolean = false,
+    transform: (List<T>) -> R
+): List<R>
+infix fun <T, R> PrimitiveIterable<T>.zip(
+    other: PrimitiveIterable<R>
+): List<Pair<T, R>>
+fun <T, R, V> PrimitiveIterable<T>.zip(
+    other: PrimitiveIterable<R>,
+    transform: (a: T, b: R) -> V
+): List<V>
+fun <T, K, V> PrimitiveIterable<T>.associate(
+    transform: (T) -> Pair<K, V>
+): Map<K, V>
+fun <T, K> PrimitiveIterable<T>.associateBy(
+    keySelector: (T) -> K
+): Map<K, T>
+
+fun <K, V> PrimitiveIterable<K>.associateBy(
+    valueSelector: (K) -> V
+): Map<K, V>
+
+fun <K, V> PrimitiveIterable<K>.associateWith(
+    valueSelector: (K) -> V
+): Map<K, V>
+fun <T, K> PrimitiveIterable<T>.groupBy(
+    keySelector: (T) -> K
+): Map<K, List<T>>
+fun <T, K, V> PrimitiveIterable<T>.groupBy(
+    keySelector: (T) -> K,
+    valueSelector: (T) -> V,
+): Map<K, List<V>>
+infix fun <T> PrimitiveIterable<T>.intersect(
+    other: PrimitiveIterable<T>
+): Set<T>
+infix fun <T> PrimitiveIterable<T>.subtract(other: PrimitiveIterable<T>): Set<T>
+fun <T> PrimitiveIterable<T>.toMutableSet(): MutableSet<T>
+fun <T> PrimitiveIterable<T>.toSet(): Set<T>
+infix fun <T> PrimitiveIterable<T>.union(other: PrimitiveIterable<T>): Set<T>
+

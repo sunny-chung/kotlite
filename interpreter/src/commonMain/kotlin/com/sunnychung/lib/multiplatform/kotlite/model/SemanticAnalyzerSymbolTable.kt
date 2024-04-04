@@ -258,7 +258,8 @@ class SemanticAnalyzerSymbolTable(
                                 acc && if (callArg == null) {
                                     functionArg.defaultValue != null
                                 } else {
-                                    currentSymbolTable.assertToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) )).isConvertibleFrom(callArg.type)
+                                    currentSymbolTable.typeNodeToDataType(functionArg.type)?.isConvertibleFrom(callArg.type) == true
+                                        || currentSymbolTable.assertToDataType(functionArg.type.resolveGenericParameterTypeToUpperBound(callable.typeParameters + (receiverClass?.typeParameters ?: emptyList()) )).isConvertibleFrom(callArg.type)
                                     // TODO filter whether same type parameter always map to same argument
                                 }
                             }

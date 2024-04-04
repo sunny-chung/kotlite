@@ -240,10 +240,10 @@ open class SymbolTable(
         }
         if (type is FunctionTypeNode) {
             return FunctionType(
-                arguments = type.parameterTypes?.map { assertToDataType(it) } ?: listOf(UnresolvedType),
-                returnType = type.returnType?.let { assertToDataType(it) } ?: UnresolvedType,
+                arguments = type.parameterTypes?.map { typeNodeToDataType(it) ?: UnresolvedType } ?: listOf(UnresolvedType),
+                returnType = type.returnType?.let { typeNodeToDataType(it) } ?: UnresolvedType,
                 isNullable = type.isNullable,
-                receiverType = type.receiverType?.let { assertToDataType(it) },
+                receiverType = type.receiverType?.let { typeNodeToDataType(it) ?: UnresolvedType },
             )
         }
         type.toPrimitiveDataType(rootScope)?.let { return it }
@@ -544,14 +544,20 @@ open class SymbolTable(
             throw RuntimeException("Number of type parameters of class `${receiverType.name}` mismatch")
         }
         val extensionTypeParameters = extensionProperty.typeParameters.toTypeParameterNodes()
-        receiverClass.typeParameters.forEachIndexed { index, tp ->
-            if (!assertToDataType(tp.typeUpperBoundOrAny()).isAssignableFrom(
-                    assertToDataType(
-                        receiverType.arguments!![index]
-                            .resolveGenericParameterTypeToUpperBound(extensionTypeParameters)
-                    )
-            )) {
-                throw RuntimeException("Provided type parameter `${tp.name}` of the class `${receiverType.name}` is out of bound (Upper bound: `${tp.typeUpperBoundOrAny().descriptiveName()}`)")
+        if (receiverClass.typeParameters.isNotEmpty()) {
+            val tempSymbolTable = createTempSymbolTable()
+            extensionTypeParameters.forEach {
+                tempSymbolTable.declareTypeAlias(it.position, it.name, it.typeUpperBound)
+            }
+            receiverClass.typeParameters.forEachIndexed { index, tp ->
+                if (!tempSymbolTable.assertToDataType(tp.typeUpperBoundOrAny()).isAssignableFrom(
+                        tempSymbolTable.assertToDataType(
+                            receiverType.arguments!![index]
+                                .resolveGenericParameterTypeToUpperBound(extensionTypeParameters)
+                        )
+                )) {
+                    throw RuntimeException("Provided type parameter `${tp.name}` of the class `${receiverType.name}` is out of bound (Upper bound: `${tp.typeUpperBoundOrAny().descriptiveName()}`)")
+                }
             }
         }
         if (receiverClass.findMemberPropertyTransformedName(extensionProperty.declaredName) != null) {

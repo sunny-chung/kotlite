@@ -193,9 +193,13 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
         if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) return false
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
         return arguments.withIndex().all {
-            it.value == StarType || it.value == otherType.arguments[it.index]
-                || (otherType.arguments[it.index] is RepeatedType && it.value.isAssignableFrom(otherType.arguments[it.index]))
-                || (it.value is TypeParameterType && (it.value as TypeParameterType).upperBound.isAssignableFrom(otherType.arguments[it.index]))
+            val otherTypeArg = otherType.arguments[it.index]
+            it.value == StarType || it.value == otherTypeArg
+                || (otherTypeArg is RepeatedType && it.value.isAssignableFrom(otherTypeArg))
+                || (it.value is TypeParameterType && (
+                    (otherTypeArg is TypeParameterType && otherTypeArg.nameWithNullable == it.value.nameWithNullable)
+                    || (it.value as TypeParameterType).upperBound.isAssignableFrom(otherTypeArg))
+                )
         }
 //        return other is ObjectType &&
 //                other.clazz.fullQualifiedName == clazz.fullQualifiedName &&

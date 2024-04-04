@@ -1,3 +1,5 @@
+import com.sunnychung.lib.multiplatform.kotlite.CodeGenerator
+import com.sunnychung.lib.multiplatform.kotlite.Interpreter
 import com.sunnychung.lib.multiplatform.kotlite.Parser
 import com.sunnychung.lib.multiplatform.kotlite.SemanticAnalyzer
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
@@ -10,6 +12,20 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+
+fun interpreter(code: String, isDebug: Boolean = false, executionEnvironment: ExecutionEnvironment = ExecutionEnvironment()) = Parser(
+    Lexer("<Test>", code)
+).let { parser ->
+    val it = parser.script()
+    if (isDebug) {
+        println("AST:\n---\nflowchart TD\n${it.toMermaid()}\n---")
+    }
+    SemanticAnalyzer(it, executionEnvironment).analyze()
+    if (isDebug) {
+        println(CodeGenerator(it, isPrintDebugInfo = true).generateCode())
+    }
+    Interpreter(it, executionEnvironment)
+}
 
 fun semanticAnalyzer(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) = SemanticAnalyzer(
     scriptNode = Parser(Lexer("<Test>", code)).script(),

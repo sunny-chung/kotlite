@@ -157,6 +157,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "remAssign",
         "compareTo",
         "contains",
+        "rangeTo",
+        "rangeUntil",
     )
 
     fun ExtensionProperty.generateTransformedName() {
@@ -278,6 +280,8 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
         "/=" -> "divAssign"
         "%=" -> "remAssign"
         "<", ">", "<=", ">=" -> "compareTo"
+        ".." -> "rangeTo"
+        "..<" -> "rangeUntil"
         else -> null
     }
 
@@ -430,16 +434,16 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
 
         node1.visit(modifier = modifier)
         node2.visit(modifier = modifier)
-        val functionName = if (operator in setOf("+", "-", "*", "/", "%", "<", ">", "<=", ">=")) {
+        val functionName = if (operator in setOf("+", "-", "*", "/", "%", "<", ">", "<=", ">=", "..", "..<")) {
             operatorToFunctionName(operator)
         } else null
         val node1Type = node1.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
         val node2Type = node2.type(ResolveTypeModifier(isSkipGenerics = true)).toDataType()
         if (functionName != null && currentScope.findMatchingCallables(
-                currentScope,
-                functionName,
-                node1Type,
-                listOf(FunctionCallArgumentInfo(name = null, type = node2Type)),
+                currentSymbolTable = currentScope,
+                originalName = functionName,
+                receiverType = node1Type,
+                arguments = listOf(FunctionCallArgumentInfo(name = null, type = node2Type)),
                 modifierFilter = SearchFunctionModifier.OperatorFunctionOnly,
             ).isNotEmpty()
         ) {
@@ -2710,6 +2714,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         throwError()
                     }
                 }
+
                 "||", "&&" -> {
                     if (t1 isPrimitiveTypeOf PrimitiveTypeName.Boolean && t2 isPrimitiveTypeOf PrimitiveTypeName.Boolean) {
                         typeRegistry["Boolean"]!!
@@ -2717,6 +2722,7 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                         throwError()
                     }
                 }
+
                 "==", "!=" -> {
                     if (
                         (t1 isPrimitiveTypeOf PrimitiveTypeName.Byte && !(t2 isPrimitiveTypeOf PrimitiveTypeName.Byte))
@@ -2727,7 +2733,15 @@ class SemanticAnalyzer(val scriptNode: ScriptNode, val executionEnvironment: Exe
                     typeRegistry["Boolean"]!!
                 }
 
-                else -> throw UnsupportedOperationException()
+                "..", "..<" -> {
+                    call?.type(modifier = modifier)?.also {
+                        type = it
+                        return it
+                    }
+                    throwError()
+                }
+
+                else -> throwError()
             }.also {
                 type = it
             }

@@ -71,6 +71,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ObjectType
 import com.sunnychung.lib.multiplatform.kotlite.model.PairClass
 import com.sunnychung.lib.multiplatform.kotlite.model.PairValue
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveIterableValue
+import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveIteratorValue
 import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveType
 import com.sunnychung.lib.multiplatform.kotlite.model.PrimitiveTypeName
 import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
@@ -81,6 +83,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterType
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitType
 import com.sunnychung.lib.multiplatform.kotlite.model.UnitValue
+import com.sunnychung.lib.multiplatform.kotlite.util.wrapPrimitiveValueAsRuntimeValue
 
 ${config.imports.joinToString("") { "import $it\n" } }
 
@@ -366,6 +369,8 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
                             "<${it.joinToString(", ") {
                                 if (it.name == "Comparable") {
                                     "ComparableRuntimeValue<Comparable<Any>, Any>"
+                                } else if (it.isPrimitiveWithValue()) {
+                                    "${it.name}Value"
                                 } else {
                                     "RuntimeValue"
                                 } +
@@ -387,10 +392,15 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     fun unwrap(variableName: String, type: TypeNode, isVararg: Boolean = false): String {
         return if (isVararg) {
             "($variableName as KotlinValueHolder<List<RuntimeValue>>).value.map { ${unwrapOne("it", type)} }"
-        } else if (type.name in setOf("List", "Iterable", "Collection")) {
+        } else if (type.name in setOf("List", "Iterable", "Collection", "PrimitiveIterable")) {
             // do not transform MutableList, otherwise no side effect can be performed
             val postUnwrap = if (type.name == "MutableList") ".toMutableList()" else ""
-            "($variableName as KotlinValueHolder<${type.name}<*>>).value.map { ${unwrapOne("it", type.arguments!!.first())} }$postUnwrap"
+            val preMap = if (type.name == "PrimitiveIterable") ".map { wrapPrimitiveValueAsRuntimeValue(it, typeArgs[\"T\"]!!, interpreter.symbolTable()) }" else ""
+            val translatedTypeName = when (type.name) {
+                "PrimitiveIterable" -> "Iterable"
+                else -> type.name
+            }
+            "($variableName as KotlinValueHolder<$translatedTypeName<*>>).value$preMap.map { ${unwrapOne("it", type.arguments!!.first())} }$postUnwrap"
         } else {
             unwrapOne(variableName, type)
         }
