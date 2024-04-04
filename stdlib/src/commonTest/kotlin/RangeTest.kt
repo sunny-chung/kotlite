@@ -76,4 +76,50 @@ class RangeTest {
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("g") as BooleanValue).value)
         assertEquals(false, (symbolTable.findPropertyByDeclaredName("h") as BooleanValue).value)
     }
+
+    @Test
+    fun customClassClosedRangeStartEndInclusiveProperty() {
+        val env = ExecutionEnvironment().apply {
+            install(RangeLibModule())
+        }
+        val interpreter = interpreter("""
+            class A(val x: Int) : Comparable<A> {
+                override operator fun compareTo(o: A): Int {
+                    return x.compareTo(o.x)
+                }
+            }
+            val r = A(3)..A(15)
+            val typeCheck: Boolean = r is ClosedRange<A>
+            val a: Int = r.start.x
+            val b: Int = r.endInclusive.x
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck") as BooleanValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun customClassOpenEndRangeStartEndInclusiveProperty() {
+        val env = ExecutionEnvironment().apply {
+            install(RangeLibModule())
+        }
+        val interpreter = interpreter("""
+            class A(val x: Int) : Comparable<A> {
+                override operator fun compareTo(o: A): Int {
+                    return x.compareTo(o.x)
+                }
+            }
+            val r = A(3)..<A(15)
+            val typeCheck: Boolean = r is OpenEndRange<A>
+            val a: Int = r.start.x
+            val b: Int = r.endExclusive.x
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals(true, (symbolTable.findPropertyByDeclaredName("typeCheck") as BooleanValue).value)
+        assertEquals(3, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
+        assertEquals(15, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
 }
