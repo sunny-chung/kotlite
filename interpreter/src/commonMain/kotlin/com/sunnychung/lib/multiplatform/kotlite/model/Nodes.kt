@@ -369,7 +369,8 @@ data class FunctionCallNode(
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Function Call\"]"
         return "$self-- function -->${function.toMermaid()}\n" +
-                arguments.joinToString("") { "$self-- argument -->${it.toMermaid()}\n" }
+                declaredTypeArguments.withIndex().joinToString("") { "$self-- \"type argument [${it.index}]\" -->${it.value.toMermaid()}\n" } +
+                arguments.withIndex().joinToString("") { "$self-- \"argument[${it.index}]\" -->${it.value.toMermaid()}\n" }
     }
 }
 
