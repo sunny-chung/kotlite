@@ -4,7 +4,7 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 
 == Differences from https://kotlinlang.org/docs/home.html[Kotlin]
 
-[%autowidth]
+[cols="65a,30a,5"]
 |===
 |Kotlin 1.9|Kotlite Script|Kotlite API
 
@@ -50,14 +50,44 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |Comparisons (<, >, <=, >=)|✓|
 |Equality (==, !=)|✓|
 |Reference Equality (===, !==)|✕|
-|Type Checks (is, !is)|✓ (with difference)|
-|Type Casts (as, as?)|✓ (with difference)|
+
+|Type Checks (is, !is)
+|
+.✓ (with difference)
+[%collapsible]
+====
+Besides the root type, Kotlite checks whether all the type arguments are assignable to the subject's one as well.
+
+Kotlin does not check.
+====
+|
+
+|Type Casts (as, as?)
+|.✓ (with difference)
+[%collapsible]
+====
+Besides the root type, Kotlite checks whether all the type arguments are assignable to the subject's one as well.
+
+Kotlin does not check.
+====
+|
+
 |In operators (in, !in)|✓|
 |To operator (`to`)|✓|
 |Spread operator (*)|✕|
 |*Control Flow*||
 |If expressions|✓|
-|When expressions with optional `val` and condition variances|✓ (with difference)|
+
+|When expressions with optional `val` and condition variances
+|.✓ (with difference)
+[%collapsible]
+====
+Kotlite always requires an `else` block.
+
+Kotlin does not require when it is not necessary.
+====
+|
+
 |For loops|✓|
 |While loops|✓|
 |Do-while loops|✓|
@@ -88,7 +118,17 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |Value parameters with default expression|✓|
 |Named arguments|✓|
 |Single-expression functions (e.g. `fun f() = 10`)|✓|
-|Variable number of arguments (`vararg` modifier)|✓ (with difference)|
+
+|Variable number of arguments (`vararg` modifier)
+|.✓ (with difference)
+[%collapsible]
+====
+In Kotlin, `vararg` argument is provided as a type of `Array<T>`.
+
+In Kotlite, it is provided as `List<T>`.
+====
+|
+
 |Overloading functions|✓|
 |Infix functions|✓|
 |Infix calls|✓|
@@ -118,7 +158,19 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |Inheriting members from super classes and interfaces|✓|
 |`open` modifier|✓|
 |`final` modifier|✕|
-|Overriding functions|✓ (with difference)|
+
+|Overriding functions
+|.✓ (with difference)
+[%collapsible]
+====
+In Kotlin, default values and names of parameters of `open` functions cannot be overridden.
+
+In Kotlite, it is possible.
+
+In the future, Kotlite may follow Kotlin.
+====
+|
+
 |Overriding properties|✓|
 |Implicit `this`|✓|
 |`super` keyword|✓|
@@ -135,7 +187,29 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |Inner classes|✕|
 |Abstract classes|✓|
 |Sealed classes|✕|
-|Enum classes|Partial|
+
+|Enum classes
+|.Partial
+[%collapsible]
+====
+In Kotlite, only optional primary constructor with property declarations is supported. Other form of member declarations is not supported.
+
+For example, the following is supported:
+
+[source, kotlin]
+----
+enum class MyEnum(val value: Int, val label: String) {
+    A(3, "aaa"), B(5, "bb")
+}
+
+enum class Enum2 {
+    A, B, C
+}
+----
+
+====
+|
+
 |Data classes|✕|
 |Value classes|✕|
 |Object classes|✕|
@@ -172,7 +246,17 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |Recursive upper bounds of type parameters (e.g. `T : Comparable<T>`)|✓|
 |Definitely non-nullable types (e.g. `T & Any`)|✕|
 |`where` generic constraints|✕|
-|Type erasure|Different|
+
+|Type erasure
+|.Different
+[%collapsible]
+====
+In Kotlin, type argument is not preserved.
+
+In Kotlite, type argument is erased to its concrete upper bound only when resolving function calls in the semantic analysis stage. It is preserved in runtime.
+====
+|
+
 |Unchecked casts|✓|
 |Underscore as type arguments|✕|
 |Reified type parameters|No as there is no type erasure|
