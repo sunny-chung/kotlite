@@ -108,7 +108,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
-class Interpreter(val rootNode: ASTNode, val executionEnvironment: ExecutionEnvironment) {
+open class Interpreter(val rootNode: ASTNode, val executionEnvironment: ExecutionEnvironment) {
 
     internal val callStack = CallStack()
     internal val globalScope = callStack.currentSymbolTable()

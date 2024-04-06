@@ -75,7 +75,7 @@ val ACCEPTED_MODIFIERS = setOf(
 /**
  * Reference grammar: https://kotlinlang.org/spec/syntax-and-grammar.html#grammar-rule-expression
  */
-class Parser(protected val lexer: Lexer) {
+open class Parser(protected val lexer: Lexer) {
     internal val allTokens = mutableListOf<Token>()
     internal val tokenCharIndexes = mutableListOf<Int>()
 

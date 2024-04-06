@@ -14,7 +14,7 @@ object BuiltinFilename {
     val GLOBAL = "<Global>"
 }
 
-class Lexer(val filename: String, val code: String) {
+open class Lexer(val filename: String, val code: String) {
     private var pos: Int = 0
     private var lineNum = 1
     private var col = 1
