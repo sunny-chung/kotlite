@@ -8,7 +8,7 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |===
 |Kotlin 1.9|Kotlite Script|Kotlite API
 
-|*Basic Data Types*||
+3+|*Basic Data Types*
 |Byte|✓|
 |Short|✕|
 |Int|✓|
@@ -24,7 +24,7 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |Triple|✕|
 |Throwable|✓|
 |Unit|✓|
-|*Literal Constants*||
+3+|*Literal Constants*
 |Decimals|✓|
 |Long - `L`|✓|
 |Hex - `0x`|✕|
@@ -37,13 +37,13 @@ Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syn
 |Multiline Strings (""")|✓|
 |String Templates ($)|✓|
 |Nested String Templates (e.g. `"is ${if (isEnabled) "at ${location.describe()}" else "N/A"}"}"`)|✓|
-|*Syntax*||
+3+|*Syntax*
 |Using spaces and symbols in identifiers (e.g. variable/function names)|✕|
 |Single-line comment (//)|✓|
 |Block comments (/* ... */)|✓|
 |Nested block comments|✕|
 |Extra new line characters within an expression|✓|
-|*Operators*||
+3+|*Operators*
 |Bitwise Operations (shl, shr, ushr, and, or, xor, inv)|✕|
 |Boolean Logic (&&, \|\|, !)|✓|
 |Arithmetics (+, -, *, /, %)|✓|
@@ -75,7 +75,7 @@ Kotlin does not check.
 |In operators (in, !in)|✓|
 |To operator (`to`)|✓|
 |Spread operator (*)|✕|
-|*Control Flow*||
+3+|*Control Flow*
 |If expressions|✓|
 
 |When expressions with optional `val` and condition variances
@@ -104,7 +104,7 @@ Kotlin does not require when it is not necessary.
 |Try expressions|✓|
 |Try-catch-finally|✓|
 |Catch exceptions which are thrown outside interpreter scope|✓|
-|*Properties*||
+3+|*Properties*
 |val/var with optional initial values|✓|
 |Shadow variables|✓|
 |Custom getters and setters|✕|✓
@@ -112,7 +112,7 @@ Kotlin does not require when it is not necessary.
 |`const`, `lateinit` modifiers|✕|
 |Delegation (`by` keyword)|✕|
 |Destructuring declarations|✕|
-|*Functions, Infix and Operator Functions*||
+3+|*Functions, Infix and Operator Functions*
 |Normal functions|✓|
 |Local functions|✓|
 |Value parameters with default expression|✓|
@@ -144,8 +144,9 @@ In Kotlite, it is provided as `List<T>`.
 |Overloading equality operators (==, !=)|✓|
 |Overloading comparison operators (>, <, >=, <=)|✓|
 |Suspending functions|✕|
-|*Packages and Imports*|✕|
-|*Class Foundations*||
+|*Packages and Imports*
+2+|✕
+3+|*Class Foundations*
 |Primary constructor with optional val/var declarations|✓|
 |Secondary constructors|✕|
 |(Multiple) `init` blocks|✓|
@@ -153,7 +154,7 @@ In Kotlite, it is provided as `List<T>`.
 |Member functions|✓|
 |Overloading member functions|✓|
 |Visibility modifiers (public/private/protected/internal)|✕|
-|*Class Inheritance*||
+3+|*Class Inheritance*
 |Passing values and type arguments to super class constructors|✓|
 |Inheriting members from super classes and interfaces|✓|
 |`open` modifier|✓|
@@ -182,7 +183,7 @@ In the future, Kotlite may follow Kotlin.
 |Overriding functions from the "Any" class|✓|
 |`this` expression with diamond|✕|
 |`super` expression with diamond|✕|
-|*Class Variations*||
+3+|*Class Variations*
 |Nested classes|✕|
 |Inner classes|✕|
 |Abstract classes|✓|
@@ -216,14 +217,14 @@ enum class Enum2 {
 |Companion objects|Only available for extension functions and properties|
 |Annotation classes|✕|
 |Anonymous classes|✕|
-|*Interfaces*||
+3+|*Interfaces*
 |Abstract functions|✓|
 |Functions with body|✕|
 |Abstract properties|✕|
 |(Multiple) interfaces inheritance|✓|
 |Functional interfaces (`fun interface`)|✕|
 |Sealed interfaces|✕|
-|*Extensions*||
+3+|*Extensions*
 |Extension functions|✓|
 |Extension operator functions|✓|
 |Extension properties|✕|✓
@@ -232,7 +233,7 @@ enum class Enum2 {
 |Generic type parameter as the receiver of extension functions (e.g. `fun <T: Any> T.f()`)|✓|
 |Extension functions as class members|✓|
 |Resolving calls to extension functions of super classes/interfaces|✓|
-|*Generics*||
+3+|*Generics*
 |Type parameters in classes|✓|
 |Type parameters in interfaces|✓|
 |Type parameters in non-class functions|✓|
@@ -260,15 +261,16 @@ In Kotlite, type argument is erased to its concrete upper bound only when resolv
 |Unchecked casts|✓|
 |Underscore as type arguments|✕|
 |Reified type parameters|No as there is no type erasure|
-|*Type Alias*|✕|
-|*Null Safety*||
+|*Type Alias*
+2+|✕
+3+|*Null Safety*
 |Nullable types (e.g. `String?`)|✓|
 |Non-nullable types (e.g. `String`)|✓|
 |Safe call operator (`?.`)|✓|
 |Elvis operator (`?:`)|✓|
 |NPE operator (`!!`)|✓|
 |Safe casts (`as?`)|✓|
-|*Lambdas and Higher-order Functions*||
+3+|*Lambdas and Higher-order Functions*
 |Lambda expressions|✓|
 |Anonymous functions|✕|
 |Returning and storing lambda literals|✓|
@@ -282,10 +284,14 @@ In Kotlite, type argument is erased to its concrete upper bound only when resolv
 |Function types with receiver in function value parameters (e.g. `fun f(g: Int.() -> Unit)`)|✓|
 |Function literials with receiver (e.g. `val f: Int.() -> Unit`)|✕|
 |Function reference (`::`)|✕|
-|*Before Execution*||
+3+|*Checking Before Execution*
 |Type checking|✓|
+|Checking of non-exist variables, functions or classes|✓|
+|Checking of illegal writes to read-only properties|✓|
+|Checking of ambiguous function calls|✓|
+|Checking of type arguments not conforming to upper bound conditions|✓|
 |Detect incompatible types on `is` and `as` operators|✕|
-|*Type Inference*||
+3+|*Type Inference*
 |Types of property declarations (val/var)|✓|
 |Return types of if and when expressions|✓|
 |Return types of single-expression functions|✓|
@@ -299,11 +305,16 @@ In Kotlite, type argument is erased to its concrete upper bound only when resolv
 |Identify a nullable type is non-nullable after asserting it is non-null|✕|
 |Identify a super type is a subtype after asserting it is a subtype|✕|
 |Unwrap types of unnecessary safe call operator (`?.`)|✕|
-|*Annotations*|✕|
-|*Reflection*|✕|
-|*Coroutines*|✕|
-|*Asynchronous Programming*|✕|
-|*Interoperability with Java and other languages*|✕|
+|*Annotations*
+2+|✕
+|*Reflection*
+2+|✕
+|*Coroutines*
+2+|✕
+|*Asynchronous Programming*
+2+|✕
+|*Interoperability with Java and other languages*
+2+|✕
 |===
 
 

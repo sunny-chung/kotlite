@@ -41,7 +41,7 @@ assertFailsWith<SemanticException> {
 }
 ----
 
-NOTE: Developers can still create a class with the same name, as if the class does never exist. This does no harm, as it does not interact with the host.
+NOTE: Developers can still create a class with the same name, as if the class never existed. This does no harm, as it does not interact with the host.
 
 == Selectively installing libraries
 
