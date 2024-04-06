@@ -1,0 +1,92 @@
+= Advanced Usage
+
+== Tool Structure
+
+There are several essential tools in Kotlite. The execution directions are roughly presented in this diagram.
+
+[mermaid]
+----
+flowchart LR
+Lexer <--> Parser --> SA["Semantic Analyzer"] --> Interpreter
+SA --> CG["Code Generator (Optional)"]
+----
+
+NOTE: Code Generator generates Kotlin codes with optionally debug information. It is mainly for debug purpose.
+
+The data directions are as follows:
+
+[mermaid]
+----
+flowchart TD
+KotliteCode["Kotlite Code"] --constructs--> Lexer <--recursively parsing--> Parser
+SA["Semantic Analyzer"]
+Env["Execution Environment"]
+Interpreter
+SA --> CG["Code Generator"]
+Parser --generates--> Mermaid["Mermaid Diagram Code"]
+Parser --generates--> ASTNodes["AST Nodes"]
+CG --generates--> DebugCode["Debuggable Kotlin Code"]
+
+ASTNodes -- "preprocessed by" --> SA
+ASTNodes -- "after being preprocessed, executed by" --> Interpreter
+
+Filter["Custom filters"] --constructs--> Env
+Custom["Custom functions/properties/extensions"] --writes to --> Env
+SA <-- manipulation --> Env
+Env -- read by --> Interpreter
+
+Interpreter -- writes to --> SymbolTable["Symbol Table"]
+
+style KotliteCode fill:#f62
+style Mermaid fill:#aa2
+style ASTNodes fill:#aa2
+style Filter fill:#f62
+style Custom fill:#f62
+style DebugCode fill:#aa2
+style Env fill:#aa2
+style SymbolTable fill:#aa2
+----
+
+All the tool classes are marked as `open`. A developer may feel free to extend the tools to create new features.
+
+== AST Nodes
+
+The Parser generates Abstract Syntax Tree (AST) nodes. The functions of the parser correspond to each syntax defined in https://kotlinlang.org/docs/reference/grammar.html[the Kotlin grammar]. The function name is the grammar name.
+
+For example, calling `Parser.script()` parses the code according to the `script` definition in the Kotlin grammar, and `Parser.type()` parses the code according to the `type` syntax.
+
+Below Kotlin code parses a type written in String to AST nodes that can be used by the Semantic Analyzer and other tools.
+
+[source, kotlin]
+----
+val simpleTypeNode: ASTNode = Parser(Lexer("(anything)", "Double")).type()
+
+val complexTypeNode: ASTNode = Parser(Lexer("(anything)", "Map<String, MutableList<Pair<Int, Double>>>")).type()
+
+val genericTypeNode: ASTNode = Parser(Lexer("(anything)", "Map<K, V>")).type()
+
+val functionTypeNode: ASTNode = Parser(Lexer("(anything)", "Int.(T) -> Unit")).type()
+----
+
+Below Kotlin code parses an expression written in String to AST nodes that can be used by the Semantic Analyzer and other tools.
+
+[source, kotlin]
+----
+val expressionNode: ASTNode = Parser(Lexer("(anything)", "(1 + 2 * 3) / 4")).expression()
+----
+
+Pass it to the Semantic Analyzer and Interpreter and execute manually.
+
+[source, kotlin]
+----
+val executionEnvironment = ExecutionEnvironment()
+SemanticAnalyzer(
+    rootNode = expressionNode,
+    executionEnvironment = executionEnvironment,
+).analyze()
+val result = Interpreter(
+    rootNode = expressionNode,
+    executionEnvironment = executionEnvironment,
+).eval() as IntValue
+val intResult: Int = result.value // 1
+----

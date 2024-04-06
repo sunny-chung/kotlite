@@ -1,0 +1,71 @@
+= Security
+
+== Standard libraries delegations
+
+The standard libraries are implemented as delegations to the original Kotlin / third-party APIs and classes in the host environment. For example, the implementation of the library function `fun String.toRegex(): Regex` would convert the `StringValue` to a real `String` in the host environment, and then invoke `toRegex()`, and return the `Regex` instance back to the embedded environment in a wrapped form. The delegation approach can be a security concern.
+
+While most of the Kotlite built-in standard libraries should be safe to execute, delegations to some third-party libraries might be unwanted.
+
+== Filtering classes, functions and properties
+
+So, Kotlite provides a way to remove them from the embedded execution environment.
+
+This can be done by supplying filter functions to `ExecutionEnvironment`.
+
+Built-in stuffs, e.g. `Int`, can be filtered out as well, but that may cause troubles during code execution and importing libraries, and has no security benefits.
+
+Below is an example to remove the class `MutableList` completely without breaking the environment.
+
+[source, kotlin]
+----
+val env = ExecutionEnvironment(
+    classRegistrationFilter = {
+        it != "MutableList"
+    },
+    functionRegistrationFilter = {
+        !(it.receiverType ?: "").contains("MutableList") &&
+            !it.returnType.contains("MutableList")
+    },
+).apply {
+    install(AllStdLibModules())
+}
+
+assertFailsWith<SemanticException> {
+    KotliteInterpreter(
+        filename = "<Test>",
+        code = """
+            val a = mutableListOf(1, 2, 3)
+        """.trimIndent(),
+        executionEnvironment = env
+    )
+}
+----
+
+NOTE: Developers can still create a class with the same name, as if the class does never exist. This does no harm, as it does not interact with the host.
+
+== Selectively installing libraries
+
+It is possible to only install specific libraries to the `ExecutionEnvironment`.
+
+[source, kotlin]
+----
+val env = ExecutionEnvironment().apply {
+    install(TextLibModule())
+    install(CollectionsLibModule())
+    install(ByteLibModule())
+}
+----
+
+The order matters. If a library module depends on another one, the one being depended should be installed first.
+
+== Implicit code execution in `equals()`, `hashCode()`, `toString()`, `compareTo()`
+
+As mentioned previously, standard libraries are just delegations to the real APIs and classes.
+
+To enable use cases like sorting a list of custom classes or using a custom class as keys of `Map`, the functions `equals()`, `hashCode()`, `toString()`, `compareTo()` can be overridden by end users in Kotlite. In the host environment, calling these functions will execute the user-overridden codes and may throw exceptions. This may be an unwanted code execution and risk.
+
+Bear in mind that doing a `a == b` or `"Debug: $a"` in your application may execute user code.
+
+== Resources
+
+There is no way to limit memory usage or computing resources of user code execution at this moment. User code can exhaust all the available memory or slow down the OS using infinite computing loops. This area might be improved in the future.

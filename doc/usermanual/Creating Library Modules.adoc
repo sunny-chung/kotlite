@@ -1,0 +1,133 @@
+= Creating Library Modules
+
+A library module is just a collection of custom classes, functions, extension functions, extension properties and global properties.
+
+NOTE: The order matters. If A depends on B, put B before A.
+
+== Manual approach
+
+Create a class that extends the abstract class `LibraryModule`, give a name to it, include all the implementations, then this class is a Library Module that can be installed.
+
+Taking this approach has the best performance, but requires lots of effort to write repetitive codes.
+
+== Delegation approach
+
+This approach is what the most Kotlite standard libraries take. Delegating everything to Kotlin, and generate all the delegation codes using the Kotlite Stdlib Processor Gradle plugin.
+
+During the execution of the delegation call, Kotlite will unwrap the Kotlite `RuntimeValue` to a Kotlin type if needed, execute the delegated function, and then wrap the result to a Kotlite `RuntimeValue`. The time performance penalty is significant when the subject, argument or result is a `Collection` with a large size.
+
+Below is a minimal example to generate a delegation library module. Some stuffs from the `Regex` and the `Collection` library modules are taken in the example.
+
+./your-library/build.gradle.kts
+[source, kotlin]
+----
+plugins {
+    kotlin("multiplatform")
+    id("io.github.sunny-chung.kotlite-stdlib-processor-plugin") version "0.1"
+}
+
+// ...
+
+kotlin {
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                // ...
+            }
+            kotlin.srcDir(tasks.named("kotliteStdlibHeaderProcess").map { it.outputs })
+        }
+
+// ...
+
+kotliteStdLibHeaderProcessor {
+    inputDir = "src/kotlinheader/"
+    outputDir = "build/generated/common/"
+    outputPackage = "com.sunnychung.lib.multiplatform.kotlite.stdlib"
+    configs = mapOf(
+        "Regex" to KotliteModuleConfig(
+            imports = listOf(
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.regex.RegexClass",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.regex.RegexValue",
+            )
+        ),
+    )
+}
+----
+
+Implement the delegated class and the value factory function.
+
+./stdlib/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/stdlib/regex/RegexValue.kt
+[source, kotlin]
+----
+fun RegexValue(value: Regex, symbolTable: SymbolTable) : DelegatedValue<Regex>
+    = DelegatedValue<Regex>(value, "Regex", RegexClass.clazz, symbolTable = symbolTable)
+
+object RegexClass {
+     val clazz = ProvidedClassDefinition(
+         fullQualifiedName = "Regex",
+         typeParameters = emptyList(),
+         isInstanceCreationAllowed = true,
+         primaryConstructorParameters = listOf(CustomFunctionParameter("value", "String")),
+         constructInstance = { interpreter, callArguments, callPosition ->
+             RegexValue(Regex((callArguments[0] as StringValue).value), interpreter.symbolTable())
+         },
+         position = SourcePosition("Regex", 1, 1),
+     )
+}
+----
+
+NOTE: The factory function name has to be `${ActualClassName}Value`. It applies to any types, regardless of primitives or interfaces. This convention is hardcoded in the code generation plugin.
+
+Create a Kotlin header file by writing every global or extension functions and extension properties that would be delegated, but without body. This file should be placed in `/your-library/src/kotlinheader/${name}.kt`.
+
+[source, kotlin]
+----
+fun String.matches(regex: Regex): Boolean
+fun String.replace(regex: Regex, replacement: String): String
+fun String.replaceFirst(regex: Regex, replacement: String): String
+fun String.toRegex(): Regex
+
+val <T> List<T>.size: Int
+    get()
+val <T> List<T>.lastIndex: Int
+    get()
+----
+
+Upon compilation, an abstract class `Abstract${name}LibModule` would be generated. Examine if the generated code is compilable and correct. It can be checked by writing unit tests.
+
+.Example of generated code
+[%collapsible]
+====
+./stdlib/build/generated/common/AbstractRegexLibModule.kt
+[source, kotlin]
+----
+include::../../stdlib/build/generated/common/AbstractRegexLibModule.kt[]
+----
+====
+
+NOTE: The code generation plugin has lots of hardcode. You may want to fork another one and add more hardcoded stuffs.
+
+Finally, create a class `${name}LibModule` extending this abstract class, override or add anything if necessary, then it is done.
+
+./stdlib/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/stdlib/RegexLibModule.kt
+[source, kotlin]
+----
+include::../../stdlib/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/stdlib/RegexLibModule.kt[]
+----
+
+=== Null values
+
+In normal situations, a Kotlite `null` value is mapped to a `NullValue` before passing to the delegation calls. If the delegated function requires a real `null` value to function correctly, for example, `setOfNotNull()` or `filterNotNull`, it is regarded as null-aware.
+
+In this case, add a `nullaware` modifier to these functions in the Kotlin header file, then the generated code would map `NullValue` to `null`. For example:
+
+./stdlib/src/kotlinheader/Collections.kt
+[source, kotlin]
+----
+nullaware fun <T : Any> Iterable<T?>.filterNotNull(): List<T>
+nullaware fun <T : Any> setOfNotNull(vararg elements: T?): Set<T>
+----
+
+== Distribution
+
+Kotlite does not provide a way to distribute or host libraries. Putting the source code in GitHub and creating an `awesome-kotlite` repository might be an option.

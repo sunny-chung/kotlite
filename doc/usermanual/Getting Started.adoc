@@ -1,0 +1,135 @@
+= Getting Started
+
+Firstly, include the dependencies.
+
+For single platform:
+
+[source, kotlin]
+----
+dependencies {
+    implementation("io.github.sunny-chung:kotlite-interpreter:<version>")
+    implementation("io.github.sunny-chung:kotlite-stdlib:<version>")
+    // ...
+}
+----
+
+For multiplatform:
+
+[source, kotlin]
+----
+kotlin {
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                api("io.github.sunny-chung:kotlite-interpreter:<version>")
+                api("io.github.sunny-chung:kotlite-stdlib:<version>")
+                // ...
+            }
+        }
+        // ...
+----
+
+Then, start writing codes.
+
+== Minimal Examples
+
+=== Print `Hello world!`
+
+[source, kotlin]
+----
+val env = ExecutionEnvironment().apply {
+    install(AllStdLibModules())
+}
+val interpreter = KotliteInterpreter(
+    filename = "Hello",
+    code = """
+        println("Hello world!")
+    """.trimIndent(),
+    executionEnvironment = env,
+)
+interpreter.eval()
+----
+
+CAUTION: Parsing and semantic analysis perform in the function `KotliteInterpreter()`. It could be imagined as a "compilation process". If there is any error, an exception would be thrown from this function, before the `eval()` call.
+
+NOTE: The `filename` parameter is only used in error messages and stacktraces.
+
+=== Retrieve global values of execution result
+[source, kotlin]
+----
+val env = ExecutionEnvironment().apply {
+    install(AllStdLibModules())
+}
+val interpreter = KotliteInterpreter(
+    filename = "Calculate",
+    code = """
+        val a = (1..10).fold(0) { acc, it ->
+            acc + it
+        }
+    """.trimIndent(),
+    executionEnvironment = env,
+)
+interpreter.eval()
+val symbolTable = interpreter.symbolTable()
+val a = (symbolTable.findPropertyByDeclaredName("a") as IntValue).value // 55
+----
+
+=== Evaluate an expression only
+
+[source, kotlin]
+----
+val env = ExecutionEnvironment().apply {
+    install(AllStdLibModules())
+}
+val result: IntValue = evalKotliteExpression(
+    filename = "Calculate",
+    code = "(1..10).fold(0) { acc, it -> acc + it }",
+    executionEnvironment = env,
+) as IntValue
+val a: Int = result.value // 55
+----
+
+== Value and Type Classes
+
+All the values returned by `evalKotliteExpression()` or `SymbolTable.findPropertyByDeclaredName()` or `Interpreter.eval()` or value arguments provided to custom functions/properties are of a subtype of `RuntimeValue`. Possible subtypes of `RuntimeValue` are:
+
+* `IntValue`
+* `LongValue`
+* `DoubleValue`
+* `CharValue`
+* `StringValue`
+* `BooleanValue`
+* `ByteValue`
+* `NullValue`
+* `UnitValue`
+* `LambdaValue`
+* `ThrowableValue`
+* `ClassInstance`
+
+`RuntimeValue` has a member function `type()`, which returns the type of the underlying value. The return type is a subtype of `DataType`. `DataType` is also provided when there are type arguments provided to custom functions/properties.
+
+Possible subtypes of `DataType` for consumer use are:
+
+* `ObjectType`
+* `FunctionType`
+* `UnitType`
+* `NothingType`
+* `TypeParameterType`
+* `StarType`
+* `RepeatedType`
+
+In most of the time, `ObjectType` would be returned. The underlying class definition, generic type arguments and nullabilities can be accessed in the `ObjectType` class.
+
+`DataType` has a String member property `descriptiveName` which returns a readable type name, for example, `"MutableMap<MyPair<Int, Boolean>, List<String?>>?"`.
+
+== Thread Safety
+
+The interpreter itself is *not* thread-safe. The code executed by the Kotlite interpreter cannot be on multiple threads.
+
+However, Kotlite interpreter does not hold global states. Thus, it is possible to run different Interpreter instances and execute in multiple threads concurrently.
+
+It might also work if mutex locks are enforced in provided custom functions.
+
+== Reusability
+
+Most Kotlite classes cannot be reused, including `ExecutionEnvironment`, AST nodes, parsers and the interpreter. They contain states. If one wants to repeat the execution or use the same inputs of `ExecutionEnvironment`, they would have to duplicate the calls.

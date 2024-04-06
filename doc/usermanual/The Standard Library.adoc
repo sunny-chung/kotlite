@@ -1,0 +1,50 @@
+= The Standard Library
+
+At this moment, the Standard Library consists of following Kotlin/Common standard library modules:
+
+* kotlin
+* kotlin.collections
+* kotlin.io
+* kotlin.math
+* kotlin.ranges
+* kotlin.text
+
+and the following external library:
+
+* https://github.com/sunny-chung/kdatetime-multiplatform[KDateTime]
+
+Currently, not all of their functions and properties are imported, but it is planned to support all of them, as long as the inclusion does not bring security issues.
+
+The standard library will be expanded as well. Regex matchers, encoding, hashing and crypto libraries are on the short-term goal list.
+
+But file I/O and networking will not be available in the standard library due to potential security issues. Users who need them can implement a <<_delegation_approach,delegated library module>>.
+
+== Redirecting the stdout pipe
+
+It is possible to redirect the stdout stream of the embedded script environment to somewhere else, for example, a `StringBuilder`.
+
+If `IOLibModule` is installed manually, its member function `outputToConsole` can be overridden.
+
+[source, kotlin]
+----
+val console = StringBuilder()
+val env = ExecutionEnvironment().apply {
+    install(object : IOLibModule() {
+        override fun outputToConsole(output: String) {
+            console.append(output)
+        }
+    })
+}
+----
+
+If `AllStdLibModules` is installed instead, it accepts an optional constructor lambda parameter `outputToConsoleFunction`.
+
+[source, kotlin]
+----
+val console = StringBuilder()
+val env = ExecutionEnvironment().apply {
+    install(AllStdLibModules(outputToConsoleFunction = {
+        console.append(it)
+    }))
+}
+----

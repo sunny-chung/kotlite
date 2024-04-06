@@ -1,0 +1,16 @@
+= Feature Requests or Reporting Issues
+
+It is glad to have your contributions to this project by raising feature requests or reporting issues.
+
+Please raise a ticket in the https://github.com/sunny-chung/kotlite/issues[GitHub repository], if it has not been raised previously. Otherwise, vote that ticket.
+
+For issue reporting, please include the following:
+
+* Code that reproduces the issue
+* Platform language, OS and versions (e.g. JVM 21 on Windows)
+* Expected result
+* Actual result
+
+Reported issues will be prioritized and addressed as soon as possible, according to importance, completeness and availability.
+
+If you have any usage question, please visit https://github.com/sunny-chung/kotlite/discussions[the discussion section of the GitHub repository] and search for if anyone has asked the same question previously. If there is none, please feel free to create a new discussion.

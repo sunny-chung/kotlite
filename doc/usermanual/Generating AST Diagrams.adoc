@@ -1,0 +1,63 @@
+= Generating AST Diagrams
+
+It is possible to generate https://mermaid.js.org/[mermaid] code from Kotlite codes to render an AST diagram.
+
+Below is an example.
+
+[source, kotlin]
+----
+val mermaidCode = kotliteAstNodeMermaidDiagram("""
+    val cache = mutableMapOf<Int, Long>()
+    fun fib(i: Int): Long {
+        if (i < 0) throw Exception("Invalid i: ${'$'}i")
+        if (i <= 1) return i.toLong()
+        if (i in cache) {
+            return cache[i]!!
+        }
+        return (fib(i - 2) + fib(i - 1)).also {
+            cache[i] = it
+        }
+    }
+    val a = fib(19) // 4181L
+""".trimIndent())
+println(mermaidCode, MermaidFlowchartDirection.LeftToRight)
+----
+
+For the above code snippet, after passing to mermaid, the generated diagram looks like this.
+
+[mermaid, width=3000]
+----
+flowchart LR
+355838823["Script"]-->-1841572794["Property Node `cache`"]
+-1841572794["Property Node `cache`"]-- initial value -->-426763853["Function Call"]-- function -->1282362152["Variable Reference Node `mutableMapOf`"]
+355838823["Script"]-->1178993689["Function Node `fib` modifiers=[]"]-- type -->-998588097["Type Long"]
+1178993689["Function Node `fib` modifiers=[]"]--body-->1671860710["Block Node"]-->540084302["If Node"]-- condition -->-704657373["Binary Op <"]-->1475575970["Variable Reference Node `i`"]
+-704657373["Binary Op <"]-->-1848977816["Integer 0"]
+540084302["If Node"]-- true -->1441705977["Block Node"]-->-638294578["Throw"]-->-482415059["Function Call"]-- function -->-977198834["Variable Reference Node `Exception`"]
+-482415059["Function Call"]-- argument -->-200080443["Function Argument Node #0 `null`"]-->-1138007741["String Node"]
+-1138007741["String Node"]-->845776394["String Node `Invalid i: `"]
+-1138007741["String Node"]-->1529797768["String Field Identifier Node `i`"]
+1671860710["Block Node"]-->1912894486["If Node"]-- condition -->808254364["Binary Op <="]-->341182585["Variable Reference Node `i`"]
+808254364["Binary Op <="]-->1396583792["Integer 1"]
+1912894486["If Node"]-- true -->985440217["Block Node"]-->241936730["Return Node ``"]-->376001782["Function Call"]-- function -->-984475863["Navigation Node"]-- subject -->1866869931["Variable Reference Node `i`"]
+-984475863["Navigation Node"]-- access -->1098721768["Class Member Reference Node `toLong`"]
+1671860710["Block Node"]-->-371540695["If Node"]-- condition -->735673408["Infix Function Call in"]-->1822851434["Variable Reference Node `i`"]
+735673408["Infix Function Call in"]-->-1878116616["Variable Reference Node `cache`"]
+-371540695["If Node"]-- true -->1828994822["Block Node"]-->-1409311123["Return Node ``"]-->1943227841["Unary Op !!"]-->611735658["Index Op Node"]-- subject -->1843178488["Variable Reference Node `cache`"]
+611735658["Index Op Node"]-- "argument[0]" -->-280342260["Variable Reference Node `i`"]
+1671860710["Block Node"]-->-1170932165["Return Node ``"]-->1648812701["Function Call"]-- function -->1629301835["Navigation Node"]-- subject -->1655698715["Binary Op +"]-->-1059710638["Function Call"]-- function -->654324571["Variable Reference Node `fib`"]
+-1059710638["Function Call"]-- argument -->274656989["Function Argument Node #0 `null`"]-->-684645251["Binary Op -"]-->-2048090922["Variable Reference Node `i`"]
+-684645251["Binary Op -"]-->-716107342["Integer 2"]
+1655698715["Binary Op +"]-->-361755297["Function Call"]-- function -->1907910473["Variable Reference Node `fib`"]
+-361755297["Function Call"]-- argument -->-1206099155["Function Argument Node #0 `null`"]-->1708274825["Binary Op -"]-->-1454930220["Variable Reference Node `i`"]
+1708274825["Binary Op -"]-->73662439["Integer 1"]
+1629301835["Navigation Node"]-- access -->-893951370["Class Member Reference Node `also`"]
+1648812701["Function Call"]-- argument -->-2142584258["Function Argument Node #0 `null`"]-->1967946240["Lambda Node"]-->552138368["Block Node"]-->-599966779["Assignment Node `=`"]-- subject -->2073895623["Index Op Node"]-- subject -->1483737102["Variable Reference Node `cache`"]
+2073895623["Index Op Node"]-- "argument[0]" -->-399367246["Variable Reference Node `i`"]
+-599966779["Assignment Node `=`"]-- value -->2010348450["Variable Reference Node `it`"]
+355838823["Script"]-->-15578270["Property Node `a`"]
+-15578270["Property Node `a`"]-- initial value -->-1480290684["Function Call"]-- function -->-1086069055["Variable Reference Node `fib`"]
+-1480290684["Function Call"]-- argument -->-1080946453["Function Argument Node #0 `null`"]-->-1063267459["Integer 19"]
+
+
+----

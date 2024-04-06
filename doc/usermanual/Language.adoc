@@ -1,0 +1,226 @@
+= Language
+
+Kotlite parser implementation mostly conforms to https://kotlinlang.org/spec/syntax-and-grammar.html[the official Kotlin 1.9 documentation]. Thus, the supported syntax and precedence resolutions are supposed to be equivalent to Kotlin 1.9.
+
+== Differences from https://kotlinlang.org/docs/home.html[Kotlin]
+
+[%autowidth]
+|===
+|Kotlin 1.9|Kotlite Script|Kotlite API
+
+|*Basic Data Types*||
+|Byte|✓|
+|Short|✕|
+|Int|✓|
+|Long|✓|
+|Float|✕|
+|Double|✓|
+|Unsigned Numbers|✕|
+|Boolean|✓|
+|Char|✓|
+|String|✓|
+|Array|Not supported except ByteArray. List is a replacement.|
+|Pair|✓|
+|Triple|✕|
+|Throwable|✓|
+|Unit|✓|
+|*Literal Constants*||
+|Decimals|✓|
+|Long - `L`|✓|
+|Hex - `0x`|✕|
+|Binary - `0b`|✕|
+|`e` notation (e.g. `1.2e10`)|✕|
+|`_` in numbers|✕|
+|Character escapes (\t, \b, \n, \r, \', \", \\, \$)|✓|
+|Unicode literal (e.g. \u0000)|✓|
+|UTF-16 surrogate pair characters in String literals|✓|
+|Multiline Strings (""")|✓|
+|String Templates ($)|✓|
+|Nested String Templates (e.g. `"is ${if (isEnabled) "at ${location.describe()}" else "N/A"}"}"`)|✓|
+|*Syntax*||
+|Using spaces and symbols in identifiers (e.g. variable/function names)|✕|
+|Single-line comment (//)|✓|
+|Block comments (/* ... */)|✓|
+|Nested block comments|✕|
+|Extra new line characters within an expression|✓|
+|*Operators*||
+|Bitwise Operations (shl, shr, ushr, and, or, xor, inv)|✕|
+|Boolean Logic (&&, \|\|, !)|✓|
+|Arithmetics (+, -, *, /, %)|✓|
+|Comparisons (<, >, <=, >=)|✓|
+|Equality (==, !=)|✓|
+|Reference Equality (===, !==)|✕|
+|Type Checks (is, !is)|✓ (with difference)|
+|Type Casts (as, as?)|✓ (with difference)|
+|In operators (in, !in)|✓|
+|To operator (`to`)|✓|
+|Spread operator (*)|✕|
+|*Control Flow*||
+|If expressions|✓|
+|When expressions with optional `val` and condition variances|✓ (with difference)|
+|For loops|✓|
+|While loops|✓|
+|Do-while loops|✓|
+|Break and Continue|✓|
+|Normal Returns|✓|
+|Labelling loops|✕|
+|Automatic Labels for loops|✕|
+|Automatic Labels for lambdas|✕|
+|Manually labelling lambdas|✓|
+|Break and Continue Labels|✕|
+|Return to Labels|✓|
+|Return to functions outside enclosing inline functions|✕|
+|Throw exceptions|✓|
+|Try expressions|✓|
+|Try-catch-finally|✓|
+|Catch exceptions which are thrown outside interpreter scope|✓|
+|*Properties*||
+|val/var with optional initial values|✓|
+|Shadow variables|✓|
+|Custom getters and setters|✕|✓
+|Backing fields for custom getters and setters|✕|
+|`const`, `lateinit` modifiers|✕|
+|Delegation (`by` keyword)|✕|
+|Destructuring declarations|✕|
+|*Functions, Infix and Operator Functions*||
+|Normal functions|✓|
+|Local functions|✓|
+|Value parameters with default expression|✓|
+|Named arguments|✓|
+|Single-expression functions (e.g. `fun f() = 10`)|✓|
+|Variable number of arguments (`vararg` modifier)|✓ (with difference)|
+|Overloading functions|✓|
+|Infix functions|✓|
+|Infix calls|✓|
+|Tail recursive functions (`tailrec fun`)|✕|
+|Inline functions|✕|
+|Overloading unary operators (+, -, !, ++, --)|✕|
+|Overloading arithmetic binary operators (+, -, *, /, %)|✓|
+|Overloading range operators (.., ..<)|✓|
+|Overloading "in" operators (in, !in)|✓|
+|Overloading indexed access operators ([], []=)|✓|
+|Overloading invoke operators (`()`)|✕|
+|Overloading augmented assignments (+=, -=, *=, /=, %=)|✓|
+|Overloading equality operators (==, !=)|✓|
+|Overloading comparison operators (>, <, >=, <=)|✓|
+|Suspending functions|✕|
+|*Packages and Imports*|✕|
+|*Class Foundations*||
+|Primary constructor with optional val/var declarations|✓|
+|Secondary constructors|✕|
+|(Multiple) `init` blocks|✓|
+|Member properties|✓|
+|Member functions|✓|
+|Overloading member functions|✓|
+|Visibility modifiers (public/private/protected/internal)|✕|
+|*Class Inheritance*||
+|Passing values and type arguments to super class constructors|✓|
+|Inheriting members from super classes and interfaces|✓|
+|`open` modifier|✓|
+|`final` modifier|✕|
+|Overriding functions|✓ (with difference)|
+|Overriding properties|✓|
+|Implicit `this`|✓|
+|`super` keyword|✓|
+|Calling super functions|✓|
+|Calling super properties|✓|
+|Abstract functions|✓|
+|Abstract properties|✕|
+|Delegations|✕|
+|Overriding functions from the "Any" class|✓|
+|`this` expression with diamond|✕|
+|`super` expression with diamond|✕|
+|*Class Variations*||
+|Nested classes|✕|
+|Inner classes|✕|
+|Abstract classes|✓|
+|Sealed classes|✕|
+|Enum classes|Partial|
+|Data classes|✕|
+|Value classes|✕|
+|Object classes|✕|
+|Companion objects|Only available for extension functions and properties|
+|Annotation classes|✕|
+|Anonymous classes|✕|
+|*Interfaces*||
+|Abstract functions|✓|
+|Functions with body|✕|
+|Abstract properties|✕|
+|(Multiple) interfaces inheritance|✓|
+|Functional interfaces (`fun interface`)|✕|
+|Sealed interfaces|✕|
+|*Extensions*||
+|Extension functions|✓|
+|Extension operator functions|✓|
+|Extension properties|✕|✓
+|Nullable receiver extensions|✓|
+|Companion object extensions|✓|
+|Generic type parameter as the receiver of extension functions (e.g. `fun <T: Any> T.f()`)|✓|
+|Extension functions as class members|✓|
+|Resolving calls to extension functions of super classes/interfaces|✓|
+|*Generics*||
+|Type parameters in classes|✓|
+|Type parameters in interfaces|✓|
+|Type parameters in non-class functions|✓|
+|Type parameters in (generic) class member functions|✓|
+|Type parameters in extension functions|✓|
+|Nested generic types|✓|
+|Use type parameter as receiver of extension functions|✕|
+|`in`, `out` type projections|✕|
+|Star projection (`<*>`)|✓|
+|Upper bounds of type parameters (e.g. `T : Base`)|✓|
+|Recursive upper bounds of type parameters (e.g. `T : Comparable<T>`)|✓|
+|Definitely non-nullable types (e.g. `T & Any`)|✕|
+|`where` generic constraints|✕|
+|Type erasure|Different|
+|Unchecked casts|✓|
+|Underscore as type arguments|✕|
+|Reified type parameters|No as there is no type erasure|
+|*Type Alias*|✕|
+|*Null Safety*||
+|Nullable types (e.g. `String?`)|✓|
+|Non-nullable types (e.g. `String`)|✓|
+|Safe call operator (`?.`)|✓|
+|Elvis operator (`?:`)|✓|
+|NPE operator (`!!`)|✓|
+|Safe casts (`as?`)|✓|
+|*Lambdas and Higher-order Functions*||
+|Lambda expressions|✓|
+|Anonymous functions|✕|
+|Returning and storing lambda literals|✓|
+|Passing trailing lambdas to functions|✓|
+|Implicit single parameter `it`|✓|
+|Underscore as unused variable names|✓|
+|Destructuring value arguments in lambdas|✕|
+|Accessing variables and functions declared in the enclosing closures|✓|
+|Nested lambdas|✓|
+|Labelling lambdas|✓|
+|Function types with receiver in function value parameters (e.g. `fun f(g: Int.() -> Unit)`)|✓|
+|Function literials with receiver (e.g. `val f: Int.() -> Unit`)|✕|
+|Function reference (`::`)|✕|
+|*Before Execution*||
+|Type checking|✓|
+|Detect incompatible types on `is` and `as` operators|✕|
+|*Type Inference*||
+|Types of property declarations (val/var)|✓|
+|Return types of if and when expressions|✓|
+|Return types of single-expression functions|✓|
+|Infer lambda vaule parameter types|✓|
+|Infer lambda return types|✓|
+|Type arguments of generic function calls|✓|
+|Type arguments of generic class constructors|✓|
+|Receiver of generic extension functions|✓|
+|Infer nested types recursively|✓|
+|Cyclic type inference error detection|✓|
+|Identify a nullable type is non-nullable after asserting it is non-null|✕|
+|Identify a super type is a subtype after asserting it is a subtype|✕|
+|Unwrap types of unnecessary safe call operator (`?.`)|✕|
+|*Annotations*|✕|
+|*Reflection*|✕|
+|*Coroutines*|✕|
+|*Asynchronous Programming*|✕|
+|*Interoperability with Java and other languages*|✕|
+|===
+
+
+

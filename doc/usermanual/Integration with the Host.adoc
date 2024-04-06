@@ -1,0 +1,147 @@
+= Integration with the Host
+
+There are some APIs to allow the host provides custom executable functions and properties to the embedded script environment. These APIs are not yet stable and subject to change in the future.
+
+== Providing functions and extension Functions
+
+To provide an extension function, use the `ExecutionEnvironment.registerFunction(CustomFunctionDefinition)` API.
+
+Below example provides an extension function with the signature `fun String.size(factor: Int): Int`. The function also alters a variable `hostVar` in the host environment before returning.
+
+[source, kotlin]
+----
+var hostVar: Int = 0
+
+val env = ExecutionEnvironment().apply {
+    registerFunction(CustomFunctionDefinition(
+        receiverType = "String",
+        functionName = "size",
+        returnType = "Int",
+        parameterTypes = listOf(CustomFunctionParameter("factor", "Int")),
+        executable = { interpreter, receiver, args, typeArgs ->
+            IntValue((receiver as StringValue).value.length * (args[0] as IntValue).value, interpreter.symbolTable()).also {
+                hostVar = it.value
+            }
+        },
+        position = SourcePosition("MyBridge", 1, 1),
+    ))
+}
+----
+
+NOTE: The value of `position` is used only when there is an error or runtime exception, in attempt to provide more information about the error.
+
+To provide a global function, simply provide a `null` value to the `receiverType` parameter.
+
+== Providing extension properties
+
+To provide an extension property, use the `ExecutionEnvironment.registerExtensionProperty(ExtensionProperty)` API.
+
+Below is an example exposing a host variable to the script environment to read and write values.
+
+[source, kotlin]
+----
+var hostScopeVariable = 0
+
+val env = ExecutionEnvironment().apply {
+    registerExtensionProperty(ExtensionProperty(
+        declaredName = "f",
+        receiver = "String",
+        type = "Int",
+        getter = { interpreter, subject, typeArgs ->
+            IntValue(hostScopeVariable, interpreter.symbolTable())
+        },
+        setter = { interpreter, subject, value, typeArgs ->
+            hostScopeVariable += (value as IntValue).value
+        }
+    ))
+}
+
+val interpreter = KotliteInterpreter(
+    filename = "MyScript",
+    code = """
+        val s = "abcde"
+        s.f = 10
+        val a = s.f // 10
+        s.f = 15
+        val b = s.f // 25
+    """.trimIndent(),
+    executionEnvironment = env,
+)
+interpreter.eval()
+----
+
+NOTE: Either `getter` or `setter` parameter can be `null` if there is no getter or setter.
+
+== Providing global properties
+
+The API to provide a global property is different from that for extension properties. It is `ExecutionEnvironment.registerGlobalProperty(GlobalProperty)`.
+
+[source, kotlin]
+----
+var property = 10
+
+val env = ExecutionEnvironment().apply {
+    registerGlobalProperty(GlobalProperty(
+        position = SourcePosition("MyScript", 1, 1),
+        declaredName = "x",
+        type = "Int",
+        isMutable = true,
+        getter = { interpreter -> IntValue(property, interpreter.symbolTable()) },
+        setter = { interpreter, value -> property = (value as IntValue).value },
+    ))
+    registerGlobalProperty(GlobalProperty(
+        position = SourcePosition("Math", 1, 1),
+        declaredName = "myPi",
+        type = "Double",
+        isMutable = false,
+        getter = { interpreter -> DoubleValue(3.14, interpreter.symbolTable()) },
+    ))
+}
+----
+
+NOTE: As seen in examples, either `getter` or `setter` can be optional (`null`).
+
+== Executing other functions in executable
+
+The APIs are less friendly, but this is possible.
+
+=== Executing a lambda argument
+
+The core stdlib has some good example.
+
+./stdlib/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/stdlib/CoreLibModule.kt
+[source, kotlin]
+----
+    CustomFunctionDefinition(
+        receiverType = "T",
+        functionName = "also",
+        returnType = "T",
+        typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
+        parameterTypes = listOf(CustomFunctionParameter("block", "(T) -> Unit")),
+        executable = { interpreter, receiver, args, typeArgs ->
+            val block = args[0] as LambdaValue
+            block.execute(arrayOf(receiver))
+            receiver!!
+        },
+        position = SourcePosition(name, 1, 1),
+    ),
+    CustomFunctionDefinition(
+        receiverType = "T",
+        functionName = "apply",
+        returnType = "T",
+        typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
+        parameterTypes = listOf(CustomFunctionParameter("block", "T.() -> Unit")),
+        executable = { interpreter, receiver, args, typeArgs ->
+            val block = args[0] as LambdaValue
+            block.execute(arguments = emptyArray(), receiver = receiver!!)
+            receiver!!
+        },
+        position = SourcePosition(name, 1, 1),
+    ),
+----
+
+NOTE: The order matters. If A depends on B, put B before A.
+
+=== Executing other declared functions
+
+This is not easy, and not a common use case. Take a look of _/interpreter/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/model/SpecialFunction.kt_ for an example.
