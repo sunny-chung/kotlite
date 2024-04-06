@@ -10,6 +10,18 @@ Create a class that extends the abstract class `LibraryModule`, give a name to i
 
 Taking this approach has the best performance, but requires lots of effort to write repetitive codes.
 
+The `IOLibModule` in the standard library is a good example to be referenced, because it is a library module completely written by hand.
+
+.`IOLibModule`
+[%collapsible%open]
+====
+./stdlib/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/stdlib/IOLibModule.kt
+[source, kotlin]
+----
+include::../../stdlib/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/stdlib/IOLibModule.kt[]
+----
+====
+
 == Delegation approach
 
 This approach is what the most Kotlite standard libraries take. Delegating everything to Kotlin, and generate all the delegation codes using the Kotlite Stdlib Processor Gradle plugin.

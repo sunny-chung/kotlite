@@ -28,6 +28,9 @@ https://github.com/sunny-chung/kotlite/[icon:github[] The Kotlite GitHub Reposit
 * Semantic analysis, e.g. variable access and type verification, before execution
 * Type inference
 * Well tested -- there are more than a thousand of hand-written unit tests per platform
+* Can be written in any IDE supporting Kotlin 1.9 -- Kotlite does not create new syntax
+
+image::img/tests.png[]
 
 == Supported Platforms
 

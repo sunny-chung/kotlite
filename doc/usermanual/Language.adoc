@@ -151,6 +151,8 @@ In Kotlite, it is provided as `List<T>`.
 |Secondary constructors|✕|
 |(Multiple) `init` blocks|✓|
 |Member properties|✓|
+|Member properties with custom getters and setters|✓|
+|Backing fields of member properties with custom getters and setters|✕|
 |Member functions|✓|
 |Overloading member functions|✓|
 |Visibility modifiers (public/private/protected/internal)|✕|
@@ -317,5 +319,107 @@ In Kotlite, type argument is erased to its concrete upper bound only when resolv
 2+|✕
 |===
 
+== Runtime Behaviour Differences
 
+[cols="50a,25a,25a"]
+|===
+|Code|Kotlin 1.9|Kotlite
 
+|.Generics with `as?` operator
+[source, kotlin]
+----
+open class A<T> {
+    fun <X> cast(value: X): T? = value as? T
+}
+class B : A<String>()
+class C : A<Int>()
+val x = B()
+val y = C()
+val a = x.cast("abc")
+val b = x.cast(123)
+val c = y.cast("abc")
+val d = y.cast(123)
+val e = y.cast(null)
+println("$a $b $c $d $e")
+----
+
+|Throws exception:
+[source]
+----
+java.lang.ClassCastException: java.lang.Integer cannot be cast to java.lang.String
+----
+
+|Output:
+[source]
+----
+abc null null 123 null
+----
+
+|.Generics with `as?` operator
+[source, kotlin]
+----
+open class A<T> {
+    fun <X> cast(value: X): X? = value as? T as? X
+}
+class B : A<String>()
+class C : A<Int>()
+val x = B()
+val y = C()
+val a = x.cast("abc")
+val b = x.cast(123)
+val c = y.cast("abc")
+val d = y.cast(123)
+val e = y.cast(null)
+println("$a $b $c $d $e")
+----
+
+|Output:
+[source]
+----
+abc 123 abc 123 null
+----
+
+|Output:
+[source]
+----
+abc null null 123 null
+----
+
+|.Property resolutions in local classes
+[source, kotlin]
+----
+fun main() {
+    var a: Int = -10
+    class MyCls {
+        var a: Int = 1
+        var b: Int
+            get() = a
+            set(value) {
+                a = value
+            }
+    }
+    val o: MyCls = MyCls()
+    val x: Int = o.a
+    o.b = 20
+    val y: Int = o.a
+    o.b = 6
+    val z: Int = o.a
+    println("a = $a; z = $z")
+}
+
+main()
+----
+
+|Output:
+[source]
+----
+a = 6; z = 1
+----
+
+|Output:
+[source]
+----
+a = -10; z = 6
+----
+
+|===

@@ -1,5 +1,7 @@
 = Getting Started
 
+== Include the dependencies
+
 Firstly, include the dependencies.
 
 For single platform:
@@ -29,9 +31,33 @@ kotlin {
         // ...
 ----
 
-Then, start writing codes.
+== Stages
+
+[mermaid]
+----
+flowchart LR
+    subgraph K["KotliteInterpreter()"]
+        ParseCode["Parse Code"] --> Syntax["Syntax Check"] --> Analysis["Semantic Analysis"]
+    end
+
+    subgraph eval["Interpreter.eval()"]
+        Execute["Execute Code"]
+    end
+
+    Analysis --> Execute
+----
+
+Developers should be familiar with most of the stages.
+
+In the Semantic Analysis stage, it is doing lots of stuffs like checking whether a function in a class tries to override a non-existing function, returning values with a wrong data type, and inferring types, optimizing codes, etc..
+
+Any stage can throw an exception.
+
+The stages in different blocks do not require to be called immediately after the previous one.
 
 == Minimal Examples
+
+After understanding the stages, we can start writing codes.
 
 === Print `Hello world!`
 
