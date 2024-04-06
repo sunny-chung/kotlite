@@ -649,7 +649,7 @@ class IndexOpNode(override val position: SourcePosition, val subject: ASTNode, v
         val self = "${generateId()}[\"Index Op Node\"]"
         return "$self-- subject -->${subject.toMermaid()}\n" +
                 arguments.mapIndexed { index, it ->
-                    "$self-- argument[$index] -->${it.toMermaid()}"
+                    "$self-- \"argument[$index]\" -->${it.toMermaid()}"
                 }.joinToString("\n")
     }
 }
@@ -697,7 +697,7 @@ data class TryNode(
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Try\"]"
         return "$self--exec-->${mainBlock.toMermaid()}" +
-                catchBlocks.withIndex().joinToString { "\n$self--catch[${it.index}]-->${it.value.toMermaid()}" } +
+                catchBlocks.withIndex().joinToString { "\n$self-- \"catch[${it.index}]\" -->${it.value.toMermaid()}" } +
                 (finallyBlock?.let { "\n$self--finally-->${it.toMermaid()}" } ?: "")
     }
 }
@@ -777,7 +777,7 @@ data class WhenNode(
 ) : ASTNode {
     override fun toMermaid(): String {
         val self = "${generateId()}[\"When\"]"
-        return entries.withIndex().joinToString("\n") { "$self--entry[${it.index}]-->${it.value.toMermaid()}" } +
+        return entries.withIndex().joinToString("\n") { "$self-- \"entry[${it.index}]\" -->${it.value.toMermaid()}" } +
             (subject?.let { "\n$self--subject-->${it.toMermaid()}" } ?: "")
     }
 }
@@ -801,7 +801,7 @@ data class EnumEntryNode(
     override fun toMermaid(): String {
         val self = "${generateId()}[\"Enum '$name'\"]"
         return self + arguments.withIndex().joinToString {
-            "\n$self--arg[${it.index}]-->${it.value.toMermaid()}"
+            "\n$self-- \"arg[${it.index}]\" -->${it.value.toMermaid()}"
         }
     }
 }
@@ -837,6 +837,6 @@ data class ForNode(
         return self +
             subject.let { "\n$self--subject-->${it.toMermaid()}" } +
             body.let { "\n$self--body-->${it.toMermaid()}" } +
-            variables.withIndex().joinToString("") { "\n$self--var[${it.index}]-->${it.value.toMermaid()}" }
+            variables.withIndex().joinToString("") { "\n$self-- \"var[${it.index}]\" -->${it.value.toMermaid()}" }
     }
 }
