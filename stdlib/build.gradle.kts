@@ -83,7 +83,8 @@ kotlin {
                 implementation(project(":kotlite-interpreter"))
                 implementation("io.github.sunny-chung:kdatetime-multiplatform:0.6.3")
             }
-            kotlin.srcDir("build/generated/common/")
+//            kotlin.srcDir("build/generated/common/")
+            kotlin.srcDir(tasks.named("kotliteStdlibHeaderProcess").map { it.outputs })
         }
         val commonTest by getting {
             dependencies {

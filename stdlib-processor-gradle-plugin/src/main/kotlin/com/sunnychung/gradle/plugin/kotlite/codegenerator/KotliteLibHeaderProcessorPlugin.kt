@@ -18,13 +18,14 @@ class KotliteLibHeaderProcessorPlugin : Plugin<Project> {
             it.outputPackage.set(extension.outputPackage.get())
             it.configs.set(extension.configs.get())
         }
-        project.afterEvaluate {
-            project.tasks.filter {
-                it.name.startsWith("compileKotlin")
-            }.forEach {
-                it.dependsOn(taskName)
-            }
-        }
+//        project.afterEvaluate {
+//            project.tasks.filter {
+//                it.name.startsWith("compile")
+//            }.forEach {
+//                it.dependsOn(taskName)
+//                println("${it.path} dependsOn $taskName")
+//            }
+//        }
     }
 }
 
