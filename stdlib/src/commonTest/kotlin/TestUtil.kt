@@ -28,7 +28,7 @@ fun interpreter(code: String, isDebug: Boolean = false, executionEnvironment: Ex
 }
 
 fun semanticAnalyzer(code: String, environment: ExecutionEnvironment = ExecutionEnvironment()) = SemanticAnalyzer(
-    scriptNode = Parser(Lexer("<Test>", code)).script(),
+    rootNode = Parser(Lexer("<Test>", code)).script(),
     executionEnvironment = environment
 )
 

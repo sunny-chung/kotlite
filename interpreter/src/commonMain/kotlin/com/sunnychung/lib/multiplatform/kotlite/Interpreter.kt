@@ -106,10 +106,9 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenEntryNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
-import com.sunnychung.lib.multiplatform.kotlite.model.toTypeNode
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
 
-class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: ExecutionEnvironment) {
+class Interpreter(val rootNode: ASTNode, val executionEnvironment: ExecutionEnvironment) {
 
     internal val callStack = CallStack()
     internal val globalScope = callStack.currentSymbolTable()
@@ -1777,9 +1776,9 @@ class Interpreter(val scriptNode: ScriptNode, val executionEnvironment: Executio
         return callStack.currentSymbolTable().assertToDataType(call!!.returnType!!)
     }
 
-    fun eval() {
+    fun eval(): RuntimeValue {
         log.d { "=== Interpreter eval() ===" }
-        return scriptNode.eval()
+        return rootNode.eval() as? RuntimeValue ?: UnitValue
     }
 
 }
