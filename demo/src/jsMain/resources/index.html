@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Kotlite Interpreter Demo</title>
+    <link rel="stylesheet" type="text/css" href="semantic/semantic.min.css" />
+    <style>
+        .monospace {
+            font-family: monospace, monospace;
+        }
+        .container {
+            margin-top: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="big ui container">
+        <div class="ui grid">
+            <div class="ten wide column">
+                <h1 class="ui header">
+                    Kotlite Interpreter Demo
+                    <div class="sub header">A lite Kotlin interpreter</div>
+                </h1>
+                <p>The code would be executing in client-side only.</p>
+            </div>
+            <div class="six wide column right aligned">
+                <a href="https://github.com/sunny-chung/kotlite/"><i class="big github icon"></i></a>
+            </div>
+        </div>
+        <div class="ui divider"></div>
+        <div class="ui grid form">
+            <div class="ten wide column">
+                <div class="ui simple dropdown item button">
+                    Example Code <i class="dropdown icon"></i>
+                    <div id="lstExample" class="menu">
+<!--                        <div class="item">A 1</div>-->
+<!--                        <div class="item">A 2</div>-->
+                    </div>
+                </div>
+                <button id="btnRun" class="ui right floated primary button" type="button">Run</button>
+            </div>
+            <div class="six wide column">
+            </div>
+            <div class="ten wide column">
+                <div class="field">
+                    <label>Code</label>
+                    <textarea id="txtCode" class="monospace" rows="29"></textarea>
+                </div>
+            </div>
+            <div class="six wide column">
+                <div class="field">
+                    <label>Output</label>
+                    <textarea id="txtOutput" class="monospace" readonly="readonly" rows="29"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+<!--    <script src="semantic/semantic.min.js"></script>-->
+    <script src="kotlite-demo.js"></script>
+</body>
+</html>
