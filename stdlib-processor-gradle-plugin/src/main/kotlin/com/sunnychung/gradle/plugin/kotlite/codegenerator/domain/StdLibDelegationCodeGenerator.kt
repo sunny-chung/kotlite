@@ -426,12 +426,13 @@ internal class ScopedDelegationCodeGenerator(private val typeParameterNodes: Lis
     }
 
     fun generateLambda(variableName: String, type: FunctionTypeNode, indent: Int): String {
-        return """{ ${type.parameterTypes!!.mapIndexed { i, it -> "arg$i: ${unwrapValueType(it)}" }.joinToString(", ")} ${if (!type.parameterTypes!!.isEmpty()) "->" else ""}
+        val question = if (type.isNullable) "?" else ""
+        return """($variableName as$question LambdaValue)$question.let { lambda -> { ${type.parameterTypes!!.mapIndexed { i, it -> "arg$i: ${unwrapValueType(it)}" }.joinToString(", ")} ${if (!type.parameterTypes!!.isEmpty()) "->" else ""}
 ${type.parameterTypes!!.mapIndexed { i, it -> "        val wa$i = ${wrap("arg$i", it)}" }.joinToString("\n")}
 
-        val result = ($variableName as LambdaValue).execute(arrayOf(${type.parameterTypes!!.indices.joinToString(", ") { "wa$it" }}))
+        val result = lambda.execute(arrayOf(${type.parameterTypes!!.indices.joinToString(", ") { "wa$it" }}))
         ${unwrap("result", type.returnType!!)}
-    }""".prependIndent(indent(indent)).trimStart()
+    } }""".prependIndent(indent(indent)).trimStart()
     }
 
     fun FunctionValueParameterNode.generate(indent: String): String {

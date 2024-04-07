@@ -6,6 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CoreLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.TextLibModule
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -81,6 +82,40 @@ class ListTest {
         interpreter.eval()
         val symbolTable = interpreter.symbolTable()
         assertEquals(">(2: 6)\n>(3: 8)\n>(4: 10)", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+    }
+
+    @Test
+    fun joinToString1() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class A(val a: Int, val b: Int) {
+                override fun toString(): String {
+                    return "${'$'}a -> ${'$'}b"
+                }
+            }
+            val l = listOf(A(1, 10), A(2, 5), A(3, 1))
+            val s = l.joinToString("; ")
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals("1 -> 10; 2 -> 5; 3 -> 1", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
+    }
+
+    @Test
+    fun joinToString2() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class A(val a: Int, val b: Int)
+            val l = listOf(A(1, 10), A(2, 5), A(3, 1))
+            val s = l.joinToString("; ") { "${'$'}{it.a} -> ${'$'}{it.b}" }
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals("1 -> 10; 2 -> 5; 3 -> 1", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
     }
 
     @Test

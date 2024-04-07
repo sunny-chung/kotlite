@@ -196,5 +196,5 @@ open class ClassInstance(
         return convertToString(isCallCustomFunction = true)
     }
 
-    override fun toString(): String = "${clazz!!.fullQualifiedName}($memberPropertyValues)"
+    override fun toString(): String = convertToString()
 }
