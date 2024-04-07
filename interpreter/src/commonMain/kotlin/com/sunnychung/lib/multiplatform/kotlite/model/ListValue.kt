@@ -8,7 +8,7 @@ fun ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: Sy
 object ListClass {
     val clazz = ProvidedClassDefinition(
         fullQualifiedName = "List",
-        typeParameters = listOf(TypeParameterNode(SourcePosition.BUILTIN, name = "T", typeUpperBound = null)),
+        typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = { _, _, _ -> throw UnsupportedOperationException() },

@@ -6,7 +6,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.RuntimeValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
-import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameterNode
+import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
 
 fun MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable)
     = DelegatedValue<MutableList<RuntimeValue>>(value, MutableListClass.clazz, listOf(typeArgument), symbolTable)
@@ -14,7 +14,7 @@ fun MutableListValue(value: MutableList<RuntimeValue>, typeArgument: DataType, s
 object MutableListClass {
     val clazz = ProvidedClassDefinition(
         fullQualifiedName = "MutableList",
-        typeParameters = listOf(TypeParameterNode(position = SourcePosition("Collections", 1, 1), name = "T", typeUpperBound = null)),
+        typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),
         constructInstance = { _, _, _ -> throw UnsupportedOperationException() },

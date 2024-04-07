@@ -8,7 +8,7 @@ fun IteratorValue(value: Iterator<RuntimeValue>, typeArgument: DataType, symbolT
 object IteratorClass {
     val clazz = ProvidedClassDefinition(
         fullQualifiedName = "Iterator",
-        typeParameters = listOf(TypeParameterNode(SourcePosition.BUILTIN, name = "T", typeUpperBound = null)),
+        typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
         isInterface = true,
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),

@@ -12,7 +12,7 @@ class ProvidedClassDefinition(
     val position: SourcePosition,
     fullQualifiedName: String,
     isInterface: Boolean = false,
-    typeParameters: List<TypeParameterNode>,
+    typeParameters: List<TypeParameter>,
     isInstanceCreationAllowed: Boolean,
     private val primaryConstructorParameters: List<CustomFunctionParameter>,
     private val constructInstance: (interpreter: Interpreter, callArguments: Array<RuntimeValue>, callPosition: SourcePosition) -> ClassInstance,
@@ -28,7 +28,7 @@ class ProvidedClassDefinition(
     fullQualifiedName = fullQualifiedName,
     isInterface = isInterface,
     modifiers = modifiers,
-    typeParameters = typeParameters,
+    typeParameters = typeParameters.toTypeParameterNodes(position = position),
     isInstanceCreationAllowed = isInstanceCreationAllowed,
     orderedInitializersAndPropertyDeclarations = emptyList(),
     declarations = emptyList(),
@@ -64,6 +64,8 @@ class ProvidedClassDefinition(
         Parser(Lexer(position.filename, it)).typeReference()
     },
 ) {
+    val typeParameters_ = typeParameters
+
     override fun construct(
         interpreter: Interpreter,
         callArguments: Array<RuntimeValue>,
@@ -79,7 +81,7 @@ class ProvidedClassDefinition(
 
     fun copyClassDefinition() = ProvidedClassDefinition(
         fullQualifiedName = fullQualifiedName,
-        typeParameters = typeParameters,
+        typeParameters = typeParameters_,
         isInterface = isInterface,
         isInstanceCreationAllowed = isInstanceCreationAllowed,
         primaryConstructorParameters = primaryConstructorParameters,
@@ -93,7 +95,7 @@ class ProvidedClassDefinition(
 
     fun copyNullableClassDefinition() = ProvidedClassDefinition(
         fullQualifiedName = "$fullQualifiedName?",
-        typeParameters = typeParameters,
+        typeParameters = typeParameters_,
         isInterface = isInterface,
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),

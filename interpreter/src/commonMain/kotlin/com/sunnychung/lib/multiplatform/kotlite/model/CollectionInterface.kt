@@ -8,7 +8,7 @@ class CollectionInterface {
         val collectionClazz = ProvidedClassDefinition(
             fullQualifiedName = "Collection",
             isInterface = true,
-            typeParameters = listOf(TypeParameterNode(position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1), name = "T", typeUpperBound = null)),
+            typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
@@ -20,7 +20,7 @@ class CollectionInterface {
         val mutableCollectionClazz = ProvidedClassDefinition(
             fullQualifiedName = "MutableCollection",
             isInterface = true,
-            typeParameters = listOf(TypeParameterNode(position = SourcePosition(BuiltinFilename.BUILTIN, 1, 1), name = "T", typeUpperBound = null)),
+            typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },

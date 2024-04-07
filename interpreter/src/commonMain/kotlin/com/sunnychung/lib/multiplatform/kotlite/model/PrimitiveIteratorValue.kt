@@ -9,7 +9,7 @@ fun PrimitiveIteratorValue(value: Iterator<Any>, typeArgument: DataType, symbolT
 object PrimitiveIteratorClass {
     val clazz = ProvidedClassDefinition(
         fullQualifiedName = "PrimitiveIterator",
-        typeParameters = listOf(TypeParameterNode(SourcePosition.BUILTIN, name = "T", typeUpperBound = null)),
+        typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
         isInterface = true,
         isInstanceCreationAllowed = false,
         primaryConstructorParameters = emptyList(),

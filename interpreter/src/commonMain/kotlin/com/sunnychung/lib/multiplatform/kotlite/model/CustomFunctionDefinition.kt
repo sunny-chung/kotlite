@@ -22,5 +22,5 @@ data class CustomFunctionDefinition(
 class CustomFunctionParameter(val name: String, val type: String, val defaultValueExpression: String? = null, val modifiers: Set<String> = emptySet())
 
 class TypeParameter(val name: String, val typeUpperBound: String?)
-fun TypeParameter.toTypeParameterNode() = TypeParameterNode(SourcePosition.NONE, this.name, this.typeUpperBound?.toTypeNode("TODO"))
-fun List<TypeParameter>.toTypeParameterNodes() = this.map { it.toTypeParameterNode() }
+fun TypeParameter.toTypeParameterNode(position: SourcePosition) = TypeParameterNode(position, this.name, this.typeUpperBound?.toTypeNode("TODO"))
+fun List<TypeParameter>.toTypeParameterNodes(position: SourcePosition = SourcePosition.NONE) = this.map { it.toTypeParameterNode(position) }

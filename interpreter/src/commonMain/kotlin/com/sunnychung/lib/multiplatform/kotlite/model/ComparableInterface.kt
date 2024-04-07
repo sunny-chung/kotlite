@@ -28,7 +28,7 @@ class ComparableInterface {
         val interfaze = ProvidedClassDefinition(
             fullQualifiedName = "Comparable",
             isInterface = true,
-            typeParameters = listOf(TypeParameterNode(position = SourcePosition.BUILTIN, name = "T", typeUpperBound = null)),
+            typeParameters = listOf(TypeParameter(name = "T", typeUpperBound = null)),
             isInstanceCreationAllowed = false,
             primaryConstructorParameters = emptyList(),
             constructInstance = { _, _, _ -> throw UnsupportedOperationException() },
