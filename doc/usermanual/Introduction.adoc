@@ -8,14 +8,15 @@ https://github.com/sunny-chung/kotlite/[icon:github[] The Kotlite GitHub Reposit
 
 == Major Features of Kotlite Interpreter
 
-* Supports a subset of Kotlin 1.9 language and standard libraries. Check the <<_language, differences>>.
+* Supports a subset of Kotlin 1.9 language and standard libraries. Kotlin is a great, descriptive and flexible language. Check the <<_language, differences between Kotlite and Kotlin>>.
 * Supports writing complicated and generic code
+* Embeddable -- it is a library
 * Safe
 ** Classes from libraries or built-ins can be whitelisted or blacklisted
 ** Extension functions from libraries or built-ins can be whitelisted or blacklisted
 ** Extension properties from libraries or built-ins can be whitelisted or blacklisted
 ** Global properties from libraries or built-ins can be whitelisted or blacklisted
-** No file or networking I/O or OS calls in the default standard library
+** No file or networking I/O or OS APIs in the standard library
 * Runs in multiplatform
 * Extensible and allows interaction with the host
 ** Allows providing custom extension functions from the host

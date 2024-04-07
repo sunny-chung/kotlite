@@ -156,6 +156,7 @@ In Kotlite, it is provided as `List<T>`.
 |Member functions|✓|
 |Overloading member functions|✓|
 |Visibility modifiers (public/private/protected/internal)|✕|
+|Reference to other classes that are declared after this class|✕|
 3+|*Class Inheritance*
 |Passing values and type arguments to super class constructors|✓|
 |Inheriting members from super classes and interfaces|✓|
