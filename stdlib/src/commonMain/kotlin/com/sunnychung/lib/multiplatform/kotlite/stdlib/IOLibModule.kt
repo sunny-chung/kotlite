@@ -21,6 +21,17 @@ open class IOLibModule : LibraryModule("IO") {
             receiverType = null,
             functionName = "println",
             returnType = "Unit",
+            parameterTypes = emptyList(),
+            executable = { interpreter, receiver, args, typeArgs ->
+                outputToConsole("\n")
+                UnitValue
+            },
+            position = SourcePosition(name, 1, 1),
+        ),
+        CustomFunctionDefinition(
+            receiverType = null,
+            functionName = "println",
+            returnType = "Unit",
             parameterTypes = listOf(CustomFunctionParameter("message", "Any?")),
             executable = { interpreter, receiver, args, typeArgs ->
                 val message = args[0]
