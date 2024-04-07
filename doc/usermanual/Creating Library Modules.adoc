@@ -35,7 +35,7 @@ Below is a minimal example to generate a delegation library module. Some stuffs 
 ----
 plugins {
     kotlin("multiplatform")
-    id("io.github.sunny-chung.kotlite-stdlib-processor-plugin") version "0.1"
+    id("io.github.sunny-chung.kotlite-stdlib-processor-plugin") version "<version>"
 }
 
 // ...

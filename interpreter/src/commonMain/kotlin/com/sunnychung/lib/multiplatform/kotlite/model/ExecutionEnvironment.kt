@@ -96,19 +96,19 @@ class ExecutionEnvironment(
         }
     }
 
-    internal fun getBuiltinFunctions(topmostSymbolTable: SymbolTable): List<CustomFunctionDeclarationNode> {
+    fun getBuiltinFunctions(topmostSymbolTable: SymbolTable): List<CustomFunctionDeclarationNode> {
         return builtinFunctions.toList()
     }
 
-    internal fun getExtensionProperties(topmostSymbolTable: SymbolTable): List<ExtensionProperty> {
+    fun getExtensionProperties(topmostSymbolTable: SymbolTable): List<ExtensionProperty> {
         return extensionProperties.toList()
     }
 
-    internal fun getGlobalProperties(topmostSymbolTable: SymbolTable): List<GlobalProperty> {
+    fun getGlobalProperties(topmostSymbolTable: SymbolTable): List<GlobalProperty> {
         return globalProperties.toList()
     }
 
-    internal fun getBuiltinClasses(topmostSymbolTable: SymbolTable): List<ClassDefinition> {
+    fun getBuiltinClasses(topmostSymbolTable: SymbolTable): List<ClassDefinition> {
         return initiallyProvidedClasses.filter { classRegistrationFilter(it.fullQualifiedName) }
             .flatMap {
                 listOf(

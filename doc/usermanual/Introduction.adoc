@@ -1,6 +1,6 @@
-= Kotlite & Kotlite Interpreter
+= Introduction
 
-*Kotlite* is a open-sourced typed programming language that has a rich subset of the Kotlin script language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
+*Kotlite* is a open-sourced type-safe programming language that has a rich subset of the https://kotlinlang.org/[Kotlin] script language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
 
 *Kotlite Interpreter* is a lightweight Kotlin Multiplatform library to interpret and execute codes written in Kotlite, and bridge the host runtime environment and the embedded runtime environment.
 
@@ -8,7 +8,7 @@ https://github.com/sunny-chung/kotlite/[icon:github[] The Kotlite GitHub Reposit
 
 == Major Features of Kotlite Interpreter
 
-* Supports a subset of Kotlin 1.9 language and standard libraries. Kotlin is a great, descriptive and flexible language. Check the <<_language, differences between Kotlite and Kotlin>>.
+* Supports a subset of Kotlin 1.9 language and standard libraries. https://kotlinlang.org/[Kotlin] is a great, safe, descriptive and flexible language. Check the <<_language, differences between Kotlite and Kotlin>>.
 * Supports writing complicated and generic code
 * Embeddable -- it is a library
 * Safe

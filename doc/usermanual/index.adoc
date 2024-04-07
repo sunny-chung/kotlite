@@ -1,15 +1,22 @@
 :doctype: book
 :toc: right
+:toclevels: 3
 :source-highlighter: rouge
 :icons: font
+
+= Kotlite & Kotlite Interpreter
 
 :leveloffset: +1
 
 include::Introduction.adoc[]
 
-include::Getting Started.adoc[]
+include::Feature Requests or Reporting Issues.adoc[]
 
-include::Language.adoc[]
+= The Kotlite Interpreter
+
+:leveloffset: +1
+
+include::Getting Started.adoc[]
 
 include::Security.adoc[]
 
@@ -23,4 +30,12 @@ include::Advanced Usage.adoc[]
 
 include::The Standard Library.adoc[]
 
-include::Feature Requests or Reporting Issues.adoc[]
+:leveloffset: -1
+
+= The Kotlite Language
+
+:leveloffset: +1
+
+include::Language.adoc[]
+
+include::../../apidoc/build/apidoc/API.adoc[]

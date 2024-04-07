@@ -56,7 +56,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.WhenNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhenSubjectNode
 import com.sunnychung.lib.multiplatform.kotlite.model.WhileNode
 
-open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Boolean) {
+open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Boolean = false) {
     var indentLevel = 0
 
     fun generateCode(): String {
@@ -170,7 +170,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
 
     protected fun ClassParameterNode.generate() = (if (isProperty) {
         if (isMutable) "var " else "val "
-    } else "") + parameter.generate() + "<$transformedRefNameInBody>"
+    } else "") + parameter.generate() + (if (isPrintDebugInfo) "<$transformedRefNameInBody>" else "")
 
     protected fun ClassPrimaryConstructorNode.generate()
         = "constructor(" + parameters.joinToString(", ") { it.generate() } + ")"
@@ -186,10 +186,10 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = "${function.generate()}${debug("<f:$functionRefName>")}${if (typeArguments.isNotEmpty()) "<${typeArguments.joinToString(", ") { it.descriptiveName() }}>" else ""}(${arguments.joinToString(", ") { it.generate() }})"
 
     protected fun FunctionDeclarationNode.generate()
-        = "${modifiers.joinToString("") { "$it " }}fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${returnType.generate()}${body?.let { " ${it.generate()}" } ?: ""}"
+        = "${modifiers.joinToString("") { "$it " }}fun ${if (typeParameters.isNotEmpty()) "<${typeParameters.joinToString(", ") {it.generate()}}> " else ""}${receiver?.let { it.generate() + "." } ?: ""}${transformedRefName ?: name}(${valueParameters.joinToString(", ") { it.generate() }}): ${(returnType as ASTNode).generate()}${body?.let { " ${it.generate()}" } ?: ""}"
 
     protected fun FunctionValueParameterNode.generate()
-        = "${modifiers.joinToString("") { "$it " }}$name<$transformedRefName>: ${type.generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"
+        = "${modifiers.joinToString("") { "$it " }}$name${if (isPrintDebugInfo) "<$transformedRefName>" else ""}: ${(type as ASTNode).generate()}${defaultValue?.let { " = ${it.generate()}" } ?: ""}"
 
     protected fun IfNode.generate()
         = "if (${condition.generate()}) ${trueBlock?.let { it.generate() } ?: ";"}${falseBlock?.let { " else ${it.generate()}" } ?: ""}"
