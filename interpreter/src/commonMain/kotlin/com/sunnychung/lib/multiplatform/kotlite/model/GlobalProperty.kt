@@ -21,6 +21,9 @@ class GlobalProperty(
         if (getter == null && setter == null) {
             throw IllegalArgumentException("Missing getter or setter")
         }
+        if (!isMutable && getter == null) {
+            throw IllegalArgumentException("Missing getter")
+        }
         typeNode = Parser(Lexer(position.filename, type)).type()
     }
 
