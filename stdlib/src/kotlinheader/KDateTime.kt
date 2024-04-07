@@ -40,6 +40,7 @@ fun KZoneOffset.Companion.fromMilliseconds(millis: Long): KZoneOffset
 fun KZoneOffset.Companion.local(): KZoneOffset
 
 operator fun KDuration.plus(other: KDuration): KDuration
+operator fun KDuration.minus(other: KDuration): KDuration
 operator fun KDuration.compareTo(other: KDuration): Int
 //fun KDuration.Companion.of(value: Int, unit: KFixedTimeUnit): KDuration
 //fun KDuration.Companion.of(value: Long, unit: KFixedTimeUnit): KDuration
@@ -69,6 +70,7 @@ fun KZonedDateTime.toIso8601String(): String
 fun KZonedDateTime.toIso8601StringWithMilliseconds(): String
 operator fun KZonedDateTime.plus(duration: KDuration): KZonedDateTime
 operator fun KZonedDateTime.minus(duration: KDuration): KZonedDateTime
+operator fun KZonedDateTime.minus(dateTime: KZonedDateTime): KDuration
 val KZonedDateTime.year: Int
     get()
 val KZonedDateTime.month: Int

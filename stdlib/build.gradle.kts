@@ -81,7 +81,7 @@ kotlin {
             dependencies {
                 implementation("co.touchlab:kermit:1.0.0")
                 implementation(project(":kotlite-interpreter"))
-                implementation("io.github.sunny-chung:kdatetime-multiplatform:0.6.3")
+                implementation("io.github.sunny-chung:kdatetime-multiplatform:1.0.0")
             }
 //            kotlin.srcDir("build/generated/common/")
             kotlin.srcDir(tasks.named("kotliteStdlibHeaderProcess").map { it.outputs })
