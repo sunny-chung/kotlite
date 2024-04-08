@@ -2,7 +2,7 @@ pluginManagement {
     repositories {
         mavenCentral()
         gradlePluginPortal()
-        mavenLocal()
+//        mavenLocal()
     }
 }
 
@@ -17,6 +17,7 @@ include(":kotlite-stdlib-processor-plugin")
 include(":kotlite-apidoc")
 include(":kotlite-demo")
 //includeBuild("./stdlib-processor-gradle-plugin")
+includeBuild("convention-plugins")
 
 project(":kotlite-interpreter").projectDir = File("$rootDir/interpreter")
 project(":kotlite-stdlib").projectDir = File("$rootDir/stdlib")

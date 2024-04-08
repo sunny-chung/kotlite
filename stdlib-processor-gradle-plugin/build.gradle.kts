@@ -1,10 +1,12 @@
 plugins {
     `java-gradle-plugin`
     kotlin("jvm")
-    `maven-publish`
+    id("sunnychung.publication")
 }
 
-version = "0.1"
+version = "1.0.0"
+
+fun getExtraString(name: String) = ext[name]?.toString()
 
 gradlePlugin {
     plugins {
@@ -12,6 +14,9 @@ gradlePlugin {
             println("> group: $group")
             id = "$group.kotlite-stdlib-processor-plugin"
             implementationClass = "com.sunnychung.gradle.plugin.kotlite.codegenerator.KotliteLibHeaderProcessorPlugin"
+            displayName = getExtraString("artifact-name")
+            description = getExtraString("artifact-description")
+
         }
     }
 }
@@ -22,4 +27,8 @@ repositories {
 
 dependencies {
     implementation(project(":kotlite-interpreter"))
+}
+
+java {
+    withSourcesJar()
 }

@@ -8,12 +8,13 @@ import com.sunnychung.gradle.plugin.kotlite.codegenerator.KotliteModuleConfig
 
 plugins {
     kotlin("multiplatform")
-    id("com.sunnychung.kotlite-stdlib-processor-plugin") version "0.1"
+    id("sunnychung.publication")
+    id("io.github.sunny-chung.kotlite-stdlib-processor-plugin") version "1.0.0"
 }
 
 //apply("kotlite-stdlib-processor-plugin")
 
-version = "0.1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()

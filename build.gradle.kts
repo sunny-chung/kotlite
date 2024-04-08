@@ -3,7 +3,7 @@ plugins {
     kotlin("jvm") version "1.9.23" apply false
 }
 
-group = "com.sunnychung"
+group = "io.github.sunny-chung"
 
 val projectGroup = group
 subprojects {

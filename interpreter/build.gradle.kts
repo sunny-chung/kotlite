@@ -1,10 +1,9 @@
 plugins {
     kotlin("multiplatform")
-    `maven-publish`
+    id("sunnychung.publication")
 }
 
-group = "com.sunnychung"
-version = "0.1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
