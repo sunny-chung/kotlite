@@ -5,8 +5,8 @@ on:
       - '**'
 
 concurrency:
-  group: "tests"
-  cancel-in-progress: true
+  group: "tests-${{ github.ref }}"
+  cancel-in-progress: false
 
 jobs:
   test:
