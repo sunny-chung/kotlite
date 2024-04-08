@@ -4,6 +4,10 @@
 
 Firstly, include the dependencies.
 
+Kotlite Interpreter image:https://img.shields.io/maven-central/v/io.github.sunny-chung/kotlite-interpreter[]
+
+Kotlite Stdlib image:https://img.shields.io/maven-central/v/io.github.sunny-chung/kotlite-stdlib[]
+
 For single platform:
 
 [source, kotlin]
@@ -76,7 +80,7 @@ val interpreter = KotliteInterpreter(
 interpreter.eval()
 ----
 
-CAUTION: Parsing and semantic analysis perform in the function `KotliteInterpreter()`. It could be imagined as a "compilation process". If there is any error, an exception would be thrown from this function, before the `eval()` call.
+CAUTION: Parsing and semantic analysis are performed in the function `KotliteInterpreter()`. It could be imagined as a "compilation process". If there is any error, an exception would be thrown from this function, before the `eval()` call.
 
 NOTE: The `filename` parameter is only used in error messages and stacktraces.
 

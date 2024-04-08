@@ -6,7 +6,7 @@ Please raise a ticket in the https://github.com/sunny-chung/kotlite/issues[GitHu
 
 For issue reporting, please include the following:
 
-* Code that reproduces the issue
+* Minimal code that reproduces the issue
 * Platform language, OS and versions (e.g. JVM 21 on Windows)
 * Expected result
 * Actual result

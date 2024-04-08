@@ -46,7 +46,7 @@ val demoScripts = mapOf(
         println(fib(19))
     """.trimIndent(),
 
-    "Mutable Map with Custom Object as Keys" to """
+    "Mutable Map with Custom Objects as Keys" to """
         println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset()}")
         println()
         

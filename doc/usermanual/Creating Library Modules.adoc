@@ -30,6 +30,19 @@ During the execution of the delegation call, Kotlite will unwrap the Kotlite `Ru
 
 Below is a minimal example to generate a delegation library module. Some stuffs from the `Regex` and the `Collection` library modules are taken in the example.
 
+./settings.gradle.kts
+[source, kotlin]
+----
+pluginManagement {
+    repositories {
+        mavenCentral()
+        // ...
+    }
+}
+----
+
+Kotlite Library Preprocessor Gradle Plugin image:https://img.shields.io/maven-central/v/io.github.sunny-chung/kotlite-stdlib-processor-plugin[]
+
 ./your-library/build.gradle.kts
 [source, kotlin]
 ----
@@ -138,6 +151,37 @@ In this case, add a `nullaware` modifier to these functions in the Kotlin header
 ----
 nullaware fun <T : Any> Iterable<T?>.filterNotNull(): List<T>
 nullaware fun <T : Any> setOfNotNull(vararg elements: T?): Set<T>
+----
+
+== Delegations to `equals()`, `hashCode()`, `toString()` of Kotlin values
+
+For security reasons, they are not delegated by default. An explicit delegation declaration is required.
+
+For manual approach, below is an example to delegate `CustomClass.toString()`.
+
+[source, kotlin]
+----
+val env = ExecutionEnvironment().apply {
+    registerClass(CustomClass.clazz)
+    registerFunction(CustomFunctionDefinition(
+        position = SourcePosition.NONE,
+        receiverType = "CustomClass",
+        functionName = "toString",
+        returnType = "String",
+        parameterTypes = emptyList(),
+        executable = { interpreter, receiver, args, typeArgs ->
+            StringValue((receiver as DelegatedValue<*>).value.toString(), interpreter.symbolTable())
+        }
+    ))
+}
+----
+
+For delegation approach, declare in the Kotlin header file. Below is an example to delegate `KInstant.toString()`.
+
+./stdlib/src/kotlinheader/KDateTime.kt
+[source, kotlin]
+----
+fun KInstant.toString(): String
 ----
 
 == Distribution

@@ -3,12 +3,15 @@
 :toclevels: 3
 :source-highlighter: rouge
 :icons: font
+:docinfo: shared
 
 = Kotlite & Kotlite Interpreter
 
 :leveloffset: +1
 
 include::Introduction.adoc[]
+
+include::Demo.adoc[]
 
 include::Feature Requests or Reporting Issues.adoc[]
 

@@ -1,0 +1,38 @@
+name: Deploy Website
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # allow manual deployment
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: uwebarthel/asciidoctor asciidoctor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - run: ./gradlew :kotlite-apidoc:generateStdlibApiDoc :kotlite-demo:assemble
+      - run: cd doc && asciidoctor -r asciidoctor-diagram -D "/wd/doc/output" /wd/doc/usermanual/index.adoc
+      - run: cp -R usermanual/img output/img
+      - run: cp -R ../demo/build/dist/js/productionExecutable output/demo
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: 'doc/output/'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2

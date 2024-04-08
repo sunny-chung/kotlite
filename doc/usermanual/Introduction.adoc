@@ -1,6 +1,6 @@
 = Introduction
 
-*Kotlite* is a open-sourced type-safe programming language that has a rich subset of the https://kotlinlang.org/[Kotlin] script language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
+*Kotlite* is an open-sourced type-safe programming language that has a rich subset of the https://kotlinlang.org/[Kotlin] script language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
 
 *Kotlite Interpreter* is a lightweight Kotlin Multiplatform library to interpret and execute codes written in Kotlite, and bridge the host runtime environment and the embedded runtime environment.
 
@@ -25,13 +25,15 @@ https://github.com/sunny-chung/kotlite/[icon:github[] The Kotlite GitHub Reposit
 ** Allows implementing custom libraries and delegating the calls to first-class Kotlin functions and properties
 ** Allows reading values of global variables in the embedded environment from the host
 ** Stdout pipe of the embedded environment is overridable
-* Lightweight -- `kotlinc` is over 300 MB, and the sum of Kotlite with stdlib for all platforms is less than 10 MB
+* Lightweight -- `kotlinc` is over 300 MB, and the sum of Kotlite with stdlib for all platforms is less than 10 MB. The JS script of the web demo is less than 800 KB.
 * Semantic analysis, e.g. variable access and type verification, before execution
 * Type inference
 * Well tested -- there are more than a thousand of hand-written unit tests per platform
 * Can be written in any IDE supporting Kotlin 1.9 -- Kotlite does not create new syntax
 
 image::img/tests.png[]
+
+CAUTION: To be honest, the standard library is not well tested. Only the language itself is well tested. Please kindly help to report if any issue is found.
 
 == Supported Platforms
 

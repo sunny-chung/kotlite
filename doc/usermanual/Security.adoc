@@ -66,6 +66,6 @@ To enable use cases like sorting a list of custom classes or using a custom clas
 
 Bear in mind that doing a `a == b` or `"Debug: $a"` in your application may execute user code.
 
-== Resources
+== Resources Usage
 
 There is no way to limit memory usage or computing resources of user code execution at this moment. User code can exhaust all the available memory or slow down the OS using infinite computing loops. This area might be improved in the future.
