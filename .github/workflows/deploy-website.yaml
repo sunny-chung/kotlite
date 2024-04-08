@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - run: apk add openjdk21
+      - run: apk add openjdk8 openjdk21
       - run: ./gradlew :kotlite-apidoc:generateStdlibApiDoc :kotlite-demo:assemble
       - run: cd doc && asciidoctor -r asciidoctor-diagram -D "/wd/doc/output" /wd/doc/usermanual/index.adoc
       - run: cp -R usermanual/img output/img
