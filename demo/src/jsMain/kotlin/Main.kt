@@ -17,6 +17,7 @@ fun main() {
         })
         lstExample.appendChild(item)
     }
+    txtCode.value = demoScripts.entries.first().value
 
     val btnRun = document.getElementById("btnRun")!!
     println("main start")
