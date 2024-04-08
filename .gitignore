@@ -3,6 +3,7 @@
 /ignore
 /doc/output
 local.properties
+/doc/usermanual/API.adoc
 
 ########
 

@@ -20,8 +20,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      doc: ${{ steps.step }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -31,12 +29,12 @@ jobs:
           java-version: '21'
       - run: ./gradlew :kotlite-apidoc:generateStdlibApiDoc :kotlite-demo:assemble
       - run: mkdir -p doc/output
-      - run: cp -R usermanual/img output/img
-      - run: cp -R ../demo/build/dist/js/productionExecutable output/demo
+      - run: cp ./apidoc/build/apidoc/API.adoc ./doc/usermanual/
+      - run: cp -R ./demo/build/dist/js/productionExecutable ./doc/output/demo
       - uses: actions/upload-artifact@v3
         with:
           name: doc-output
-          path: doc/output
+          path: doc
           retention-days: 1
   deploy:
     needs: build
@@ -50,6 +48,7 @@ jobs:
       - run: ls -al
       - run: ls -al doc/
       - run: cd doc && asciidoctor -r asciidoctor-diagram -D "doc/output" doc/usermanual/index.adoc
+      - run: cp -R usermanual/img output/img
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:

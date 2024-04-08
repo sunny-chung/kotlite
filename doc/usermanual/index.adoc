@@ -41,4 +41,4 @@ include::The Standard Library.adoc[]
 
 include::Language.adoc[]
 
-include::../../apidoc/build/apidoc/API.adoc[]
+include::API.adoc[]
