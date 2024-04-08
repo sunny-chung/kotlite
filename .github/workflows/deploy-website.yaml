@@ -18,19 +18,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      doc: ${{ steps.step }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+      - run: ./gradlew :kotlite-apidoc:generateStdlibApiDoc :kotlite-demo:assemble
+      - run: mkdir -p doc/output
+      - run: cp -R usermanual/img output/img
+      - run: cp -R ../demo/build/dist/js/productionExecutable output/demo
+      - uses: actions/upload-artifact@v3
+        with:
+          name: doc-output
+          path: doc/output
+          retention-days: 1
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     container:
       image: uwebarthel/asciidoctor
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - run: rm -Rf /root/.gradle/jdks
-      - run: apk add openjdk21
-      - run: ./gradlew :kotlite-apidoc:generateStdlibApiDoc :kotlite-demo:assemble
-      - run: cd doc && asciidoctor -r asciidoctor-diagram -D "/wd/doc/output" /wd/doc/usermanual/index.adoc
-      - run: cp -R usermanual/img output/img
-      - run: cp -R ../demo/build/dist/js/productionExecutable output/demo
+      - uses: actions/download-artifact@v3
+        with:
+          name: doc-output
+      - run: ls -al
+      - run: ls -al doc/
+      - run: cd doc && asciidoctor -r asciidoctor-diagram -D "doc/output" doc/usermanual/index.adoc
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
