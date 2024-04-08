@@ -46,13 +46,12 @@ jobs:
         with:
           name: doc-output
       - run: ls -al
-      - run: ls -al doc/
-      - run: cd doc && asciidoctor -r asciidoctor-diagram -D "doc/output" doc/usermanual/index.adoc
+      - run: asciidoctor -r asciidoctor-diagram -D "output" usermanual/index.adoc
       - run: cp -R usermanual/img output/img
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: 'doc/output/'
+          path: 'output/'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
