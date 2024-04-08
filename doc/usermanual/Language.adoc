@@ -424,3 +424,16 @@ a = -10; z = 6
 ----
 
 |===
+
+== Intended Differences
+
+In Kotlin, member functions always have a higher priority than extension functions.
+
+Currently, since the only way to provide custom class functions in Kotlite is to provide extension functions, extension functions with below signatures are treated as special functions and have a higher priority than member functions. Return types are not in consideration in the process of identifying special functions.
+
+[source, kotlin]
+----
+fun equals(Any?)
+fun hashCode()
+fun toString()
+----

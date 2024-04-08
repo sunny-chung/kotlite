@@ -1201,6 +1201,7 @@ open class SemanticAnalyzer(val rootNode: ASTNode, val executionEnvironment: Exe
 
                 functionRefName = resolution.transformedName
                 callableType = resolution.type
+                isSpecialFunction = resolution.isSpecialFunction
 
                 /**
                  * Return type must be nullable if:

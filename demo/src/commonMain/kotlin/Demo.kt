@@ -17,13 +17,13 @@ fun interpretKotlite(code: String): String {
 
 val demoScripts = mapOf(
     "Hello World" to """
-        println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset().toIso8601String()}")
+        println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset()}")
         println()
         println("Hello World!")
     """.trimIndent(),
 
     "Fibonacci Sequence" to """
-        println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset().toIso8601String()}")
+        println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset()}")
         println()
         
         fun fib(n: Int): Long {
@@ -47,7 +47,7 @@ val demoScripts = mapOf(
     """.trimIndent(),
 
     "Mutable Map with Custom Object as Keys" to """
-        println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset().toIso8601String()}")
+        println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset()}")
         println()
         
         class MyTriple(val a: Int, val b: Int, val c: Int) {

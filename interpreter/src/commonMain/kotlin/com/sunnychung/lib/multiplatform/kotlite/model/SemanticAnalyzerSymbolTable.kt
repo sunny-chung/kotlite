@@ -1,7 +1,6 @@
 package com.sunnychung.lib.multiplatform.kotlite.model
 
 import com.sunnychung.lib.multiplatform.kotlite.error.IdentifierClassifier
-import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
 import com.sunnychung.lib.multiplatform.kotlite.extension.resolveGenericParameterTypeToUpperBound
 import com.sunnychung.lib.multiplatform.kotlite.log
 import com.sunnychung.lib.multiplatform.kotlite.util.ClassMemberResolver
@@ -311,6 +310,34 @@ class SemanticAnalyzerSymbolTable(
             ?.let { (findClass(it.nameWithNullable) ?: throw RuntimeException("Class ${it.nameWithNullable} not found")).first }
         return findAllMatchingCallables(currentSymbolTable, originalName, receiverClass, receiverType, arguments, modifierFilter)
             .distinctBy { it.definition }
+            .let { result -> // prioritize extension function first if they are special functions (toString/hashCode/equals)
+                val biasedResult = mutableListOf<FindCallableResult>()
+                val otherCandidates = mutableListOf<FindCallableResult>()
+                result.forEach {
+                    var isSpecialFunctionAndExtensionFunction = false
+                    if (it.type == CallableType.ExtensionFunction) {
+                        loop@ for (sf in SpecialFunction.Name.entries) {
+                            if (sf.functionName != it.originalName) continue
+                            for (acceptableValueParameters in sf.acceptableValueParameterTypes) {
+                                if (acceptableValueParameters.size != it.arguments.size) continue
+                                if (acceptableValueParameters.withIndex()
+                                        .all { (index, vp) -> vp == (it.arguments[index] as? FunctionValueParameterNode)?.type }
+                                ) {
+                                    isSpecialFunctionAndExtensionFunction = true
+                                    it.isSpecialFunction = true
+                                    break@loop
+                                }
+                            }
+                        }
+                    }
+                    if (isSpecialFunctionAndExtensionFunction) {
+                        biasedResult += it
+                    } else {
+                        otherCandidates += it
+                    }
+                }
+                biasedResult + otherCandidates
+            }
             .distinctBy { FunctionDistinctId(it.receiverType, it.originalName, it.arguments.map { toTypeNode(it) }) }
             .let { callables ->
                 modifierFilter.returnType?.let { requiredReturnType ->

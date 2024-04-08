@@ -306,9 +306,9 @@ open class ClassDefinition(
                 )
             }
             if (callables.isEmpty()) {
-                throw SemanticException(SourcePosition.NONE, "`compareTo` function not found")
+                throw SemanticException(SourcePosition.NONE, "`compareTo` function not found for type `$fullQualifiedName`")
             } else if (callables.size > 1) {
-                throw SemanticException(SourcePosition.NONE, "Ambiguous `compareTo` functions")
+                throw SemanticException(SourcePosition.NONE, "Ambiguous `compareTo` functions for type `$fullQualifiedName`")
             }
             compareToFunctionNode = callables.single().definition as FunctionDeclarationNode
             sa.executionEnvironment.registerSpecialFunction(

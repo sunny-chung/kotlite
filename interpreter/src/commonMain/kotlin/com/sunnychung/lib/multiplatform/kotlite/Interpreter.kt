@@ -585,10 +585,20 @@ open class Interpreter(val rootNode: ASTNode, val executionEnvironment: Executio
                         }
                         (subject as? ClassInstance)
                             ?.let { function.resolveSuperKeyword(it) as? ClassInstance }
-                            ?.clazz
-                            ?.findMemberFunctionByTransformedName(functionRefName!!)
-                            ?.let { function ->
-                                return evalClassMemberAnyFunctionCall(subject, function, replaceArguments = replaceArguments)
+                            ?.let { instance ->
+                                val function = instance.clazz!!.findMemberFunctionByTransformedName(functionRefName!!)
+                                if (function != null) {
+                                    val subject = if (isSpecialFunction == true) {
+                                        instance
+                                    } else {
+                                        subject
+                                    }
+                                    return evalClassMemberAnyFunctionCall(
+                                        subject = subject,
+                                        function = function,
+                                        replaceArguments = replaceArguments,
+                                    )
+                                }
                             }
                         (subject as? PrimitiveValue)
                             ?.clazz
@@ -605,6 +615,22 @@ open class Interpreter(val rootNode: ASTNode, val executionEnvironment: Executio
                         ) {
                             throw EvaluateNullPointerException(callStack.currentSymbolTable(), callStack.getStacktrace(position))
                         }
+
+                        (subject as? ClassInstance)
+                            ?.let { this.function.resolveSuperKeyword(it) as? ClassInstance }
+                            ?.let { instance ->
+                                val subject = if (isSpecialFunction == true) {
+                                    instance
+                                } else {
+                                    subject
+                                }
+                                return evalClassMemberAnyFunctionCall(
+                                    subject = subject,
+                                    function = function,
+                                    replaceArguments = replaceArguments,
+                                )
+                            }
+
                         return evalClassMemberAnyFunctionCall(subject as RuntimeValue, function, replaceArguments = replaceArguments)
                     }
                     else -> {}

@@ -354,6 +354,7 @@ data class FunctionCallNode(
     @ModifyByAnalyzer var returnType: TypeNode? = null,
     @ModifyByAnalyzer var functionRefName: String? = null,
     @ModifyByAnalyzer var callableType: CallableType? = null,
+    @ModifyByAnalyzer var isSpecialFunction: Boolean? = null,
     @ModifyByAnalyzer var inferredTypeArguments: List<TypeNode?>? = null,
     @ModifyByAnalyzer var modifierFilter: SearchFunctionModifier? = null,
 ) : ASTNode {

@@ -12,6 +12,7 @@ data class FindCallableResult(
     val returnType: TypeNode,
     val signature: String,
     val definition: Any,
+    var isSpecialFunction: Boolean = false,
     val scope: SymbolTable,
 ) {
     fun toDisplayableSignature() = buildString {

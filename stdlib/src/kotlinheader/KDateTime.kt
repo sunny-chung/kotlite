@@ -134,3 +134,8 @@ fun Int.hours(): KDuration
 fun Int.days(): KDuration
 fun Int.weeks(): KDuration
 
+fun KInstant.toString(): String
+fun KZonedInstant.toString(): String
+fun KZonedDateTime.toString(): String
+fun KZoneOffset.toString(): String
+fun KDuration.toString(): String
