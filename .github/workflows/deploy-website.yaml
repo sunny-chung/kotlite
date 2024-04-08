@@ -27,7 +27,7 @@ jobs:
         with:
           distribution: 'corretto'
           java-version: '21'
-      - run: ./gradlew :kotlite-apidoc:generateStdlibApiDoc :kotlite-demo:assemble
+      - run: ./gradlew :kotlite-apidoc:generateStdlibApiDoc :kotlite-demo:jsBrowserDistribution
       - run: mkdir -p doc/output
       - run: cp ./apidoc/build/apidoc/API.adoc ./doc/usermanual/
       - run: cp -R ./demo/build/dist/js/productionExecutable ./doc/output/demo
