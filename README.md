@@ -9,6 +9,7 @@ _A lite embedded Kotlin interpreter_
 ![macOS](https://img.shields.io/badge/macOS-blue)
 ![watchOS](https://img.shields.io/badge/watchOS-blue)
 ![tvOS](https://img.shields.io/badge/tvOS-blue)
+![Verification Test Status](https://github.com/sunny-chung/kotlite/actions/workflows/run-test.yaml/badge.svg?branch=main)
 
 **Kotlite** is an open-sourced type-safe programming language that has a rich subset of the [Kotlin](https://kotlinlang.org/) script language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
 
@@ -54,6 +55,8 @@ interpreter.eval()
 val symbolTable = interpreter.symbolTable()
 val a = (symbolTable.findPropertyByDeclaredName("a") as LongValue).value // 4181L
 ```
+
+The interpreter is well tested.
 
 ![Well tested](./doc/usermanual/img/tests.png)
 
