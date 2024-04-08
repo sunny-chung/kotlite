@@ -21,7 +21,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     container:
-      image: uwebarthel/asciidoctor asciidoctor
+      image: uwebarthel/asciidoctor
     steps:
       - name: Checkout
         uses: actions/checkout@v3
