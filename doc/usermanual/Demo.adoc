@@ -1,3 +1,17 @@
 = Demo
 
+Their source codes are under https://github.com/sunny-chung/kotlite/tree/main/demo[the demo folder] of the GitHub repository.
+
+== Web
+
 link:./demo/[JS - An online Kotlite interpreter that runs within your browser]
+
+video::media/Web.mp4[width=1024]
+
+== Android
+
+video::media/Android.mp4[width=480]
+
+== iOS
+
+video::media/iOS.mp4[width=480]

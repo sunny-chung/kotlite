@@ -34,7 +34,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: doc-output
-          path: doc
+          path: .
           retention-days: 1
   build-main-doc:
     needs: build-apidoc-and-demo
@@ -46,12 +46,13 @@ jobs:
         with:
           name: doc-output
       - run: ls -al
+      - run: cd doc && ls -al
       - run: asciidoctor -r asciidoctor-diagram -D "output" usermanual/index.adoc
-      - run: cp -R usermanual/img output/img
+      - run: cp -R usermanual/media output/media
       - uses: actions/upload-artifact@v3
         with:
           name: doc-output2
-          path: .
+          path: doc
           retention-days: 1
   deploy:
     needs: build-main-doc

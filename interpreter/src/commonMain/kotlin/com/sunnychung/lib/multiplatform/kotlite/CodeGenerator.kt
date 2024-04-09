@@ -213,7 +213,7 @@ open class CodeGenerator(protected val node: ASTNode, val isPrintDebugInfo: Bool
         = nodes.joinToString("") { "${it.generate()}\n" }
 
     protected fun FunctionTypeNode.generate(): String
-        = "(${parameterTypes!!.joinToString(", ") {(it as ASTNode).generate()}}) -> ${(returnType as ASTNode).generate()}"
+        = "${receiverType?.let { "${(it as ASTNode).generate()}." } ?: ""}(${parameterTypes!!.joinToString(", ") {(it as ASTNode).generate()}}) -> ${(returnType as ASTNode).generate()}"
 
     protected fun TypeNode.generate(): String
         = "$name${arguments?.let { "<${it.joinToString(", ") { (it as ASTNode).generate() }}>" } ?: ""}${if (isNullable) "?" else ""}"

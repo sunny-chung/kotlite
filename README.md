@@ -58,11 +58,16 @@ val a = (symbolTable.findPropertyByDeclaredName("a") as LongValue).value // 4181
 
 The interpreter is well tested.
 
-![Well tested](./doc/usermanual/img/tests.png)
+![Well tested](./doc/usermanual/media/tests.png)
 
 ## Demo
 
 [Web - Kotlite Interpreter in browser](https://sunny-chung.github.io/kotlite/demo/)
+
+| Android                                             | iOS                                         |
+|-----------------------------------------------------|---------------------------------------------|
+| ![Android Demo](./doc/usermanual/media/Android.mp4) | ![iOS Demo](./doc/usermanual/media/iOS.mp4) |
+
 
 ## Documentation
 

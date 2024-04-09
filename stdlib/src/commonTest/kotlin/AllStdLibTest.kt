@@ -1,6 +1,7 @@
 import com.sunnychung.lib.multiplatform.kotlite.KotliteInterpreter
 import com.sunnychung.lib.multiplatform.kotlite.MermaidFlowchartDirection
 import com.sunnychung.lib.multiplatform.kotlite.error.SemanticException
+import com.sunnychung.lib.multiplatform.kotlite.evalKotliteExpression
 import com.sunnychung.lib.multiplatform.kotlite.kotliteAstNodeMermaidDiagram
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
@@ -33,6 +34,19 @@ class AllStdLibTest {
         val symbolTable = interpreter.symbolTable()
         assertEquals(55, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals("Hello world!\n", console.toString())
+    }
+
+    @Test
+    fun expression() {
+        val env = ExecutionEnvironment().apply {
+            install(AllStdLibModules())
+        }
+        val result: IntValue = evalKotliteExpression(
+            filename = "Calculate",
+            code = "(1..10).fold(0) { acc, it -> acc + it }",
+            executionEnvironment = env,
+        ) as IntValue
+        assertEquals(55, result.value)
     }
 
     @Test
