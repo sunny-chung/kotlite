@@ -13,6 +13,16 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+
+### Xcode ###
+
+**/*.xcodeproj/*
+!**/*.xcodeproj/project.pbxproj
+!**/*.xcodeproj/xcshareddata/
+!**/*.xcodeproj/project.xcworkspace/
+!**/*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+
 ### IntelliJ IDEA ###
 # User-specific stuff
 .idea/**/workspace.xml
