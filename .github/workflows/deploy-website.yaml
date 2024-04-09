@@ -31,7 +31,11 @@ jobs:
       - run: mkdir -p doc/output
       - run: cp ./apidoc/build/apidoc/API.adoc ./doc/usermanual/
       - run: cp -R ./demo/build/dist/js/productionExecutable ./doc/output/demo
-      - run: ./gradlew clean && rm -Rf .gradle # reduce size of artifacts
+
+      # reduce size of artifacts while keeping files needed in original locations
+      - run: mv ./stdlib/build/generated/common ./mytemp
+      - run: ./gradlew clean && rm -Rf .gradle
+      - run: mkdirs -p ./stdlib/build/generated && mv ./mytemp ./stdlib/build/generated/common
       - uses: actions/upload-artifact@v3
         with:
           name: doc-output
