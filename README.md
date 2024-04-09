@@ -64,10 +64,11 @@ The interpreter is well tested.
 
 [Web - Kotlite Interpreter in browser](https://sunny-chung.github.io/kotlite/demo/)
 
-| Android                                             | iOS                                         |
-|-----------------------------------------------------|---------------------------------------------|
-| ![Android Demo](./doc/usermanual/media/Android.mp4) | ![iOS Demo](./doc/usermanual/media/iOS.mp4) |
+https://github.com/sunny-chung/kotlite/assets/14835950/bf74ce30-99aa-4ff1-bdde-1a95a2fbacc8
 
+https://github.com/sunny-chung/kotlite/assets/14835950/417143fa-6240-40cf-ba5f-8e40e97a4243
+
+https://github.com/sunny-chung/kotlite/assets/14835950/f731c9a0-d941-4cd3-a23c-bfc2a60429f4
 
 ## Documentation
 
