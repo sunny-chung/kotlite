@@ -35,7 +35,9 @@ jobs:
       # reduce size of artifacts while keeping files needed in original locations
       - run: mv ./stdlib/build/generated/common ./mytemp
       - run: ./gradlew clean && rm -Rf .gradle
-      - run: mkdirs -p ./stdlib/build/generated && mv ./mytemp ./stdlib/build/generated/common
+      # "mkdirs" command is not available
+      - run: mkdir ./stdlib/build && mkdir ./stdlib/build/generated && mv ./mytemp ./stdlib/build/generated/common
+
       - uses: actions/upload-artifact@v3
         with:
           name: doc-output
