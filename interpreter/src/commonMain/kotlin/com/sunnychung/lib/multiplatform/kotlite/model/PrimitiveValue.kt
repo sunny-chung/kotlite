@@ -10,6 +10,8 @@ abstract class PrimitiveValue(symbolTable: SymbolTable) : RuntimeValue {
     }
 
     abstract fun primitiveType(rootSymbolTable: SymbolTable): ObjectType
+
+    override fun toString(): String = convertToString()
 }
 
 class PrimitiveType(val typeName: PrimitiveTypeName, isNullable: Boolean, val nonNullableClass: ClassDefinition, val nullableClass: ClassDefinition, superTypes: List<ObjectType>) : ObjectType(

@@ -2,6 +2,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.NumberValue
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.AllStdLibModules
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.IOLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.RangeLibModule
@@ -346,5 +347,51 @@ class RangeTest {
             interpreter.eval()
             assertEquals("12\n24\n13\n26\n14\n28\n15\n30\n", console.toString())
         }
+    }
+
+    @Test
+    fun intRangeJoinToString() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+            install(RangeLibModule())
+        }
+        val interpreter = interpreter("""
+            println("${'$'}{(1..5).joinToString(" + ")} = ${'$'}{
+                (1..5).fold(0) { acc, it ->
+                    acc + it
+                }
+            }")
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("1 + 2 + 3 + 4 + 5 = 15\n", console.toString())
+    }
+
+    @Test
+    fun longRangeJoinToString() {
+        val console = StringBuilder()
+        val env = ExecutionEnvironment().apply {
+            install(object : IOLibModule() {
+                override fun outputToConsole(output: String) {
+                    console.append(output)
+                }
+            })
+            install(CollectionsLibModule())
+            install(RangeLibModule())
+        }
+        val interpreter = interpreter("""
+            println("${'$'}{(1L..5L).joinToString(" + ")} = ${'$'}{
+                (1L..5L).fold(0L) { acc, it ->
+                    acc + it
+                }
+            }")
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        assertEquals("1 + 2 + 3 + 4 + 5 = 15\n", console.toString())
     }
 }
