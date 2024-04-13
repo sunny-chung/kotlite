@@ -564,4 +564,23 @@ class ListTest {
         assertEquals("B", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
         assertEquals(NullValue, symbolTable.findPropertyByDeclaredName("c"))
     }
+
+    @Test
+    fun first() {
+        val env = ExecutionEnvironment().apply {
+            install(CoreLibModule())
+            install(CollectionsLibModule())
+        }
+        val interpreter = interpreter("""
+            class V(val name: String, val num: Int)
+            val list = listOf(V("A", 7), V("B", 29), V("C", 6), V("D", 14), V("E", 27))
+            fun f(s: String): String = s
+            val a: String = f(list.first { it.num >= 10 }.name)
+            val b: String = f(list.first { it.num >= 5 }.name)
+        """.trimIndent(), executionEnvironment = env, isDebug = true)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals("B", (symbolTable.findPropertyByDeclaredName("a") as StringValue).value)
+        assertEquals("A", (symbolTable.findPropertyByDeclaredName("b") as StringValue).value)
+    }
 }

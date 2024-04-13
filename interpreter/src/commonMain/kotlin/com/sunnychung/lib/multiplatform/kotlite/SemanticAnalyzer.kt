@@ -1531,7 +1531,9 @@ open class SemanticAnalyzer(val rootNode: ASTNode, val executionEnvironment: Exe
 
         // revisit to resolve generic lambda type parameters
         // visit argument must before evaluating type
-        arguments.forEach { it.visit(modifier = modifier) }
+        arguments.forEach {
+            it.visit(modifier = modifier.copy(isSkipGenerics = false))
+        }
 
         // use resolved type parameters in generic lambda arguments to resolve function type parameters
         inferTypeArgumentsFromOtherArguments(isSkipGenerics = false)
@@ -1592,6 +1594,7 @@ open class SemanticAnalyzer(val rootNode: ASTNode, val executionEnvironment: Exe
     }
 
     fun FunctionValueParameterNode.generateTransformedName() {
+        if (transformedRefName != null) return
         transformedRefName = "$name/${++variableDefIndex}" //"$name/${currentScope.scopeLevel}"
     }
 

@@ -1154,4 +1154,55 @@ class LambdaTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertEquals(18, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
+
+    @Test
+    fun callToLambdaWithImplicitItAsFunctionArgument1() {
+        val interpreter = interpreter("""
+            class L(val a: Int, val b: Int) {
+                fun first(predicate: (Int) -> Boolean): Int {
+                    return if (predicate(a)) {
+                        a
+                    } else {
+                        b
+                    }
+                }
+            }
+            fun f(s: Int): String {
+                return s.toString()
+            }
+            val x = f(L(6, 9).first { it >= 7 })
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals("9", (symbolTable.findPropertyByDeclaredName("x") as StringValue).value)
+    }
+
+    @Test
+    fun callToLambdaWithImplicitItAsFunctionArgument2() {
+        val interpreter = interpreter("""
+            class L(val a: Int, val b: Int) {
+                fun first(predicate: (Int) -> Boolean): Int {
+                    return if (predicate(a)) {
+                        a
+                    } else {
+                        b
+                    }
+                }
+            }
+            fun f(x: Int): String {
+                return x.toString()
+            }
+            fun g(s: String): String {
+                return s
+            }
+            val x = g(f(L(6, 9).first { it >= 7 }))
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals("9", (symbolTable.findPropertyByDeclaredName("x") as StringValue).value)
+    }
 }
