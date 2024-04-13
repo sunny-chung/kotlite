@@ -48,6 +48,7 @@ open class SymbolTable(
     private val typeAliasResolution = mutableMapOf<String, DataType>()
 
     internal lateinit var rootScope: SymbolTable
+    val AnyType get() = AnyType()
     lateinit var IntType: PrimitiveType
         private set
     lateinit var LongType: PrimitiveType
