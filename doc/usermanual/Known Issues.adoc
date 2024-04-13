@@ -1,0 +1,6 @@
+= Known Issues or Limitations
+
+There are some known issues that may not be tackled in short-term. They properly would be addressed in a later time, and might be improved bit by bit before fully addressed.
+
+- In a JVM with default JVM arguments, the depth of recursion calls only support up to about 140. Beyond that, "StackOverflowError" would be thrown.
+- Deep recursion calls use lots of memory and run slower

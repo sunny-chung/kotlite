@@ -33,6 +33,8 @@ include::Advanced Usage.adoc[]
 
 include::The Standard Library.adoc[]
 
+include::Known Issues.adoc[]
+
 :leveloffset: -1
 
 = The Kotlite Language
