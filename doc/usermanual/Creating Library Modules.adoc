@@ -4,6 +4,235 @@ A library module is just a collection of custom classes, functions, extension fu
 
 NOTE: The order matters. If A depends on B, put B before A.
 
+== Kotlite Interpreter APIs
+
+Let's start with providing custom functions. Usually the process is like this:
+
+[mermaid]
+----
+flowchart TD
+    Call["Function Call"] --> Unwrap["Unwrap Kotlite argument values to Kotlin values"] --> Process["Process (custom logic)"] --> Wrap["Wrap the Kotlin value to a Kotlite value or provide a Kotlite constant"] --> Return["Return the wrapped value"]
+----
+
+In `CustomFunctionDefinition`, the `executable` lambda argument looks like this:
+
+[source, kotlin]
+----
+{ interpreter: Interpreter, receiver: RuntimeValue?, args: List<RuntimeValue>, typeArgs: Map<String, DataType> ->
+    // ...
+}
+----
+
+=== RuntimeValue -- a Kotlite value that wraps a Kotlin value
+
+In code level, a Kotlite value is a `RuntimeValue` in the Kotlin host. Wrapping a Kotlin value to a `RuntimeValue` is tricky. Below lists out how to wrap them.
+
+[cols="20,80a"]
+|===
+|Kotlin Type |Code to convert to a Kotlite value
+
+|`Int`
+|[source, kotlin]
+----
+IntValue(value: Int, symbolTable: SymbolTable)
+----
+
+|`Long`
+|[source, kotlin]
+----
+LongValue(value: Long, symbolTable: SymbolTable)
+----
+
+|`Double`
+|[source, kotlin]
+----
+DoubleValue(value: Double, symbolTable: SymbolTable)
+----
+
+|`Byte`
+|[source, kotlin]
+----
+ByteValue(value: Byte, symbolTable: SymbolTable)
+----
+
+|`Boolean`
+|[source, kotlin]
+----
+BooleanValue(value: Boolean, symbolTable: SymbolTable)
+----
+
+|`String`
+|[source, kotlin]
+----
+StringValue(value: String, symbolTable: SymbolTable)
+----
+
+|`Null`
+|[source, kotlin]
+----
+NullValue
+----
+
+|`Unit`
+|[source, kotlin]
+----
+UnitValue
+----
+
+|Non-generic object
+|[source, kotlin]
+----
+DelegatedValue<T>(value: T, clazz: ClassDefinition, symbolTable: SymbolTable)
+----
+
+where `T` is the type of the Kotlin value, and `clazz` is the Kotlite <<_classdefinition_and_providedclassdefinition,class definition>> of the value.
+
+|Generic object
+|[source, kotlin]
+----
+DelegatedValue<T>(value: T, clazz: ClassDefinition, symbolTable: SymbolTable, typeArguments: List<DataType>)
+----
+
+where `T` is the type of the Kotlin value, and `clazz` is the Kotlite <<_classdefinition_and_providedclassdefinition,class definition>> of the value.
+
+|Object that is supported by the standard library
+|Non-exhausted list:
+[source, kotlin]
+----
+ByteArrayValue(value: ByteArray, symbolTable: SymbolTable)
+
+PairValue(value: Pair<RuntimeValue, RuntimeValue>, typeA: DataType, typeB: DataType, symbolTable: SymbolTable)
+
+ListValue(value: List<RuntimeValue>, typeArgument: DataType, symbolTable: SymbolTable)
+
+MutableMapValue(value: MutableMap<RuntimeValue, RuntimeValue>, keyType: DataType, valueType: DataType, symbolTable: SymbolTable)
+----
+
+Examples:
+[source, kotlin]
+----
+val symbolTable = interpreter.symbolTable()
+val wrappedValue = ListValue(
+    value = listOf(1, 2, 3, 5, 10),
+    typeArgument = symbolTable.IntType,
+    symbolTable = symbolTable,
+)
+----
+
+|===
+
+CAUTION: For nested classes such as `List`, `Map` or `Pair`, don't forget to wrap all the nested values. Otherwise, the things would go wrong and exceptions may be thrown during code execution.
+
+=== SymbolTable
+
+A `SymbolTable` can be obtained via `Interpreter.symbolTable()`. `SymbolTable` cannot be persisted, because it might be different in the context of another function call, and persisting it would lead to memory leak.
+
+=== ClassDefinition and ProvidedClassDefinition
+
+For types that are available from the standard libraries, usually it could be found by `${TypeName}Class.clazz`. For example, `MutableListClass.clazz` for the class `MutableList`.
+
+For types that are not known to Kotlite, you will have to provide a custom `ClassDefinition`.
+
+`ProvidedClassDefinition` is a friendly API for library users to define a class. It extends `ClassDefinition`. An example can be found <<ProvidedClassDefinitionExample, here>>.
+
+=== `DataType`
+
+If creation of generic Kotlite values is needed, for example, a `List<T>` value, one or more `DataType` are needed to specify the type arguments. It can be obtained from multiple ways.
+
+1. If it is available in the type arguments of the function call, use `typeArgs[name]`.
+
+For example, for a function signature like this:
+[source, kotlin]
+----
+fun <T, R : Comparable<R>> MutableList<T>.sortBy(selector: (T) -> R?)
+----
+
+`typeArgs["T"]` is the `T` type argument in `DataType`, and `typeArgs["R"]` is the `R` type argument in `DataType`.
+
+[start=2]
+2. Primitive data types
+
+It can be obtained from `SymbolTable`. For example, `symbolTable.IntType`. For some special types like `Any`, `Unit` and `Nothing`, it can be directly constructed: `UnitType(isNullable: Boolean = false)`.
+
+[start=3]
+3. For other types, it can be obtained by the `String.toDataType(symbolTable: SymbolTable)` convenient extension function. For example,
+
+[source, kotlin]
+----
+val symbolTable: SymbolTable = interpreter.symbolTable()
+
+val byteArrayType: DataType = "ByteArray".toDataType(symbolTable)
+val pairType: DataType = "Pair<String, Pair<Double, Int>>".toDataType(symbolTable)
+val genericType: DataType = "Map<K, Int>".toDataType(symbolTable)
+----
+
+CAUTION: If there is untrusted user input, this approach is vulnerable to https://owasp.org/www-community/Injection_Theory[injection attacks].
+
+=== Unwrapping Kotlite `RuntimeValue` to a Kotlin value
+
+It is relatively easy. Just cast the type and call the member property `.value`.
+
+[cols="20,80a"]
+|===
+|Kotlin Type |Code to convert a Kotlite value to a Kotlin value
+
+|`Int`
+|[source, kotlin]
+----
+val actualValue: Int = (value as IntValue).value
+val nullableActualValue: Int? = (value as? IntValue)?.value
+----
+
+|`Long`
+|[source, kotlin]
+----
+val actualValue: Long = (value as LongValue).value
+val nullableActualValue: Long? = (value as? LongValue)?.value
+----
+
+|`Double`
+|[source, kotlin]
+----
+val actualValue: Double = (value as DoubleValue).value
+val nullableActualValue: Double? = (value as? DoubleValue)?.value
+----
+
+|`Byte`
+|[source, kotlin]
+----
+val actualValue: Byte = (value as ByteValue).value
+val nullableActualValue: Byte? = (value as? ByteValue)?.value
+----
+
+|`Boolean`
+|[source, kotlin]
+----
+val actualValue: Boolean = (value as BooleanValue).value
+val nullableActualValue: Boolean? = (value as? BooleanValue)?.value
+----
+
+|`String`
+|[source, kotlin]
+----
+val actualValue: String = (value as StringValue).value
+val nullableActualValue: String? = (value as? StringValue)?.value
+----
+
+|Object
+|[source, kotlin]
+----
+val byteArray: ByteArray = (value as DelegatedValue<ByteArray>).value
+val nullableByteArray: ByteArray? = (value as? DelegatedValue<ByteArray>)?.value
+
+val list: List<RuntimeValue> = (value as DelegatedValue<List<RuntimeValue>>).value
+val listWithIntValue: List<Int> = list.map {
+    (it as IntValue).value
+}
+----
+|===
+
+CAUTION: For nested classes such as `List`, `Map` or `Pair`, don't forget to unwrap all the nested values if necessary.
+
 == Manual approach
 
 Create a class that extends the abstract class `LibraryModule`, give a name to it, include all the implementations, then this class is a Library Module that can be installed.
@@ -79,6 +308,7 @@ kotliteStdLibHeaderProcessor {
 }
 ----
 
+[#ProvidedClassDefinitionExample]
 Implement the delegated class and the value factory function.
 
 ./stdlib/src/commonMain/kotlin/com/sunnychung/lib/multiplatform/kotlite/stdlib/regex/RegexValue.kt
@@ -101,9 +331,9 @@ object RegexClass {
 }
 ----
 
-NOTE: The factory function name has to be `${ActualClassName}Value`. It applies to any types, regardless of primitives or interfaces. This convention is hardcoded in the code generation plugin.
+NOTE: The factory function name has to be `${ActualTypeName}Value`. It applies to any types, regardless of primitives or interfaces. This convention is hardcoded in the code generation plugin.
 
-Create a Kotlin header file by writing every global or extension functions and extension properties that would be delegated, but without body. This file should be placed in `/your-library/src/kotlinheader/${name}.kt`.
+Create a Kotlin header file by writing every global or extension functions and extension properties that would be delegated, but without body. This file should be placed in `/your-library/src/kotlinheader/${LibraryName}.kt`.
 
 [source, kotlin]
 ----

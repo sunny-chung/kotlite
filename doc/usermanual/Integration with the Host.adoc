@@ -2,6 +2,8 @@
 
 There are some APIs to allow the host provides custom executable functions and properties to the embedded script environment. These APIs are not yet stable and subject to change in the future.
 
+NOTE: Creating an integration is similar to creating a library module. It is recommended to read the details in the <<_kotlite_interpreter_apis,Creating Library Modules>> to have a deep understanding on this topic.
+
 == Providing functions and extension Functions
 
 To provide an extension function, use the `ExecutionEnvironment.registerFunction(CustomFunctionDefinition)` API.
