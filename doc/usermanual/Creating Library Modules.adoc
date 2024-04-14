@@ -170,7 +170,7 @@ CAUTION: If there is untrusted user input, this approach is vulnerable to https:
 
 === Unwrapping Kotlite `RuntimeValue` to a Kotlin value
 
-It is relatively easy. Just cast the type and call the member property `.value`.
+It is relatively easy. Just cast to the right type and call the member property `.value`.
 
 [cols="20,80a"]
 |===

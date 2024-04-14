@@ -39,14 +39,14 @@ kotlin {
             }
             testTask {
                 useMocha {
-                    timeout = "11s"
+                    timeout = "21s" // github mac runner is slow
                 }
             }
         }
         nodejs {
             testTask {
                 useMocha {
-                    timeout = "11s"
+                    timeout = "21s" // github mac runner is slow
                 }
             }
         }
