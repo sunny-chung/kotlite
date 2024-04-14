@@ -8,8 +8,8 @@ import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.SymbolTable
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
 
-fun MutableMapValue(value: Map<RuntimeValue, RuntimeValue>, keyType: DataType, valueType: DataType, symbolTable: SymbolTable)
-    = DelegatedValue<Map<RuntimeValue, RuntimeValue>>(value, MutableMapClass.clazz, listOf(keyType, valueType), symbolTable)
+fun MutableMapValue(value: MutableMap<RuntimeValue, RuntimeValue>, keyType: DataType, valueType: DataType, symbolTable: SymbolTable)
+    = DelegatedValue<MutableMap<RuntimeValue, RuntimeValue>>(value, MutableMapClass.clazz, listOf(keyType, valueType), symbolTable)
 
 object MutableMapClass {
     val clazz = ProvidedClassDefinition(
