@@ -23,6 +23,8 @@ In `CustomFunctionDefinition`, the `executable` lambda argument looks like this:
 }
 ----
 
+NOTE: The APIs and processes are similar for custom properties. This section applies to them as well.
+
 === RuntimeValue -- a Kotlite value that wraps a Kotlin value
 
 In code level, a Kotlite value is a `RuntimeValue` in the Kotlin host. Wrapping a Kotlin value to a `RuntimeValue` is tricky. Below lists out how to wrap them.
@@ -135,7 +137,7 @@ For types that are not known to Kotlite, you will have to provide a custom `Clas
 
 `ProvidedClassDefinition` is a friendly API for library users to define a class. It extends `ClassDefinition`. An example can be found <<ProvidedClassDefinitionExample, here>>.
 
-=== `DataType`
+=== DataType
 
 If creation of generic Kotlite values is needed, for example, a `List<T>` value, one or more `DataType` are needed to specify the type arguments. It can be obtained from multiple ways.
 
