@@ -14,7 +14,7 @@ object BuiltinFilename {
     val GLOBAL = "<Global>"
 }
 
-open class Lexer(val filename: String, val code: String) {
+open class Lexer(val filename: String, val code: String, val isParseComment: Boolean = false) {
     private var pos: Int = 0
     private var lineNum = 1
     private var col = 1
@@ -128,6 +128,7 @@ open class Lexer(val filename: String, val code: String) {
             advanceChar()
         }
         advanceChar()
+        sb.append("*/")
         return sb.toString()
     }
 
@@ -242,14 +243,20 @@ open class Lexer(val filename: String, val code: String) {
                                 }
 
                                 "//" -> {
-                                    advanceChar()
-                                    readLine()
+//                                    advanceChar()
+                                    val s = readLine()
+                                    if (isParseComment) {
+                                        return Token(TokenType.Comment, s, position)
+                                    }
                                     continue // discard
                                 }
 
                                 "/*" -> {
-                                    advanceChar()
-                                    readBlockComment()
+//                                    advanceChar()
+                                    val s = readBlockComment()
+                                    if (isParseComment) {
+                                        return Token(TokenType.Comment, s, position)
+                                    }
                                     continue // discard
                                 }
                             }

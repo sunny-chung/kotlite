@@ -12,5 +12,6 @@ enum class TokenType {
     StringFieldIdentifier,
     NewLine,
     Semicolon,
+    Comment,
     EOF,
 }
