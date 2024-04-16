@@ -18,7 +18,7 @@ open class Lexer(val filename: String, val code: String) {
     private var pos: Int = 0
     private var lineNum = 1
     private var col = 1
-    private var locationHistory = mutableListOf(SourcePosition(filename, 1, 1)) // TODO optimize
+    private var locationHistory = mutableListOf(SourcePosition(filename, 1, 1, 0)) // TODO optimize
     private var mode = mutableListOf(Mode.Main)
 
     fun switchToMode(mode: Mode) {
@@ -43,8 +43,8 @@ open class Lexer(val filename: String, val code: String) {
             } else {
                 ++col
             }
-            locationHistory += SourcePosition(filename, lineNum, col)
             ++pos
+            locationHistory += SourcePosition(filename, lineNum, col, pos)
         }
         return if (pos < code.length) code[pos] else null
     }
@@ -66,7 +66,7 @@ open class Lexer(val filename: String, val code: String) {
         col = locationHistory[pos].col
     }
 
-    internal fun makeSourcePosition() = SourcePosition(filename = filename, lineNum = lineNum, col = col)
+    internal fun makeSourcePosition() = SourcePosition(filename = filename, lineNum = lineNum, col = col, index = pos)
 
     internal fun Char.isIdentifierChar() = !isWhitespace() && this !in NON_IDENTIFIER_CHARACTERS
 
