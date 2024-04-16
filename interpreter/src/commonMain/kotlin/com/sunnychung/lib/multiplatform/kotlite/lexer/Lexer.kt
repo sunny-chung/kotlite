@@ -29,6 +29,8 @@ open class Lexer(val filename: String, val code: String) {
         this.mode.removeLast()
     }
 
+    fun currentMode() = mode.last()
+
     fun currentCursor() = pos
 
     internal inline fun currentChar() = if (pos < code.length) code[pos] else null
