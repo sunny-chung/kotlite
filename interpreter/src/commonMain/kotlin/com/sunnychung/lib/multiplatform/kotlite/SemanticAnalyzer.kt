@@ -1733,6 +1733,7 @@ open class SemanticAnalyzer(val rootNode: ASTNode, val executionEnvironment: Exe
 
         // find member
         val subjectType = subject.type().unboxClassTypeAsCompanion().toDataType()
+        log.v { "NavigationNode pos=${position} member=${member.name} subjectType = ${subjectType.descriptiveName} ${subjectType.nameWithNullable} ${subjectType.isNullable}" }
         val subjectTypesToSearch = if (operator == "?." && subjectType.isNullable) {
             listOf(subjectType.copyOf(isNullable = false), subjectType)
         } else {

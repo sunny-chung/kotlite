@@ -3,6 +3,7 @@ package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import com.sunnychung.lib.multiplatform.kotlite.model.TypeParameter
 import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
@@ -259,5 +260,20 @@ class CustomBuiltinExtensionPropertyTest {
         assertEquals(2, symbolTable.propertyValues.size)
         assertEquals(10, (symbolTable.findPropertyByDeclaredName("a") as IntValue).value)
         assertEquals(-5, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun accessNullableExtensionPropertyMemberWithDot() {
+        val env = ExecutionEnvironment().apply {
+            registerExtensionProperty(ExtensionProperty(
+                declaredName = "prop",
+                receiver = "Int",
+                type = "Pair<Int, Double>?",
+                getter = { interpreter, subject, typeArgs -> NullValue }
+            ))
+        }
+        assertSemanticFail("""
+            val a = 1.prop.second
+        """.trimIndent(), environment = env)
     }
 }

@@ -591,7 +591,7 @@ open class SymbolTable(
         return extensionProperties.asSequence()
             .filter {
                 it.value.receiverType!!.name == resolvedReceiver.name &&
-                        (resolvedReceiver.isNullable || !it.value.receiverType!!.isNullable) &&
+                        (!resolvedReceiver.isNullable || it.value.receiverType!!.isNullable) &&
                         it.value.declaredName == declaredName
             }
             // Here assumes at most 3 same-name extension properties declared: exact type or Any? or Any. exact type one has higher precedence

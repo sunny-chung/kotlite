@@ -4,8 +4,10 @@ import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
 import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionParameter
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.NullValue
 import com.sunnychung.lib.multiplatform.kotlite.model.SourcePosition
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import com.sunnychung.lib.multiplatform.kotlite.test.semanticanalysis.assertSemanticFail
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -225,5 +227,47 @@ class CustomBuiltinFunctionTest {
         assertEquals(16, (symbolTable.findPropertyByDeclaredName("c") as IntValue).value)
         assertEquals(22, (symbolTable.findPropertyByDeclaredName("d") as IntValue).value)
         assertEquals(12, (symbolTable.findPropertyByDeclaredName("e") as IntValue).value)
+    }
+    @Test
+    fun accessMemberOfNullableValueReturnedByGlobalFunctionWithDot() {
+        val env = ExecutionEnvironment().apply {
+            registerFunction(CustomFunctionDefinition(
+                receiverType = null,
+                functionName = "myGlobalFunc",
+                returnType = "Pair<String, Int>?",
+                parameterTypes = listOf(
+                    CustomFunctionParameter("a", "String"),
+                    CustomFunctionParameter("b", "Int"),
+                ),
+                executable = { interpreter, _, args, typeArgs ->
+                    NullValue
+                },
+                position = SourcePosition("<Test>", 1, 1),
+            ))
+        }
+        assertSemanticFail("""
+            val b = myGlobalFunc("aaaaa", 123).second
+        """.trimIndent(), environment = env)
+    }
+    @Test
+    fun accessMemberOfNullableValueReturnedByExtensionFunctionWithDot() {
+        val env = ExecutionEnvironment().apply {
+            registerFunction(CustomFunctionDefinition(
+                receiverType = "String",
+                functionName = "myExtFunc",
+                returnType = "Pair<String, Int>?",
+                parameterTypes = listOf(
+                    CustomFunctionParameter("a", "String"),
+                    CustomFunctionParameter("b", "Int"),
+                ),
+                executable = { interpreter, _, args, typeArgs ->
+                    NullValue
+                },
+                position = SourcePosition("<Test>", 1, 1),
+            ))
+        }
+        assertSemanticFail("""
+            val b = "abc".myExtFunc("aaaaa", 123).second
+        """.trimIndent(), environment = env)
     }
 }

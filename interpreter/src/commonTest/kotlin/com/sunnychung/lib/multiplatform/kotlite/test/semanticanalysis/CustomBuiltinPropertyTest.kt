@@ -27,6 +27,24 @@ class CustomBuiltinPropertyTest {
     }
 
     @Test
+    fun accessNullablePropertyMemberWithDot() {
+        val env = ExecutionEnvironment().apply {
+            registerGlobalProperty(
+                GlobalProperty(
+                    position = SourcePosition("<Test>", 1, 1),
+                    declaredName = "x",
+                    type = "Pair<Int, Int>?",
+                    isMutable = false,
+                    getter = { interpreter -> DoubleValue(3.14, interpreter.symbolTable()) },
+                )
+            )
+        }
+        assertSemanticFail("""
+            val y = x.first
+        """.trimIndent(), environment = env)
+    }
+
+    @Test
     fun incorrectType() {
         val env = ExecutionEnvironment().apply {
             registerGlobalProperty(
