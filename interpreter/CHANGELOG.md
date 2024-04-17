@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Incorrect nullable resolution of extension properties
 - `IntRange.joinToString` yields incorrect string value
 - Function signature of `MutableMapValue`
+- Logger is no longer a shared instance but a dedicated one
 
 ## [1.0.0] - 2024-04-08
 
