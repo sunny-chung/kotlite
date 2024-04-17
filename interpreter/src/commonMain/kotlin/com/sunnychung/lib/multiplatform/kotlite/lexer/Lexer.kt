@@ -70,6 +70,15 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
 
     internal fun makeSourcePosition() = SourcePosition(filename = filename, lineNum = lineNum, col = col, index = pos)
 
+    internal fun makeNextCharSourcePosition(): SourcePosition {
+        advanceChar()
+        return try {
+            makeSourcePosition()
+        } finally {
+            backward()
+        }
+    }
+
     internal fun Char.isIdentifierChar() = !isWhitespace() && this !in NON_IDENTIFIER_CHARACTERS
 
     internal fun Char.isFieldIdentifierChar() = isIdentifierChar() && this !in setOf('$')
@@ -146,16 +155,16 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                 if (number.removeSuffix("L").length > 19) throw RuntimeException("Number `$number` is too big.")
                 if (number.endsWith("L") || compareString(number, "2147483647") > 0) { // FIXME -2147483648 should not be casted to Long
                     val value = number.removeSuffix("L").toLongOrNull() ?: throw RuntimeException("Long `$number` is invalid.")
-                    return Token(TokenType.Long, value, position)
+                    return Token(TokenType.Long, value, position, makeSourcePosition())
                 } else {
                     val value = number.toIntOrNull() ?: throw RuntimeException("Integer `$number` is invalid.")
-                    return Token(TokenType.Integer, value, position)
+                    return Token(TokenType.Integer, value, position, makeSourcePosition())
                 }
             }
             advanceChar() // eat the '.'
             val decimal = readInteger()
             val value = "$number.$decimal".toDoubleOrNull() ?: throw RuntimeException("Double `$number` is invalid.")
-            return Token(TokenType.Double, value, position)
+            return Token(TokenType.Double, value, position, makeSourcePosition())
         } finally {
             backward()
         }
@@ -200,8 +209,11 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
             sb.append(readChar(isDecodeSurrogatePair = true))
             advanceChar()
         }
-        backward()
-        return Token(TokenType.StringLiteral, sb.toString(), position)
+        try {
+            return Token(TokenType.StringLiteral, sb.toString(), position, makeSourcePosition())
+        } finally {
+            backward()
+        }
     }
 
     internal fun readMultilineStringContent(): Token {
@@ -211,8 +223,11 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
             sb.append(currentChar())
             advanceChar()
         }
-        backward()
-        return Token(TokenType.StringLiteral, sb.toString(), position)
+        try {
+            return Token(TokenType.StringLiteral, sb.toString(), position, makeSourcePosition())
+        } finally {
+            backward()
+        }
     }
 
     fun readToken(): Token {
@@ -221,32 +236,32 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
             try {
                 when (mode.last()) {
                     Mode.Main -> when {
-                        c in setOf('\n') -> return Token(TokenType.NewLine, c.toString(), makeSourcePosition())
+                        c in setOf('\n') -> return Token(TokenType.NewLine, c.toString(), makeSourcePosition(), makeNextCharSourcePosition())
                         c.isWhitespace() -> continue
                         c.isDigit() -> return readNumber()
-                        c in setOf('(', ')', '[', ']') -> return Token(TokenType.Operator, c.toString(), makeSourcePosition())
+                        c in setOf('(', ')', '[', ']') -> return Token(TokenType.Operator, c.toString(), makeSourcePosition(), makeNextCharSourcePosition())
                         c in setOf('+', '-', '*', '/', '%') -> {
                             val position = makeSourcePosition()
                             if (nextChar() == '=') {
                                 advanceChar()
-                                return Token(TokenType.Symbol, "$c=", position)
+                                return Token(TokenType.Symbol, "$c=", position, makeNextCharSourcePosition())
                             }
                             when (val withNextChar = "$c${nextChar()}") {
                                 "++", "--" -> {
                                     advanceChar()
-                                    return Token(TokenType.Operator, withNextChar, position)
+                                    return Token(TokenType.Operator, withNextChar, position, makeNextCharSourcePosition())
                                 }
 
                                 "->" -> {
                                     advanceChar()
-                                    return Token(TokenType.Symbol, withNextChar, position)
+                                    return Token(TokenType.Symbol, withNextChar, position, makeNextCharSourcePosition())
                                 }
 
                                 "//" -> {
 //                                    advanceChar()
                                     val s = readLine()
                                     if (isParseComment) {
-                                        return Token(TokenType.Comment, s, position)
+                                        return Token(TokenType.Comment, s, position, makeNextCharSourcePosition())
                                     }
                                     continue // discard
                                 }
@@ -255,12 +270,12 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
 //                                    advanceChar()
                                     val s = readBlockComment()
                                     if (isParseComment) {
-                                        return Token(TokenType.Comment, s, position)
+                                        return Token(TokenType.Comment, s, position, makeNextCharSourcePosition())
                                     }
                                     continue // discard
                                 }
                             }
-                            return Token(TokenType.Operator, c.toString(), position)
+                            return Token(TokenType.Operator, c.toString(), position, makeNextCharSourcePosition())
                         }
 
                         c in setOf('|', '&') -> {
@@ -268,7 +283,7 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                             when (val withNextChar = "$c${nextChar()}") {
                                 "||", "&&" -> {
                                     advanceChar()
-                                    return Token(TokenType.Operator, withNextChar, position)
+                                    return Token(TokenType.Operator, withNextChar, position, makeNextCharSourcePosition())
                                 }
                             }
 //                        return Token(TokenType.Operator, c.toString(), position)
@@ -280,7 +295,7 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                             when (val withNextChar = "$c${nextChar()}") {
                                 "?.", "?:" -> {
                                     advanceChar()
-                                    return Token(TokenType.Operator, withNextChar, position)
+                                    return Token(TokenType.Operator, withNextChar, position, makeNextCharSourcePosition())
                                 }
                                 ".." -> {
                                     var op = withNextChar
@@ -289,13 +304,13 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                                         advanceChar()
                                         op += "<"
                                     }
-                                    return Token(TokenType.Operator, op, position)
+                                    return Token(TokenType.Operator, op, position, makeNextCharSourcePosition())
                                 }
                             }
                             if (c == '.') {
-                                return Token(TokenType.Operator, c.toString(), position)
+                                return Token(TokenType.Operator, c.toString(), position, makeNextCharSourcePosition())
                             }
-                            return Token(TokenType.Symbol, c.toString(), position)
+                            return Token(TokenType.Symbol, c.toString(), position, makeNextCharSourcePosition())
                         }
 
                         c in setOf('<', '>', '=', '!') -> {
@@ -307,9 +322,9 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                                 "$c"
                             }
                             if (token == "=") {
-                                return Token(TokenType.Symbol, token, position)
+                                return Token(TokenType.Symbol, token, position, makeNextCharSourcePosition())
                             } else {
-                                return Token(TokenType.Operator, token, position)
+                                return Token(TokenType.Operator, token, position, makeNextCharSourcePosition())
                             }
                         }
 
@@ -320,7 +335,7 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                             if (advanceChar() != '\'') {
                                 throw RuntimeException("Invalid char literal")
                             }
-                            return Token(TokenType.Char, char, position)
+                            return Token(TokenType.Char, char, position, makeSourcePosition())
                         }
 
                         c == '"' -> {
@@ -328,25 +343,28 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                             return if (nextChar() == '"' && nextChar(howMany = 2) == '"') {
                                 advanceChar()
                                 advanceChar()
-                                Token(TokenType.Symbol, "\"\"\"", position)
+                                Token(TokenType.Symbol, "\"\"\"", position, makeNextCharSourcePosition())
                             } else {
-                                Token(TokenType.Symbol, "$c", position)
+                                Token(TokenType.Symbol, "$c", position, makeNextCharSourcePosition())
                             }
                         }
 
                         c in setOf(':', ',', '{', '}', '@') -> return Token(
                             TokenType.Symbol,
                             c.toString(),
-                            makeSourcePosition()
+                            makeSourcePosition(),
+                            makeNextCharSourcePosition(),
                         )
 
-                        c in setOf(';') -> return Token(TokenType.Semicolon, c.toString(), makeSourcePosition())
+                        c in setOf(';') -> return Token(TokenType.Semicolon, c.toString(), makeSourcePosition(), makeNextCharSourcePosition())
                         c.isIdentifierChar() -> {
                             val position = makeSourcePosition()
+                            val identifier = readIdentifier()
                             return Token(
                                 TokenType.Identifier,
-                                readIdentifier(),
-                                position
+                                identifier,
+                                position,
+                                makeNextCharSourcePosition(),
                             )
                         }
                     }
@@ -355,22 +373,24 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                         c == '$' && nextChar() == '{' -> {
                             val position = makeSourcePosition()
                             advanceChar()
-                            Token(TokenType.Symbol, "\${", position)
+                            Token(TokenType.Symbol, "\${", position, makeNextCharSourcePosition())
                         }
                         c == '$' -> {
                             val position = makeSourcePosition()
                             if (advanceChar() != '"') {
+                                val identifier = readFieldIdentifier()
                                 Token(
                                     TokenType.StringFieldIdentifier,
-                                    readFieldIdentifier(),
-                                    position
+                                    identifier,
+                                    position,
+                                    makeNextCharSourcePosition(),
                                 )
                             } else {
                                 backward()
-                                Token(TokenType.StringLiteral, "$", position)
+                                Token(TokenType.StringLiteral, "$", position, makeNextCharSourcePosition())
                             }
                         }
-                        c == '"' -> Token(TokenType.Symbol, "$c", makeSourcePosition())
+                        c == '"' -> Token(TokenType.Symbol, "$c", makeSourcePosition(), makeNextCharSourcePosition())
                         else -> readStringContent()
                     }
 
@@ -378,27 +398,30 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                         c == '$' && nextChar() == '{' -> {
                             val position = makeSourcePosition()
                             advanceChar()
-                            Token(TokenType.Symbol, "\${", position)
+                            Token(TokenType.Symbol, "\${", position, makeNextCharSourcePosition())
                         }
                         c == '$' -> {
                             val position = makeSourcePosition()
                             if (advanceChar() != '"') {
+                                val identifier = readFieldIdentifier()
                                 Token(
                                     TokenType.StringFieldIdentifier,
-                                    readFieldIdentifier(),
-                                    position
+                                    identifier,
+                                    position,
+                                    makeNextCharSourcePosition(),
                                 )
                             } else {
                                 backward()
-                                Token(TokenType.StringLiteral, "$", position)
+                                Token(TokenType.StringLiteral, "$", position, makeNextCharSourcePosition())
                             }
                         }
                         c == '"' && nextChar() == '"' && nextChar(howMany = 2) == '"' ->
-                            Token(TokenType.Symbol, "\"\"\"", makeSourcePosition()).also {
+                            Token(TokenType.Symbol, "\"\"\"", makeSourcePosition(), makeSourcePosition()).let {
                                 advanceChar()
                                 advanceChar()
+                                it.copy(endExclusive = makeNextCharSourcePosition())
                             }
-                        c == '"' -> Token(TokenType.StringLiteral, "$c", makeSourcePosition())
+                        c == '"' -> Token(TokenType.StringLiteral, "$c", makeSourcePosition(), makeNextCharSourcePosition())
                         else -> readMultilineStringContent()
                     }
                 }
@@ -406,7 +429,7 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
                 advanceChar()
             }
         }
-        return Token(TokenType.EOF, '\u0000', makeSourcePosition())
+        return Token(TokenType.EOF, '\u0000', makeSourcePosition(), makeSourcePosition())
     }
 
     /**
