@@ -14,7 +14,7 @@ plugins {
 
 //apply("kotlite-stdlib-processor-plugin")
 
-version = "1.0.0"
+version = "1.1.0-snapshot.1"
 
 repositories {
     mavenCentral()
