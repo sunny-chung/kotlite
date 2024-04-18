@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - New enum entry `Comment` to the enum class `TokenType`
+- Error message of `TypeMismatchException` now include type arguments
 
 ### Fixed
 

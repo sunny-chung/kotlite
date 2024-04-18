@@ -1688,7 +1688,7 @@ open class SemanticAnalyzer(val rootNode: ASTNode, val executionEnvironment: Exe
         value?.visit(modifier = modifier)
         val valueType = value?.type()?.toDataType() ?: UnitType()
         if (declaredReturnType != null && !declaredReturnType.isAssignableFrom(valueType)) {
-            throw TypeMismatchException(position, s.returnType!!.nameWithNullable, valueType.nameWithNullable)
+            throw TypeMismatchException(position, s.returnType!!.descriptiveName, valueType.descriptiveName)
         }
     }
 
