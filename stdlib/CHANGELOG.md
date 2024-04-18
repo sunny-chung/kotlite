@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Global function `setKotliteStdlibLogMinLevel(severity: Severity)`
 
+### Removed
+
+- `MultipleLibModules` -- it is moved into the kotlite-interpreter library
+
 ### Fixed
 
 - Logger is no longer a shared instance but a dedicated one

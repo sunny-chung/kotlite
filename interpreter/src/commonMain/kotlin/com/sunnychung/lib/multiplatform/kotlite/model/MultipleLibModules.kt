@@ -1,10 +1,4 @@
-package com.sunnychung.lib.multiplatform.kotlite.stdlib
-
-import com.sunnychung.lib.multiplatform.kotlite.model.CustomFunctionDefinition
-import com.sunnychung.lib.multiplatform.kotlite.model.ExtensionProperty
-import com.sunnychung.lib.multiplatform.kotlite.model.GlobalProperty
-import com.sunnychung.lib.multiplatform.kotlite.model.LibraryModule
-import com.sunnychung.lib.multiplatform.kotlite.model.ProvidedClassDefinition
+package com.sunnychung.lib.multiplatform.kotlite.model
 
 /**
  * @param modules An ordered list of modules where the one depends on another one should be placed later.

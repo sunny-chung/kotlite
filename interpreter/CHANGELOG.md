@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Property `endExclusive` to the class `Token`
 - Function `Lexer.currentMode`
 - Optional constructor parameter `isParseComment` to `Lexer`. If it is `true`, `Token` instances would be created for comments. Default is `false`.
+- `MultipleLibModules` -- moved from the kotlite-stdlib library
 
 ### Changed
 
