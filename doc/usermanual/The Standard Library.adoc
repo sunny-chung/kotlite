@@ -9,9 +9,10 @@ At this moment, the Standard Library consists of following Kotlin/Common standar
 * kotlin.ranges
 * kotlin.text
 
-and the following external library:
+and the following external libraries:
 
 * https://github.com/sunny-chung/kdatetime-multiplatform[KDateTime]
+* https://github.com/benasher44/uuid[A Kotlin Multiplatform UUID]
 
 Currently, not all of their functions and properties are imported, but it is planned to support all of them, as long as the inclusion does not bring security issues.
 

@@ -83,6 +83,7 @@ kotlin {
                 implementation("co.touchlab:kermit:1.0.0")
                 implementation(project(":kotlite-interpreter"))
                 implementation("io.github.sunny-chung:kdatetime-multiplatform:1.0.0")
+                implementation("com.benasher44:uuid:0.8.4")
             }
 //            kotlin.srcDir("build/generated/common/")
             kotlin.srcDir(tasks.named("kotliteStdlibHeaderProcess").map { it.outputs })
@@ -223,6 +224,19 @@ kotliteStdLibHeaderProcessor {
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.IntRangeValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.LongProgressionValue",
                 "com.sunnychung.lib.multiplatform.kotlite.stdlib.range.LongRangeValue",
+            )
+        ),
+        "Uuid" to KotliteModuleConfig(
+            imports = listOf(
+                "com.benasher44.uuid.Uuid",
+                "com.benasher44.uuid.bytes",
+                "com.benasher44.uuid.variant",
+                "com.benasher44.uuid.version",
+                "com.benasher44.uuid.uuidFrom",
+                "com.benasher44.uuid.uuidOf",
+                "com.benasher44.uuid.uuid4",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.byte.ByteArrayValue",
+                "com.sunnychung.lib.multiplatform.kotlite.stdlib.uuid.UuidValue",
             )
         ),
     )

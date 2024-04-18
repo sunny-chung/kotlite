@@ -18,5 +18,6 @@ class AllStdLibModules(outputToConsoleFunction: (String) -> Unit = { print(it) }
         ByteLibModule(),
         RangeLibModule(),
         KDateTimeLibModule(),
+        UuidLibModule(),
     )
 )
