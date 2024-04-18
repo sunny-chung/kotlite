@@ -889,7 +889,7 @@ open class Interpreter(val rootNode: ASTNode, val executionEnvironment: Executio
             }
 
             log.v { "Fun Return $returnValue; symbolTable = $symbolTable" }
-            if (!returnType.isConvertibleFrom(returnValue.type())) {
+            if (!returnType.isCastableFrom(returnValue.type())) {
                 throw RuntimeException("Return value's type ${returnValue.type().descriptiveName} cannot be casted to ${returnType.descriptiveName} in function `${functionNode.name}` at ${functionNode.position}")
             }
 
@@ -1439,7 +1439,7 @@ open class Interpreter(val rootNode: ASTNode, val executionEnvironment: Executio
     fun AsOpNode.eval(): RuntimeValue {
         val value = expression.eval() as RuntimeValue
         val targetType = symbolTable().typeNodeToDataType(type) ?: throw RuntimeException("Unknown type `${type.descriptiveName()}`")
-        return if (targetType.isConvertibleFrom(value.type())) {
+        return if (targetType.isCastableFrom(value.type())) {
             value
         } else if (isNullable) {
             NullValue

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New enum entry `Comment` to the enum class `TokenType`
 - Error message of `TypeMismatchException` now include type arguments
+- Type arguments are now erased when evaluating the `as` operator, assignment type check and return value type check
 
 ### Fixed
 

@@ -283,4 +283,22 @@ class FunctionTest {
         assertEquals(1, symbolTable.propertyValues.size)
         assertEquals(443, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
     }
+
+    @Test
+    fun returnTypeCheckSkipTypeArguments() {
+        val interpreter = interpreter("""
+            open class A
+            open class B(val value: Int) : A()
+            class Container<T>(val delegation: T)
+            fun f(): Container<B> {
+                return Container<A>(B(100)) as Container<B>
+            }
+            val x = f().delegation.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals(100, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }

@@ -138,4 +138,22 @@ class AsOperatorTest {
         assertEquals("abc", (symbolTable.findPropertyByDeclaredName("y") as StringValue).value)
         assertEquals(168, (symbolTable.findPropertyByDeclaredName("z") as IntValue).value)
     }
+
+    @Test
+    fun asOperatorGenericTypeCastToAnyTypeArgument() {
+        val interpreter = interpreter("""
+            open class A
+            open class B(val value: Int) : A()
+            class Container<T>(val delegation: T)
+            val o = Container<A>(B(100))
+            val cast1: Container<A> = o as Container<A>
+            val cast2: Container<B> = o as Container<B>
+            val x = cast2.delegation.value
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(4, symbolTable.propertyValues.size)
+        assertEquals(100, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
 }

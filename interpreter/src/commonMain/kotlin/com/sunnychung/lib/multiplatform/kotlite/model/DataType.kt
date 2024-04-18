@@ -47,6 +47,16 @@ sealed interface DataType {
         return other.isConvertibleFrom(this)
     }
 
+    /**
+     * Check a type is convertible from another type but ignore type arguments.
+     *
+     * List<Any>.isCastableFrom(List<Int>) = true
+     * List<Int>.isCastableFrom(List<Any>) = true
+     */
+    fun isCastableFrom(other: DataType): Boolean {
+        return this.isConvertibleFrom(other)
+    }
+
     fun copyOf(isNullable: Boolean): DataType
 
     fun toTypeNode(isResolveTypeArguments: Boolean = true) = TypeNode(SourcePosition.NONE, name, null, isNullable)
@@ -207,15 +217,12 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 //                (isNullable || !other.isNullable)
     }
 
-    // e.g. open class A; class B : A()
-    // A.isConvertibleFrom(B) = true
-    // B.isConvertibleFrom(A) = false
-    override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
-        if (other is NothingType && isNullable) return true
-        if (other is RepeatedType) return other.actualType == null || this.isConvertibleFrom(other.actualType!!, isResolveTypeArguments = false) // this is the key
-        if (other is TypeParameterType) return this.isConvertibleFrom(other.upperBound)
-        if (other !is ObjectType) return false
-        if (other.isNullable && !isNullable) return false
+    private fun checkCastAndFindSuperType(other: DataType): Pair<Boolean, ObjectType?> {
+        if (other is NothingType && isNullable) return true to null
+        if (other is RepeatedType) return (other.actualType == null || this.isConvertibleFrom(other.actualType!!, isResolveTypeArguments = false)) to null // this is the key
+        if (other is TypeParameterType) return this.isConvertibleFrom(other.upperBound) to null
+        if (other !is ObjectType) return false to null
+        if (other.isNullable && !isNullable) return false to null
 //        var otherClazz = other.clazz
 //        var upwardOffset = 0
 //        while (otherClazz.fullQualifiedName != clazz.fullQualifiedName && otherClazz.superClass != null) {
@@ -243,16 +250,31 @@ open class ObjectType(val clazz: ClassDefinition, val arguments: List<DataType>,
 //            otherType = otherType.superType!!
 //        }
         if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) {
-            otherType = otherType.findSuperType(clazz.fullQualifiedName.removeSuffix("?")) ?: return false
+            otherType = otherType.findSuperType(clazz.fullQualifiedName.removeSuffix("?")) ?: return false to null
         }
-        if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) return false
+        if (otherType.clazz.fullQualifiedName.removeSuffix("?") != clazz.fullQualifiedName.removeSuffix("?")) return false to null
         if (otherType.arguments.size != arguments.size) throw RuntimeException("runtime type argument mismatch")
+
+        return true to otherType
+    }
+
+    // e.g. open class A; class B : A()
+    // A.isConvertibleFrom(B) = true
+    // B.isConvertibleFrom(A) = false
+    override fun isConvertibleFrom(other: DataType, isResolveTypeArguments: Boolean): Boolean {
+        val (isCastable, otherType) = checkCastAndFindSuperType(other)
+        if (!isCastable) return false
+
         if (!isResolveTypeArguments) {
             return true
         }
-        return arguments.withIndex().all {
+        return otherType == null || arguments.withIndex().all {
             it.value.isConvertibleFrom(otherType.arguments[it.index])
         }
+    }
+
+    override fun isCastableFrom(other: DataType): Boolean {
+        return checkCastAndFindSuperType(other).first
     }
 
 

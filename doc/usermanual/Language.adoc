@@ -63,14 +63,7 @@ Kotlin does not check.
 |
 
 |Type Casts (as, as?)
-|.✓ (with difference)
-[%collapsible]
-====
-Besides the root type, Kotlite checks whether all the type arguments are assignable to the subject's one as well.
-
-Kotlin does not check.
-====
-|
+|.✓|
 
 |In operators (in, !in)|✓|
 |To operator (`to`)|✓|
@@ -257,7 +250,7 @@ enum class Enum2 {
 ====
 In Kotlin, type argument is not preserved.
 
-In Kotlite, type argument is erased to its concrete upper bound only when resolving function calls in the semantic analysis stage. It is preserved in runtime.
+In Kotlite, it is behaved as if type argument is erased, but it is preserved in runtime.
 ====
 |
 
