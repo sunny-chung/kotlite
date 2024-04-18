@@ -23,7 +23,7 @@ class UuidLibTest {
         }
         val interpreter = interpreter("""
             val uuids = mutableSetOf<String>()
-            repeat(20) {
+            repeat(1000) {
                 uuids += uuid4().toString()
             }
             val n = uuids.size
@@ -31,7 +31,7 @@ class UuidLibTest {
         """.trimIndent(), executionEnvironment = env)
         interpreter.eval()
         val symbolTable = interpreter.symbolTable()
-        assertEquals(20, (symbolTable.findPropertyByDeclaredName("n") as IntValue).value)
+        assertEquals(1000, (symbolTable.findPropertyByDeclaredName("n") as IntValue).value)
         assertEquals(36, (symbolTable.findPropertyByDeclaredName("f") as StringValue).value.length)
         assertTrue("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".toRegex()
             .matches((symbolTable.findPropertyByDeclaredName("f") as StringValue).value))
@@ -48,7 +48,7 @@ class UuidLibTest {
         }
         val interpreter = interpreter("""
             val uuids = mutableSetOf<String>()
-            repeat(20) {
+            repeat(1000) {
                 uuids += uuidString()
             }
             val n = uuids.size
@@ -56,7 +56,7 @@ class UuidLibTest {
         """.trimIndent(), executionEnvironment = env)
         interpreter.eval()
         val symbolTable = interpreter.symbolTable()
-        assertEquals(20, (symbolTable.findPropertyByDeclaredName("n") as IntValue).value)
+        assertEquals(1000, (symbolTable.findPropertyByDeclaredName("n") as IntValue).value)
         assertEquals(36, (symbolTable.findPropertyByDeclaredName("f") as StringValue).value.length)
         assertTrue("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".toRegex()
             .matches((symbolTable.findPropertyByDeclaredName("f") as StringValue).value))
