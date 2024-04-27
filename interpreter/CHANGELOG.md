@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.1.0] - 2024-04-27
+
 ### Added
 
 - `AnyType` property to `SymbolTable` for API consistence
