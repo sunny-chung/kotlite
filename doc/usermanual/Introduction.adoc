@@ -1,6 +1,6 @@
 = Introduction
 
-*Kotlite* is an open-sourced type-safe programming language that has a rich subset of the https://kotlinlang.org/[Kotlin] script language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
+*Kotlite* is an open-sourced type-safe programming language that has a rich subset of the https://kotlinlang.org/docs/custom-script-deps-tutorial.html[script] variant of the https://kotlinlang.org/[Kotlin] programming language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
 
 *Kotlite Interpreter* is a lightweight Kotlin Multiplatform library to interpret and execute codes written in Kotlite, and bridge the host runtime environment and the embedded runtime environment.
 

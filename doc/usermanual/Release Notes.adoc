@@ -1,0 +1,5 @@
+= Release Notes
+
+* https://github.com/sunny-chung/kotlite/blob/main/interpreter/CHANGELOG.md[Interpreter]
+* https://github.com/sunny-chung/kotlite/blob/main/stdlib/CHANGELOG.md[Standard Libraries]
+* https://github.com/sunny-chung/kotlite/blob/main/stdlib-processor-gradle-plugin/CHANGELOG.md[Library Preprocessor Plugin]

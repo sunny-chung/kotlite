@@ -13,6 +13,8 @@ include::Introduction.adoc[]
 
 include::Demo.adoc[]
 
+include::Release Notes.adoc[]
+
 include::Feature Requests or Reporting Issues.adoc[]
 
 = The Kotlite Interpreter

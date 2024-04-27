@@ -11,7 +11,7 @@ _A lite embedded Kotlin interpreter_
 ![tvOS](https://img.shields.io/badge/tvOS-blue)
 ![Verification Test Status](https://github.com/sunny-chung/kotlite/actions/workflows/run-test.yaml/badge.svg?branch=main)
 
-**Kotlite** is an open-sourced type-safe programming language that has a rich subset of the [Kotlin](https://kotlinlang.org/) script language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
+**Kotlite** is an open-sourced type-safe programming language that has a rich subset of the [script](https://kotlinlang.org/docs/custom-script-deps-tutorial.html) variant of the [Kotlin](https://kotlinlang.org/) programming language. It comes with standard libraries, which are a subset of Kotlin Multiplatform/Common standard libraries and a few third-party libraries.
 
 **Kotlite Interpreter** is a lightweight Kotlin Multiplatform library to interpret and execute codes written in Kotlite, and bridge the host runtime environment and the embedded runtime environment.
 
@@ -20,6 +20,8 @@ Kotlite Interpreter ![Kotlite Interpreter](https://img.shields.io/maven-central/
 Kotlite Stdlib ![Kotlite Stdlib](https://img.shields.io/maven-central/v/io.github.sunny-chung/kotlite-stdlib)
 
 Kotlite Library Preprocessor ![Kotlite Library Preprocessor](https://img.shields.io/maven-central/v/io.github.sunny-chung/kotlite-stdlib-processor-plugin)
+
+[Release Notes](CHANGELOG.md)
 
 ## TL;DR
 
