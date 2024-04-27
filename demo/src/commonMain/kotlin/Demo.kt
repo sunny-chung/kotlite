@@ -15,11 +15,33 @@ fun interpretKotlite(code: String): String {
     return stdout.toString()
 }
 
-val demoScripts = mapOf(
+val demoScripts = linkedMapOf(
     "Hello World" to """
         println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset()}")
         println()
         println("Hello World!")
+    """.trimIndent(),
+
+    "Factorial" to """
+        fun printFactorial(n: Int) {
+            if (n < 0) {
+                throw Exception("`n` cannot be negative")
+            } else if (n == 0) {
+                println("0! = 1")
+                return
+            }
+            println("${'$'}{
+                (1..n).joinToString(" * ")
+            } = ${'$'}{
+                (1..n).fold(1L) { acc, it ->
+                    acc * it
+                }
+            }")
+        }
+        
+        println("Execute at: ${'$'}{KZonedInstant.nowAtLocalZoneOffset()}")
+        println()
+        printFactorial(9)
     """.trimIndent(),
 
     "Fibonacci Sequence" to """
@@ -89,4 +111,12 @@ val demoScripts = mapOf(
         println("f = ${'$'}f")
         println("g = ${'$'}g")
     """.trimIndent(),
-)
+
+    "Kotlin and Kotlite are Type Safe" to """
+        var x = 123  // Type of `x` is Int
+        
+        x = "abc"  // String is not assignable to an Int field, compile fail!
+        
+        println("x = ${'$'}x")  // won't execute
+    """.trimIndent()
+).mapValues { it.value + "\n" }
