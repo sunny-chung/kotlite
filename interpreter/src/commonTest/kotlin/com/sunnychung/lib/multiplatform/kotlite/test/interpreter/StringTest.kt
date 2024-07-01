@@ -219,6 +219,22 @@ class StringTest {
     }
 
     @Test
+    fun specialCharStrings() {
+        val interpreter = interpreter("""
+            val aa: String = "|"
+            val bb: String = "?:"
+            val s: String = "" + aa + bb + aa
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(3, symbolTable.propertyValues.size)
+        assertEquals("|", (symbolTable.findPropertyByDeclaredName("aa") as StringValue).value)
+        assertEquals("?:", (symbolTable.findPropertyByDeclaredName("bb") as StringValue).value)
+        assertEquals("|?:|", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
+    }
+
+    @Test
     fun multilineStringLiteral() {
         val interpreter = interpreter("""
             val s: String = ${"\"\"\""}

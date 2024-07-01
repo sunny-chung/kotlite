@@ -19,7 +19,7 @@ open class Lexer(val filename: String, val code: String, val isParseComment: Boo
     private var lineNum = 1
     private var col = 1
     private var locationHistory = mutableListOf(SourcePosition(filename, 1, 1, 0)) // TODO optimize
-    private var mode = mutableListOf(Mode.Main)
+    val mode = mutableListOf(Mode.Main)
 
     fun switchToMode(mode: Mode) {
         this.mode += mode

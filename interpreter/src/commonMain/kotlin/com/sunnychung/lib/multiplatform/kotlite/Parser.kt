@@ -177,7 +177,7 @@ open class Parser(protected val lexer: Lexer) {
                     TokenType.Symbol,
                     "@"
                 ) && areTokensConsecutive(t, next1) && !areTokensConsecutive(next1, next2)
-            } catch (_: IndexOutOfBoundsException) {
+            } catch (_: Throwable) {
                 false
             }
         }
@@ -258,20 +258,24 @@ open class Parser(protected val lexer: Lexer) {
 
     fun <T> tryParse(operation: () -> T): T? {
         val originalIndex = tokenIndex
+        val modeStackLastIndex = lexer.mode.lastIndex
         return try {
             operation()
         } catch (_: ParseException) {
             resetTokenToIndex(originalIndex)
+            lexer.mode.removeAfterIndex(modeStackLastIndex)
             null
         }
     }
 
     fun <T> parseAndRollback(operation: () -> T): T {
         val originalIndex = tokenIndex
+        val modeStackLastIndex = lexer.mode.lastIndex
         return try {
             operation()
         } finally {
             resetTokenToIndex(originalIndex)
+            lexer.mode.removeAfterIndex(modeStackLastIndex)
         }
     }
 
@@ -735,6 +739,7 @@ open class Parser(protected val lexer: Lexer) {
         repeatedNL()
 
         val originalIndex = tokenIndex
+        val modeStackLastIndex = lexer.mode.lastIndex
         try {
             var hasEatenComma = false
             while (!isCurrentTokenExcludingNL(TokenType.Symbol, "->")) {
@@ -761,6 +766,7 @@ open class Parser(protected val lexer: Lexer) {
             repeatedNL()
         } catch (_: ParseException) {
             resetTokenToIndex(originalIndex)
+            lexer.mode.removeAfterIndex(modeStackLastIndex)
             parameters.clear()
         }
 
