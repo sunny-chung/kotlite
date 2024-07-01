@@ -25,3 +25,13 @@ jobs:
           distribution: 'corretto'
           java-version: '21'
       - run: ./gradlew check -PCICD=GitHubActions # the "clean" task would fail on GitHub Actions: https://github.com/sunny-chung/kdatetime-multiplatform/actions/runs/8213856523/job/22465724399
+      - uses: actions/upload-artifact@v3
+        with:
+          name: test-result_${{ matrix.os }}_interpreter
+          path: interpreter/build/reports/tests
+        if: ${{ !cancelled() }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: test-result_${{ matrix.os }}_stdlib
+          path: stdlib/build/reports/tests
+        if: ${{ !cancelled() }}
