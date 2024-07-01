@@ -66,7 +66,7 @@ The interpreter is well tested.
 
 [Web - Kotlite Interpreter in browser](https://sunny-chung.github.io/kotlite/demo/)
 
-https://github.com/sunny-chung/kotlite/assets/14835950/bf74ce30-99aa-4ff1-bdde-1a95a2fbacc8
+https://github.com/sunny-chung/kotlite/assets/14835950/464ddb68-5623-463e-89cb-5b34a4bebf41
 
 https://github.com/sunny-chung/kotlite/assets/14835950/417143fa-6240-40cf-ba5f-8e40e97a4243
 
