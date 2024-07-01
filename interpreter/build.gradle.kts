@@ -3,7 +3,7 @@ plugins {
     id("sunnychung.publication")
 }
 
-version = "1.1.0"
+version = "1.1.1-0-SNAPSHOT"
 
 repositories {
     mavenCentral()
