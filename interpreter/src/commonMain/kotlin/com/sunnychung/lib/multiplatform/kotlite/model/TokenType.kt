@@ -14,4 +14,5 @@ enum class TokenType {
     Semicolon,
     Comment,
     EOF,
+    Unknown,
 }

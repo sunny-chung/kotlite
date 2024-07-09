@@ -2,6 +2,7 @@ import com.sunnychung.lib.multiplatform.kotlite.model.BooleanValue
 import com.sunnychung.lib.multiplatform.kotlite.model.ExecutionEnvironment
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
 import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
+import com.sunnychung.lib.multiplatform.kotlite.stdlib.CollectionsLibModule
 import com.sunnychung.lib.multiplatform.kotlite.stdlib.TextLibModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -118,5 +119,21 @@ class StringLibTest {
         interpreter.eval()
         val symbolTable = interpreter.symbolTable()
         assertEquals(6, (symbolTable.findPropertyByDeclaredName("b") as IntValue).value)
+    }
+
+    @Test
+    fun joinToString() {
+        val env = ExecutionEnvironment().apply {
+            install(CollectionsLibModule())
+            install(TextLibModule())
+        }
+        val interpreter = interpreter("""
+            val a = listOf("aBc", "de", "Fghi")
+            val s = a
+                .joinToString("|") { it }
+        """.trimIndent(), executionEnvironment = env)
+        interpreter.eval()
+        val symbolTable = interpreter.symbolTable()
+        assertEquals("aBc|de|Fghi", (symbolTable.findPropertyByDeclaredName("s") as StringValue).value)
     }
 }

@@ -109,7 +109,11 @@ open class Parser(protected val lexer: Lexer) {
 
     private fun peekNextToken(): Token {
         val originalTokenIndex = tokenIndex
-        val t = readToken()
+        val t = try {
+            readToken()
+        } catch (e: Throwable) {
+            Token(TokenType.Unknown, "", lexer.makeSourcePosition())
+        }
         resetTokenToIndex(originalTokenIndex)
         return t
     }

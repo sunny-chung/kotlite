@@ -1,6 +1,7 @@
 package com.sunnychung.lib.multiplatform.kotlite.test.interpreter
 
 import com.sunnychung.lib.multiplatform.kotlite.model.IntValue
+import com.sunnychung.lib.multiplatform.kotlite.model.StringValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -52,6 +53,21 @@ class FunctionTest {
         println(symbolTable.propertyValues)
         assertEquals(1, symbolTable.propertyValues.size)
         assertEquals(15, (symbolTable.findPropertyByDeclaredName("x") as IntValue).value)
+    }
+
+    @Test
+    fun simpleFunctionWithSpecialCharArgument() {
+        val interpreter = interpreter("""
+            fun myFunction(s: String): String {
+                return s
+            }
+            val x: String = myFunction("|")
+        """.trimIndent())
+        interpreter.eval()
+        val symbolTable = interpreter.callStack.currentSymbolTable()
+        println(symbolTable.propertyValues)
+        assertEquals(1, symbolTable.propertyValues.size)
+        assertEquals("|", (symbolTable.findPropertyByDeclaredName("x") as StringValue).value)
     }
 
     @Test
