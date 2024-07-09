@@ -36,7 +36,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("io.github.sunny-chung:kotlite-interpreter:1.1.0")
+                implementation("io.github.sunny-chung:kotlite-interpreter:1.1.1")
                 implementation("io.github.sunny-chung:kotlite-stdlib:1.1.0")
             }
         }
