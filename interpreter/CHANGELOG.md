@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Nothing yet.
 
+## [1.1.1] - 2024-07-09
+
 ### Fixed
 
 - Parsing code consisting of the String literal `"|"` should not throw UnsupportedOperationException: "Operator `|` is not supported"
